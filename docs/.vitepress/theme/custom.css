@@ -1,0 +1,82 @@
+/*
+ * Loica brand colors
+ * Brown: #3B2314 (from logo text + bird body)
+ * Red:   #ED1C24 (from logo bird chest)
+ */
+
+:root {
+  /* Brand red as primary */
+  --vp-c-brand-1: #d41920;
+  --vp-c-brand-2: #ed1c24;
+  --vp-c-brand-3: #f04048;
+  --vp-c-brand-soft: rgba(237, 28, 36, 0.12);
+
+  /* Hero name gradient */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #3B2314 30%, #ED1C24 100%);
+
+  /* Hero image glow */
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(237, 28, 36, 0.25) 0%, rgba(59, 35, 20, 0.15) 100%);
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+.dark {
+  --vp-c-brand-1: #f04048;
+  --vp-c-brand-2: #ed1c24;
+  --vp-c-brand-3: #d41920;
+  --vp-c-brand-soft: rgba(237, 28, 36, 0.16);
+
+  --vp-home-hero-name-background: linear-gradient(135deg, #f5f5f5 30%, #f04048 100%);
+
+  --vp-home-hero-image-background-image: linear-gradient(135deg, rgba(237, 28, 36, 0.2) 0%, rgba(59, 35, 20, 0.3) 100%);
+}
+
+/* Button overrides for the brand color */
+:root {
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-bg: #d41920;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-hover-bg: #b8151b;
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: #fff;
+  --vp-button-brand-active-bg: #a01218;
+}
+
+/* Feature card icons — warm brown accent */
+.VPFeature .icon {
+  color: #3B2314;
+}
+
+.dark .VPFeature .icon {
+  color: #f04048;
+}
+
+/* Hero image sizing */
+.VPHero .image-container .image-bg {
+  opacity: 0.8;
+}
+
+.VPHero .VPImage {
+  max-width: 220px;
+  max-height: 220px;
+}
+
+@media (min-width: 960px) {
+  .VPHero .VPImage {
+    max-width: 280px;
+    max-height: 280px;
+  }
+}
+
+/* Navbar logo sizing */
+.VPNavBarTitle img {
+  height: 28px;
+  width: auto;
+}
+
+/* Sidebar active item uses brand color */
+.VPSidebar .is-active > .indicator {
+  background-color: var(--vp-c-brand-1);
+}
