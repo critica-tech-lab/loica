@@ -21,6 +21,26 @@ export default defineConfig({
   // Vite doesn't discover them on first /w visit and force a full client
   // reload mid-navigation — which cancels in-flight fetcher loads and
   // surfaces as a "JSON.parse: unexpected end of data" error boundary.
+  resolve: {
+    // @manuscripts/transform bundles its own prosemirror copies.
+    // Force a single instance of each PM package to prevent
+    // "Duplicate use of selection JSON ID" runtime errors.
+    dedupe: [
+      "prosemirror-state",
+      "prosemirror-view",
+      "prosemirror-model",
+      "prosemirror-transform",
+      "prosemirror-tables",
+      "prosemirror-schema-basic",
+      "prosemirror-schema-list",
+      "prosemirror-commands",
+      "prosemirror-history",
+      "prosemirror-keymap",
+      "prosemirror-inputrules",
+      "prosemirror-gapcursor",
+      "prosemirror-dropcursor",
+    ],
+  },
   optimizeDeps: {
     exclude: ["better-sqlite3", "@node-rs/argon2"],
     // zod is server-only but Vite's scanner sees it imported by .server.ts
@@ -50,6 +70,7 @@ export default defineConfig({
       "prosemirror-docx", "docx",
       "y-prosemirror",
       "orderedmap",
+      "@manuscripts/track-changes-plugin", "@manuscripts/transform",
     ],
     // Eagerly scan the doc-editor entry so any *further* transitive deps are
     // discovered up-front rather than during a navigation. The workspace and
@@ -89,6 +110,8 @@ export default defineConfig({
       "prosemirror-trailing-node",
       "prosemirror-resizable-view",
       "orderedmap",
+      "@manuscripts/track-changes-plugin",
+      "@manuscripts/transform",
     ],
   },
 });
