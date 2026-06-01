@@ -204,7 +204,6 @@ function ThreadCard({
   onMention?: (body: string) => void;
 }) {
   const [replyText, setReplyText] = useState("");
-  const [showReplies, setShowReplies] = useState(false);
   const [animating, setAnimating] = useState(false);
   const newCommentRef = useRef<HTMLTextAreaElement>(null);
   const [newCommentText, setNewCommentText] = useState("");
@@ -324,47 +323,25 @@ function ThreadCard({
           />
 
           {/* Replies */}
-          <div style={{ marginTop: "0.45rem" }}>
-            {thread.replies.length > 0 ? (
-              <>
-                <button
-                  onClick={() => setShowReplies(v => !v)}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: "0.72rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)",
-                    padding: "0.15rem 0", fontFamily: "var(--font-ui)",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = "var(--accent)")}
-                  onMouseLeave={e => (e.currentTarget.style.color = "color-mix(in srgb, var(--fg) 45%, transparent)")}
-                >
-                  {thread.replies.length} {thread.replies.length === 1 ? "reply" : "replies"}
-                </button>
-                {showReplies && (
-                  <div style={{ marginTop: "0.4rem", paddingLeft: "0.75rem", borderLeft: "2px solid color-mix(in srgb, var(--fg) 10%, transparent)" }}>
-                    {thread.replies.map(reply => (
-                      <div key={reply.id} style={{ marginBottom: "0.5rem" }}>
-                        <CommentBody
-                          commentId={reply.id}
-                          userName={reply.userName}
-                          body={reply.body}
-                          createdAt={reply.createdAt}
-                          isOwn={currentUserId === reply.userId}
-                          readOnly={readOnly}
-                          onEdit={onEditComment}
-                          onDelete={onDeleteComment}
-                          onMention={onMention}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <span style={{ fontSize: "0.72rem", color: "color-mix(in srgb, var(--fg) 28%, transparent)" }}>
-                0 replies
-              </span>
-            )}
-          </div>
+          {thread.replies.length > 0 && (
+            <div style={{ marginTop: "0.4rem", paddingLeft: "0.75rem", borderLeft: "2px solid color-mix(in srgb, var(--fg) 10%, transparent)" }}>
+              {thread.replies.map(reply => (
+                <div key={reply.id} style={{ marginBottom: "0.5rem" }}>
+                  <CommentBody
+                    commentId={reply.id}
+                    userName={reply.userName}
+                    body={reply.body}
+                    createdAt={reply.createdAt}
+                    isOwn={currentUserId === reply.userId}
+                    readOnly={readOnly}
+                    onEdit={onEditComment}
+                    onDelete={onDeleteComment}
+                    onMention={onMention}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Reply input */}
           {!readOnly && !thread.resolved && (
