@@ -259,7 +259,6 @@ export function DocEditorView(_props: DocumentProps) {
             focusedCommentId={focusedCommentId}
             onThreadsChange={setComments}
             onThreadClick={(thread) => {
-              setActivePanel("comments");
               setFocusedCommentId(thread.id);
               setFocusedSuggestionId(null);
               selectionFocusedIdRef.current = null;
