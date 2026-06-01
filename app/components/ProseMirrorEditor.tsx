@@ -252,10 +252,6 @@ export function ProseMirrorEditor({
             }
             return false;
           },
-          blur: () => {
-            onSelectionChangeRef.current?.(null);
-            return false;
-          },
         },
         dispatchTransaction(tr: any) {
           if (!view) return;
@@ -597,6 +593,11 @@ export function ProseMirrorEditor({
         overflow: "auto",
         display: "flex",
         flexDirection: "column",
+      }}
+      onBlur={(e) => {
+        if (!mountRef.current?.contains(e.relatedTarget as Node)) {
+          onSelectionChangeRef.current?.(null);
+        }
       }}
     />
   );
