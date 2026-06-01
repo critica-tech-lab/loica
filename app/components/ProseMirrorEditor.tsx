@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { Peer } from "~/components/Editor";
-import type { PMActiveState, TrackChangesActiveState } from "./editor/types";
+import type { PMActiveState, TrackChangesActiveState, TrackedChangeEntry } from "./editor/types";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
 
@@ -283,9 +283,19 @@ export function ProseMirrorEditor({
           if (onTrackChangesStateChangeRef.current) {
             const tcState = trackChangesPluginKey.getState(view.state);
             if (tcState) {
+              const pending = tcState.changeSet.pending;
+              const changes: TrackedChangeEntry[] = pending.map((c: any) => {
+                const op = c.dataTracked?.operation ?? "";
+                const type: TrackedChangeEntry["type"] =
+                  op === "insert" ? "insert" : op === "delete" ? "delete" : "other";
+                const text = c.type === "text-change" ? (c.text ?? "") :
+                  c.type === "node-change" ? (c.node?.textContent ?? "") : "";
+                return { id: c.id, type, text, authorId: c.dataTracked?.authorID ?? "" };
+              });
               onTrackChangesStateChangeRef.current({
                 enabled: tcState.status === TrackChangesStatus.enabled,
-                pendingCount: tcState.changeSet.pending.length,
+                pendingCount: pending.length,
+                changes,
               });
             }
           }
@@ -544,6 +554,16 @@ export function ProseMirrorEditor({
           if (!tcState || !tcState.changeSet.pending.length) return;
           const ids = tcState.changeSet.pending.map((c: any) => c.id);
           trackCommands.setChangeStatuses(CHANGE_STATUS.rejected, ids)(view.state, view.dispatch);
+          view.focus();
+        },
+
+        acceptChangeById: (id: string) => {
+          trackCommands.setChangeStatuses(CHANGE_STATUS.accepted, [id])(view.state, view.dispatch);
+          view.focus();
+        },
+
+        rejectChangeById: (id: string) => {
+          trackCommands.setChangeStatuses(CHANGE_STATUS.rejected, [id])(view.state, view.dispatch);
           view.focus();
         },
 

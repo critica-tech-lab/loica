@@ -76,6 +76,8 @@ export interface EditorApi {
   toggleTrackChanges?: () => void;
   acceptAllChanges?: () => void;
   rejectAllChanges?: () => void;
+  acceptChangeById?: (id: string) => void;
+  rejectChangeById?: (id: string) => void;
 }
 
 export interface DocumentContextValue {
@@ -108,6 +110,8 @@ export interface DocumentContextValue {
   // Comments
   comments: ResolvedThread[];
   setComments: (threads: ResolvedThread[]) => void;
+  trackChangesState: import("~/components/editor/types").TrackChangesActiveState | null;
+  setTrackChangesState: (s: import("~/components/editor/types").TrackChangesActiveState | null) => void;
   activePanel: PanelId | null;
   setActivePanel: (panel: PanelId | null) => void;
   focusedCommentId: string | null;
@@ -264,6 +268,7 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const [editorKey, setEditorKey] = useState(0);
   const [editorReady, setEditorReady] = useState(false);
   const [comments, setComments] = useState<ResolvedThread[]>([]);
+  const [trackChangesState, setTrackChangesState] = useState<import("~/components/editor/types").TrackChangesActiveState | null>(null);
   const [activePanel, setActivePanel] = useState<PanelId | null>(null);
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
@@ -563,6 +568,8 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
     comments,
     setComments,
+    trackChangesState,
+    setTrackChangesState,
     activePanel,
     setActivePanel,
     focusedCommentId,

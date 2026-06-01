@@ -1,7 +1,7 @@
 import { CommentIcon, ClockIcon, ShareIcon, DocIcon } from "./icons";
 import { useDocument } from "~/lib/DocumentContext";
 
-export type PanelId = "comments" | "history" | "share" | "info";
+export type PanelId = "comments" | "history" | "share" | "info" | "changes";
 
 const items: { id: PanelId; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; label: string }[] = [
   { id: "comments", icon: CommentIcon, label: "Comments" },

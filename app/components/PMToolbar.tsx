@@ -6,9 +6,10 @@ interface Props {
   trackChangesState?: TrackChangesActiveState | null;
   onLink?: () => void;
   onImageUpload?: (file: File) => void;
+  onOpenChangesPanel?: () => void;
 }
 
-export function PMToolbar({ activeState, trackChangesState, onLink, onImageUpload }: Props) {
+export function PMToolbar({ activeState, trackChangesState, onLink, onImageUpload, onOpenChangesPanel }: Props) {
   const ctx = useOptionalDocument();
   const api = ctx?.editorApi.current;
   const canEdit = ctx?.canEdit ?? false;
@@ -162,12 +163,20 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
       {trackChangesState?.enabled && trackChangesState.pendingCount > 0 && (
         <>
           <Btn
+            title={`Review ${trackChangesState.pendingCount} pending change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
+            active={false}
+            onActivate={run(() => onOpenChangesPanel?.())}
+            style={{ fontSize: "0.72rem", fontWeight: 600 }}
+          >
+            Review ({trackChangesState.pendingCount})
+          </Btn>
+          <Btn
             title={`Accept all ${trackChangesState.pendingCount} change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
             active={false}
             onActivate={run(() => api?.acceptAllChanges?.())}
             style={{ color: "#16a34a", fontSize: "0.72rem", fontWeight: 600 }}
           >
-            Accept all
+            ✓ All
           </Btn>
           <Btn
             title={`Reject all ${trackChangesState.pendingCount} change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
@@ -175,7 +184,7 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
             onActivate={run(() => api?.rejectAllChanges?.())}
             style={{ color: "#dc2626", fontSize: "0.72rem", fontWeight: 600 }}
           >
-            Reject all
+            ✗ All
           </Btn>
         </>
       )}

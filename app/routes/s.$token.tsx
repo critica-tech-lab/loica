@@ -9,7 +9,7 @@ import { useDocTypeExtension } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
 import { PMToolbar } from "~/components/PMToolbar";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
-import type { PMActiveState } from "~/components/editor/types";
+import type { PMActiveState, TrackChangesActiveState } from "~/components/editor/types";
 import { LinkModal } from "~/components/LinkModal";
 
 const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
@@ -490,6 +490,7 @@ function EditableView({
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [trackChangesState, setTrackChangesState] = useState<TrackChangesActiveState | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [selectionBubble, setSelectionBubble] = useState<{ top: number; left: number } | null>(null);
   const [linkModal, setLinkModal] = useState<
@@ -529,7 +530,7 @@ function EditableView({
     <>
       {!ExtensionEditor && (
         USE_PM
-          ? <PMToolbar activeState={pmActiveState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
+          ? <PMToolbar activeState={pmActiveState} trackChangesState={trackChangesState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
           : <Toolbar
               onFormat={(b, a) => editorApi.current?.format(b, a)}
               onFormatLine={(p) => editorApi.current?.formatLine(p)}
@@ -587,6 +588,7 @@ function EditableView({
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
             onChange={(val) => { setContent(val); scheduleSave(val); }}
             onStateChange={setPmActiveState}
+            onTrackChangesStateChange={setTrackChangesState}
             onThreadsChange={setThreads}
             onThreadClick={(thread) => {
               setShowComments(true);

@@ -10,7 +10,15 @@ export interface PMActiveState {
   inOrderedList: boolean;
 }
 
+export interface TrackedChangeEntry {
+  id: string;
+  type: "insert" | "delete" | "other";
+  text: string;
+  authorId: string;
+}
+
 export interface TrackChangesActiveState {
   enabled: boolean;
   pendingCount: number;
+  changes: TrackedChangeEntry[];
 }
