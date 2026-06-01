@@ -27,11 +27,7 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
 
   const imgUpload = onImageUpload ?? (canEdit ? (file: File) => api?.uploadImage?.(file) : undefined);
 
-  const blockType = active?.heading
-    ? `h${active.heading}`
-    : active?.inBlockquote
-    ? "blockquote"
-    : "p";
+  const blockType = active?.heading ? `h${active.heading}` : "p";
 
   return (
     <div
@@ -47,8 +43,7 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
         background: "var(--bg)",
       }}
     >
-      {/* Block type dropdown-style buttons */}
-      <Btn title="Paragraph (Ctrl+Alt+0)" active={blockType === "p"} onActivate={run(() => api?.clearFormatting?.())}>P</Btn>
+      {/* Headings */}
       <Btn title="Heading 1 (Ctrl+Alt+1)" active={blockType === "h1"} style={{ fontWeight: 700, fontSize: "0.95rem" }} onActivate={run(() => api?.setHeading?.(1))}>H1</Btn>
       <Btn title="Heading 2 (Ctrl+Alt+2)" active={blockType === "h2"} style={{ fontWeight: 700, fontSize: "0.88rem" }} onActivate={run(() => api?.setHeading?.(2))}>H2</Btn>
       <Btn title="Heading 3 (Ctrl+Alt+3)" active={blockType === "h3"} style={{ fontWeight: 700, fontSize: "0.8rem" }} onActivate={run(() => api?.setHeading?.(3))}>H3</Btn>
@@ -62,6 +57,10 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
       <Btn title="Underline (Ctrl+U)" active={active?.underline} style={{ textDecoration: "underline", textUnderlineOffset: 2 }} onActivate={fmt("__")}>U</Btn>
       <Btn title="Strikethrough (Ctrl+Shift+X)" active={active?.strikethrough} style={{ textDecoration: "line-through" }} onActivate={fmt("~~")}>S</Btn>
       <Btn title="Inline code (Ctrl+`)" active={active?.code} style={{ fontFamily: "var(--font-mono)", fontSize: "0.85em" }} onActivate={fmt("`")}>{"<>"}</Btn>
+
+      <Sep />
+
+      {/* Highlight + Link */}
       <Btn
         title="Highlight"
         active={false}
@@ -74,15 +73,11 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
           </svg>
         }
       />
-
-      <Sep />
-
-      {/* Link */}
       <Btn title="Link (Ctrl+K)" active={false} onActivate={run(() => onLink?.())} style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>Link</Btn>
 
       <Sep />
 
-      {/* Lists */}
+      {/* Lists + Blockquote */}
       <Btn
         title="Bullet list"
         active={active?.inBulletList}
@@ -109,15 +104,11 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
           </svg>
         }
       />
+      <Btn title="Blockquote" active={active?.inBlockquote} style={{ fontSize: "1rem", fontWeight: 700, opacity: active?.inBlockquote ? 1 : 0.6 }} onActivate={run(() => api?.toggleBlockquote?.())}>&#8220;</Btn>
 
       <Sep />
 
-      {/* Blockquote */}
-      <Btn title="Blockquote" active={active?.inBlockquote} style={{ fontSize: "1rem", fontWeight: 700, opacity: active?.inBlockquote ? 1 : 0.6 }} onActivate={run(() => api?.toggleBlockquote?.())}>{"“”"}</Btn>
-
-      <Sep />
-
-      {/* Table */}
+      {/* Insert: Table, HR, Image */}
       <Btn
         title="Insert table"
         active={false}
@@ -131,33 +122,26 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
           </svg>
         }
       />
-
-      {/* Horizontal rule */}
       <Btn title="Horizontal rule" active={false} onActivate={run(() => api?.insertHr?.())} style={{ letterSpacing: "-1px" }}>{"—"}</Btn>
-
-      {/* Image upload */}
       {imgUpload && (
-        <>
-          <Sep />
-          <Btn
-            title="Upload image"
-            active={false}
-            onActivate={run(() => {
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = "image/png,image/jpeg,image/gif,image/webp,image/svg+xml";
-              input.onchange = () => { const f = input.files?.[0]; if (f) imgUpload(f); };
-              input.click();
-            })}
-            icon={
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            }
-          />
-        </>
+        <Btn
+          title="Upload image"
+          active={false}
+          onActivate={run(() => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/png,image/jpeg,image/gif,image/webp,image/svg+xml";
+            input.onchange = () => { const f = input.files?.[0]; if (f) imgUpload(f); };
+            input.click();
+          })}
+          icon={
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          }
+        />
       )}
     </div>
   );
