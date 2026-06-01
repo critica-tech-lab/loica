@@ -161,7 +161,6 @@ export default function FolderView() {
       workspaceName={workspace.name}
       workspaceId={workspace.id}
       expandAncestors={folderPath.map((seg) => seg.id)}
-      autoCollapse
       lazy
     />
   );

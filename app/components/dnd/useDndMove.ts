@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { useToast } from "~/components/Toast";
 import type { DragItem, DropTarget } from "./DndProvider";
@@ -5,6 +6,15 @@ import type { DragItem, DropTarget } from "./DndProvider";
 export function useDndMove() {
   const fetcher = useFetcher();
   const { toast } = useToast();
+  const prevState = useRef(fetcher.state);
+
+  useEffect(() => {
+    const prev = prevState.current;
+    prevState.current = fetcher.state;
+    if (prev !== "idle" && fetcher.state === "idle") {
+      window.dispatchEvent(new CustomEvent("loica:sidebar-refresh"));
+    }
+  }, [fetcher.state]);
 
   function handleMove(item: DragItem, target: DropTarget) {
     const formData = new FormData();

@@ -16,6 +16,8 @@ export interface FolderTreeNodeProps {
   urlPrefix?: string;
   /** When set, drops onto this folder trigger a cross-workspace move to this workspace. */
   crossWorkspaceId?: string;
+  /** Increment to force a refetch of this node's children. */
+  refreshToken?: number;
 }
 
 interface ChildData {
@@ -42,6 +44,7 @@ export function FolderTreeNode({
   onToggle,
   urlPrefix = "/w",
   crossWorkspaceId,
+  refreshToken,
 }: FolderTreeNodeProps) {
   // Plain `fetch` instead of `useFetcher.load` to avoid RR's fog-of-war
   // manifest discovery, which Vite caches as immutable in dev and stalls
@@ -70,6 +73,16 @@ export function FolderTreeNode({
   useEffect(() => {
     if (isExpanded) loadChildren();
   }, [isExpanded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refetch when a move operation completes
+  useEffect(() => {
+    if (!refreshToken) return;
+    hasFetched.current = false;
+    if (isExpanded) {
+      setChildren(null);
+      loadChildren();
+    }
+  }, [refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleToggle() {
     onToggle(folder.id);
@@ -170,6 +183,7 @@ export function FolderTreeNode({
                   onToggle={onToggle}
                   urlPrefix={urlPrefix}
                   crossWorkspaceId={crossWorkspaceId}
+                  refreshToken={refreshToken}
                 />
               ))}
               {children.docs.map((doc) => (

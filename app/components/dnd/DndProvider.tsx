@@ -114,6 +114,7 @@ export function DndProvider({ onMove, allFolders, children }: DndProviderProps) 
   return (
     <DndStateCtx.Provider value={{ activeItem, allFolders, enabled: true }}>
       <DndContext
+        id="main-dnd"
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
