@@ -40,6 +40,7 @@ export function DocEditorView(_props: DocumentProps) {
     editorReady,
     mounted,
 
+    comments,
     setComments,
     setSuggestions,
     activePanel,
@@ -264,6 +265,11 @@ export function DocEditorView(_props: DocumentProps) {
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
                 setSelectionBubble({ top: sel.top, left: sel.left });
+                const hit = comments.find(
+                  t => !t.resolved && t.from > 0 && t.to > t.from
+                    && sel.from < t.to && sel.to > t.from
+                );
+                if (hit) setFocusedCommentId(hit.id);
               } else {
                 setSelectionBubble(null);
               }
