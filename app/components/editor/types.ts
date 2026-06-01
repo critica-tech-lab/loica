@@ -9,3 +9,8 @@ export interface PMActiveState {
   inBulletList: boolean;
   inOrderedList: boolean;
 }
+
+export interface TrackChangesActiveState {
+  enabled: boolean;
+  pendingCount: number;
+}

@@ -73,6 +73,9 @@ export interface EditorApi {
   toggleOrderedList?: () => void;
   insertTable?: () => void;
   insertHr?: () => void;
+  toggleTrackChanges?: () => void;
+  acceptAllChanges?: () => void;
+  rejectAllChanges?: () => void;
 }
 
 export interface DocumentContextValue {

@@ -61,5 +61,19 @@ export const schema = new Schema({
         return ["mark", { style: `background-color: ${mark.attrs.color}` }, 0] as const;
       },
     },
+    tracked_insert: {
+      attrs: { dataTracked: { default: null } },
+      parseDOM: [{ tag: "ins.tracked-insert" }],
+      toDOM() {
+        return ["ins", { class: "tracked-insert" }, 0] as const;
+      },
+    },
+    tracked_delete: {
+      attrs: { dataTracked: { default: null } },
+      parseDOM: [{ tag: "del.tracked-delete" }],
+      toDOM() {
+        return ["del", { class: "tracked-delete" }, 0] as const;
+      },
+    },
   },
 });

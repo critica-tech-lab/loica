@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { Peer } from "~/components/Editor";
-import type { PMActiveState } from "./editor/types";
+import type { PMActiveState, TrackChangesActiveState } from "./editor/types";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
 
@@ -20,6 +20,7 @@ interface Props {
   ) => void;
   onChange?: (content: string) => void;
   onStateChange?: (state: PMActiveState) => void;
+  onTrackChangesStateChange?: (state: TrackChangesActiveState) => void;
   onThreadsChange?: (threads: ResolvedThread[]) => void;
   onThreadClick?: (thread: ResolvedThread) => void;
   onSelectionChange?: (sel: { from: number; to: number; top: number; left: number } | null) => void;
@@ -63,6 +64,7 @@ export function ProseMirrorEditor({
   onConnectionStatus,
   onChange,
   onStateChange,
+  onTrackChangesStateChange,
   onThreadsChange,
   onThreadClick: _onThreadClick,
   onSelectionChange,
@@ -82,6 +84,8 @@ export function ProseMirrorEditor({
   onThreadClickRef.current = _onThreadClick;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
+  onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -119,6 +123,13 @@ export function ProseMirrorEditor({
       const { addColumnAfter } = await import("prosemirror-tables");
       const { makeImageNodeView } = await import("./editor/image-view");
       const { pmCommentPlugin } = await import("./editor/pm-comments");
+      const {
+        trackChangesPlugin,
+        trackChangesPluginKey,
+        trackCommands,
+        TrackChangesStatus,
+        CHANGE_STATUS,
+      } = await import("@manuscripts/track-changes-plugin");
 
       const [Y, { WebsocketProvider }, {
         ySyncPlugin, yCursorPlugin, yUndoPlugin,
@@ -189,6 +200,13 @@ export function ProseMirrorEditor({
           ySyncPluginKey,
           relativePositionToAbsolutePosition,
         }),
+        ...(readOnlyRef.current ? [] : [
+          trackChangesPlugin({
+            userID: currentUserId ?? "anonymous",
+            initialStatus: TrackChangesStatus.disabled,
+            skipTrsWithMetas: [ySyncPluginKey],
+          }),
+        ]),
       ];
 
       const state = EditorState.create({ schema, plugins });
@@ -261,6 +279,16 @@ export function ProseMirrorEditor({
             onChange?.(view.state.doc.textContent);
           }
           onStateChange?.(computeActiveState(view.state));
+          // Emit track-changes state
+          if (onTrackChangesStateChangeRef.current) {
+            const tcState = trackChangesPluginKey.getState(view.state);
+            if (tcState) {
+              onTrackChangesStateChangeRef.current({
+                enabled: tcState.status === TrackChangesStatus.enabled,
+                pendingCount: tcState.changeSet.pending.length,
+              });
+            }
+          }
           // Emit selection for bubble menu
           const { from, to } = view.state.selection;
           if (onSelectionChangeRef.current) {
@@ -492,6 +520,32 @@ export function ProseMirrorEditor({
         },
 
         focus: () => view.focus(),
+
+        toggleTrackChanges: () => {
+          const tcState = trackChangesPluginKey.getState(view.state);
+          if (!tcState) return;
+          const next = tcState.status === TrackChangesStatus.enabled
+            ? TrackChangesStatus.disabled
+            : TrackChangesStatus.enabled;
+          trackCommands.setTrackingStatus(next)(view.state, view.dispatch);
+          view.focus();
+        },
+
+        acceptAllChanges: () => {
+          const tcState = trackChangesPluginKey.getState(view.state);
+          if (!tcState || !tcState.changeSet.pending.length) return;
+          const ids = tcState.changeSet.pending.map((c: any) => c.id);
+          trackCommands.setChangeStatuses(CHANGE_STATUS.accepted, ids)(view.state, view.dispatch);
+          view.focus();
+        },
+
+        rejectAllChanges: () => {
+          const tcState = trackChangesPluginKey.getState(view.state);
+          if (!tcState || !tcState.changeSet.pending.length) return;
+          const ids = tcState.changeSet.pending.map((c: any) => c.id);
+          trackCommands.setChangeStatuses(CHANGE_STATUS.rejected, ids)(view.state, view.dispatch);
+          view.focus();
+        },
 
         uploadImage: async (file: File) => {
           const { schema: s } = view.state;

@@ -1794,3 +1794,20 @@ html {
 .pm-comment-highlight.pm-comment-focused {
   background-color: rgba(255, 217, 102, 0.85);
 }
+
+/* Track changes: insertions and deletions */
+ins.tracked-insert {
+  text-decoration: none;
+  background-color: rgba(34, 197, 94, 0.18);
+  color: #15803d;
+  border-bottom: 2px solid #16a34a;
+  border-radius: 1px;
+}
+
+del.tracked-delete {
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border-radius: 1px;
+}

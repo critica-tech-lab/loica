@@ -1,7 +1,7 @@
 import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
-import type { PMActiveState } from "~/components/editor/types";
+import type { PMActiveState, TrackChangesActiveState } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
 import type { DocMenuItem } from "~/components/DocMenu";
@@ -71,6 +71,7 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [trackChangesState, setTrackChangesState] = useState<TrackChangesActiveState | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
   }, [setFocusedCommentId]);
@@ -214,7 +215,7 @@ export function DocEditorView(_props: DocumentProps) {
         )}
         {!hasCustomEditor && (
           USE_PM
-            ? <PMToolbar activeState={pmActiveState} onLink={openLinkModal} />
+            ? <PMToolbar activeState={pmActiveState} trackChangesState={trackChangesState} onLink={openLinkModal} />
             : toolbarOpen && <Toolbar variant="pill" onLink={openLinkModal} />
         )}
         {(() => {
@@ -256,6 +257,7 @@ export function DocEditorView(_props: DocumentProps) {
             onConnectionStatus={setConnectionStatus}
             onChange={handleContentChange}
             onStateChange={setPmActiveState}
+            onTrackChangesStateChange={setTrackChangesState}
             focusedCommentId={focusedCommentId}
             onThreadsChange={setComments}
             onThreadClick={(thread) => {
