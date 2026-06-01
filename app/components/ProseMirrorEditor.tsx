@@ -303,12 +303,12 @@ export function ProseMirrorEditor({
             const tcState = trackChangesPluginKey.getState(view.state);
             if (tcState) {
               const pending = tcState.changeSet.pending;
-              const changes: TrackedChangeEntry[] = pending.map((c: any) => {
+              const raw: TrackedChangeEntry[] = pending.map((c: any) => {
                 const op = c.dataTracked?.operation ?? "";
                 const type: TrackedChangeEntry["type"] =
                   op === "insert" ? "insert" : op === "delete" ? "delete" : "other";
-                const text = c.type === "text-change" ? (c.text ?? "") :
-                  c.type === "node-change" ? (c.node?.textContent ?? "") : "";
+                // text-change has .text; node-change / mark-change use node textContent
+                const text = c.text ?? c.node?.textContent ?? c.mark?.attrs?.dataTracked?.text ?? "";
                 return {
                   id: c.id, type, text,
                   authorId: c.dataTracked?.authorID ?? "",
@@ -317,9 +317,27 @@ export function ProseMirrorEditor({
                   to: c.to ?? 0,
                 };
               });
+              // Merge adjacent changes from the same author+type into one panel entry.
+              // The plugin often splits a continuous insertion into multiple segments.
+              const changes: TrackedChangeEntry[] = [];
+              for (const c of raw) {
+                const last = changes[changes.length - 1];
+                if (
+                  last &&
+                  last.type === c.type &&
+                  last.type !== "other" &&
+                  last.authorId === c.authorId &&
+                  c.from <= last.to + 2
+                ) {
+                  last.to = c.to;
+                  last.text = (last.text + c.text).trimStart();
+                } else {
+                  changes.push({ ...c });
+                }
+              }
               onTrackChangesStateChangeRef.current({
                 enabled: tcState.status === TrackChangesStatus.enabled,
-                pendingCount: pending.length,
+                pendingCount: changes.length,
                 changes,
               });
             }
