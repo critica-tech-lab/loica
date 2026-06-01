@@ -243,27 +243,27 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
       <button
         type="button"
         onMouseDown={(e) => { e.preventDefault(); setOpen(v => !v); }}
+        title={meta.label}
         style={{
           display: "inline-flex",
           alignItems: "center",
-          gap: "0.25rem",
-          padding: "0.18rem 0.45rem",
-          border: `1px solid ${meta.color ? meta.color + "50" : "color-mix(in srgb, var(--fg) 14%, transparent)"}`,
-          borderRadius: "6px",
-          background: meta.color ? `color-mix(in srgb, ${meta.color} 10%, transparent)` : "transparent",
-          color: meta.color ?? "var(--fg)",
-          fontSize: "0.75rem",
-          fontWeight: 500,
+          gap: "2px",
+          padding: "0.18rem 0.3rem",
+          border: "none",
+          borderRadius: "5px",
+          background: "transparent",
+          color: meta.color ?? "color-mix(in srgb, var(--fg) 65%, transparent)",
           cursor: "pointer",
           fontFamily: "var(--font-ui)",
-          transition: "background 100ms",
+          transition: "background 100ms, color 100ms",
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 7%, transparent)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ fontSize: "0.8rem" }}>{meta.icon}</span>
-        <span>{meta.label}</span>
-        <span style={{ fontSize: "0.6rem", opacity: 0.6, marginLeft: "1px" }}>▾</span>
+        <span style={{ fontSize: "0.85rem", lineHeight: 1 }}>{meta.icon}</span>
+        <span style={{ fontSize: "0.55rem", opacity: 0.5 }}>▾</span>
       </button>
 
       {open && (
