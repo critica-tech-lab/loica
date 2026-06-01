@@ -80,6 +80,8 @@ export function ProseMirrorEditor({
   onThreadsChangeRef.current = onThreadsChange;
   const onThreadClickRef = useRef(_onThreadClick);
   onThreadClickRef.current = _onThreadClick;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -241,16 +243,16 @@ export function ProseMirrorEditor({
           onStateChange?.(computeActiveState(view.state));
           // Emit selection for bubble menu
           const { from, to } = view.state.selection;
-          if (onSelectionChange) {
+          if (onSelectionChangeRef.current) {
             if (to > from) {
               try {
                 const coords = view.coordsAtPos(from);
-                onSelectionChange({ from, to, top: coords.top, left: coords.left });
+                onSelectionChangeRef.current({ from, to, top: coords.top, left: coords.left });
               } catch {
-                onSelectionChange(null);
+                onSelectionChangeRef.current(null);
               }
             } else {
-              onSelectionChange(null);
+              onSelectionChangeRef.current(null);
             }
           }
         },
