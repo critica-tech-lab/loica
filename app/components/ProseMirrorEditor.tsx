@@ -493,12 +493,6 @@ export function ProseMirrorEditor({
 
         focus: () => view.focus(),
 
-        // Suggestions — phase 3
-        addSuggestion: () => {},
-        acceptSuggestion: () => {},
-        rejectSuggestion: () => {},
-        getSuggestions: () => [],
-
         uploadImage: async (file: File) => {
           const { schema: s } = view.state;
           // Insert placeholder

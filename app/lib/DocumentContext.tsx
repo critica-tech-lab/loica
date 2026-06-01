@@ -4,7 +4,6 @@ import type { BreadcrumbSegment } from "~/lib/folder.server";
 import type { Peer } from "~/components/Editor";
 import type { ConnectionStatus } from "~/components/DocActionBar";
 import type { PanelId } from "~/components/ActivityBar";
-import type { SuggestionEntry } from "~/components/criticmarkup";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { detectLanguage } from "~/components/DocActionBar";
 import { getDocumentType } from "~/lib/templates";
@@ -62,10 +61,6 @@ export interface EditorApi {
   unresolveThread: (threadId: string) => void;
   scrollToPos: (pos: number) => void;
   focus: () => void;
-  addSuggestion: (type: "addition" | "deletion" | "substitution") => void;
-  acceptSuggestion: (entry: SuggestionEntry) => void;
-  rejectSuggestion: (entry: SuggestionEntry) => void;
-  getSuggestions: () => SuggestionEntry[];
   uploadImage: (file: File) => void;
   insertAt: (pos: number, text: string) => void;
   replaceContent: (newContent: string, cursorPos?: number) => void;
@@ -107,21 +102,15 @@ export interface DocumentContextValue {
   setEditorReady: (ready: boolean) => void;
   mounted: boolean;
 
-  // Comments & suggestions
+  // Comments
   comments: ResolvedThread[];
   setComments: (threads: ResolvedThread[]) => void;
-  suggestions: SuggestionEntry[];
-  setSuggestions: (entries: SuggestionEntry[]) => void;
   activePanel: PanelId | null;
   setActivePanel: (panel: PanelId | null) => void;
   focusedCommentId: string | null;
   setFocusedCommentId: (id: string | null) => void;
   focusedSuggestionId: string | null;
   setFocusedSuggestionId: (id: string | null) => void;
-
-  // Modes
-  suggestionMode: boolean;
-  setSuggestionMode: React.Dispatch<React.SetStateAction<boolean>>;
 
   // History preview (scrubbing through versions)
   historyPreview: HistoryPreviewState | null;
@@ -272,11 +261,9 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const [editorKey, setEditorKey] = useState(0);
   const [editorReady, setEditorReady] = useState(false);
   const [comments, setComments] = useState<ResolvedThread[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
   const [activePanel, setActivePanel] = useState<PanelId | null>(null);
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
-  const [suggestionMode, setSuggestionMode] = useState(false);
   const [historyPreview, setHistoryPreview] = useState<HistoryPreviewState | null>(null);
   const [selectionBubble, setSelectionBubble] = useState<{ top: number; left: number } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
@@ -291,15 +278,8 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const hasCustomEditor = docTypeExtension?.EditorView != null;
   const spellLang = useMemo(() => detectLanguage(content), [content]);
   const docStats = useMemo(() => {
-    const plain = content
-      .replace(/\{==([\s\S]*?)==\}\{>>[\s\S]*?<<\}/g, "$1")
-      .replace(/\{>>[\s\S]*?<<\}/g, "")
-      .replace(/\{==([\s\S]*?)==\}/g, "$1")
-      .replace(/\{\+\+(?:@[^:]+:)?([\s\S]*?)\+\+\}/g, "$1")
-      .replace(/\{--(?:@[^:]+:)?[\s\S]*?--\}/g, "")
-      .replace(/\{~~(?:@[^:]+:)?[\s\S]*?~>([\s\S]*?)~~\}/g, "$1");
-    const chars = plain.length;
-    const words = plain.split(/\s+/).filter((w) => w.length > 0).length;
+    const chars = content.length;
+    const words = content.split(/\s+/).filter((w) => w.length > 0).length;
     return { chars, words };
   }, [content]);
 
@@ -360,14 +340,14 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
   // ─── Auto-show/hide comments panel ────────────────────────
   useEffect(() => {
-    const hasItems = comments.some((c) => !c.resolved) || suggestions.length > 0;
+    const hasItems = comments.some((c) => !c.resolved);
     if (hasItems && activePanel !== "comments") setActivePanel("comments");
     if (!hasItems && activePanel === "comments") {
       setActivePanel(null);
       setFocusedCommentId(null);
       setFocusedSuggestionId(null);
     }
-  }, [comments.length, suggestions.length]);
+  }, [comments.length]);
 
   // ─── Restore: update state + remount Editor + undo toast ─
   // We only want to react to each restore once, so we track the backup id
@@ -580,17 +560,12 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
     comments,
     setComments,
-    suggestions,
-    setSuggestions,
     activePanel,
     setActivePanel,
     focusedCommentId,
     setFocusedCommentId,
     focusedSuggestionId,
     setFocusedSuggestionId,
-
-    suggestionMode,
-    setSuggestionMode,
 
     historyPreview,
     setHistoryPreview,

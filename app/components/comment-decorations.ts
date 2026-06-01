@@ -4,7 +4,6 @@ import {
   type Extension,
 } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
-import { authorColorFromName } from "./criticmarkup";
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -59,6 +58,18 @@ export function dispatchThreads(view: EditorView, threads: ResolvedThread[]) {
 
 export function getThreads(view: EditorView): ResolvedThread[] {
   return view.state.field(threadsField, false) ?? [];
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+
+function authorColorFromName(name: string | null): string {
+  if (!name) return "#facc15"; // default yellow for legacy comments
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = ((hash % 360) + 360) % 360;
+  return `hsl(${hue}, 70%, 65%)`;
 }
 
 // ─── Decorations ──────────────────────────────────────────

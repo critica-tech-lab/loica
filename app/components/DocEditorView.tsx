@@ -42,13 +42,11 @@ export function DocEditorView(_props: DocumentProps) {
 
     comments,
     setComments,
-    setSuggestions,
     activePanel,
     setActivePanel,
     focusedCommentId,
     setFocusedCommentId,
     setFocusedSuggestionId,
-    suggestionMode,
     setSelectionBubble,
     setConnectionStatus,
 
@@ -286,16 +284,10 @@ export function DocEditorView(_props: DocumentProps) {
             initialValue={document.content}
             onChange={handleContentChange}
             onThreadsChange={setComments}
-            onSuggestionsChange={setSuggestions}
             onThreadClick={(thread) => {
               setActivePanel("comments");
               setFocusedCommentId(thread.id);
               setFocusedSuggestionId(null);
-            }}
-            onSuggestionClick={(entry) => {
-              setActivePanel("comments");
-              setFocusedSuggestionId(entry.id);
-              setFocusedCommentId(null);
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
@@ -313,7 +305,6 @@ export function DocEditorView(_props: DocumentProps) {
             wsUrl={wsUrl}
             currentUserId={user.id}
             userInfo={{ name: user.name, color: userColor(user.id) }}
-            suggestionMode={suggestionMode}
             userName={user.name}
             spellLang={spellLang}
             onConnectionStatus={setConnectionStatus}
@@ -685,7 +676,6 @@ function DocNavActions({
     document,
     togglePanel,
     comments,
-    suggestions,
     isStarred,
     toggleStar,
     canEdit,
@@ -699,11 +689,11 @@ function DocNavActions({
     if (!window.confirm("Move this document to trash? You can restore it later from the Trash page.")) return;
     trashFetcher.submit({ intent: "trash-doc" }, { method: "post" });
   };
-  const unreadComments = comments.filter((c) => !c.resolved).length + suggestions.length;
+  const unreadComments = comments.filter((c) => !c.resolved).length;
   // Only surface the Comments button when there's something to read — adds UI
   // pressure only for docs that actually have a conversation on them.
   // First comment is created via the selection bubble (+ Comment).
-  const hasComments = comments.length + suggestions.length > 0;
+  const hasComments = comments.length > 0;
 
   const { editorApi, title } = useDocument();
   const download = (kind: "md" | "pdf" | "docx") => {

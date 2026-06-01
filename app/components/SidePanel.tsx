@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useDocument } from "~/lib/DocumentContext";
 import { timeAgo, formatDate } from "~/lib/ui-utils";
 import type { PanelId } from "./ActivityBar";
-import type { SuggestionEntry } from "./criticmarkup";
 import type { ResolvedThread } from "./comment-decorations";
 import { CommentPanel } from "./CommentPanel";
 import { VersionPanel } from "./VersionPanel";
@@ -18,7 +17,6 @@ export function SidePanel() {
     setActivePanel,
     document: doc,
     comments,
-    suggestions,
     user,
     focusedCommentId,
     focusedSuggestionId,
@@ -43,7 +41,6 @@ export function SidePanel() {
       return (
         <CommentPanel
           threads={comments}
-          suggestions={suggestions}
           currentUserId={user.id}
           focusedThreadId={focusedCommentId}
           focusedSuggestionId={focusedSuggestionId}
@@ -56,8 +53,6 @@ export function SidePanel() {
           onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
           onFinish={() => editorApi.current?.focus()}
           onMention={sendMention}
-          onAcceptSuggestion={(entry) => editorApi.current?.acceptSuggestion(entry)}
-          onRejectSuggestion={(entry) => editorApi.current?.rejectSuggestion(entry)}
         />
       );
 

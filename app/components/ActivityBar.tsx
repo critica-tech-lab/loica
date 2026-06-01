@@ -11,8 +11,8 @@ const items: { id: PanelId; icon: React.ComponentType<React.SVGProps<SVGSVGEleme
 ];
 
 export function ActivityBar() {
-  const { activePanel, togglePanel: onToggle, comments, suggestions } = useDocument();
-  const commentCount = comments.filter((c) => !c.resolved).length + suggestions.length;
+  const { activePanel, togglePanel: onToggle, comments } = useDocument();
+  const commentCount = comments.filter((c) => !c.resolved).length;
   return (
     <div className="activity-bar">
       {items.map((item) => {

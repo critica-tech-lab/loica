@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { SuggestionEntry } from "./criticmarkup";
-import { authorColorFromName } from "./criticmarkup";
 import type { ResolvedThread } from "./comment-decorations";
 import { MentionTextarea } from "./MentionTextarea";
 import { timeAgo } from "~/lib/ui-utils";
 
 interface CommentPanelProps {
   threads: ResolvedThread[];
-  suggestions?: SuggestionEntry[];
   currentUserId?: string;
   onClose: () => void;
   onScrollTo: (pos: number) => void;
@@ -22,17 +19,13 @@ interface CommentPanelProps {
   canResolve?: boolean;
   focusedThreadId?: string | null;
   focusedSuggestionId?: string | null;
-  onAcceptSuggestion?: (entry: SuggestionEntry) => void;
-  onRejectSuggestion?: (entry: SuggestionEntry) => void;
 }
 
 type ListItem =
-  | { type: "thread"; thread: ResolvedThread; top: number }
-  | { type: "suggestion"; entry: SuggestionEntry; top: number };
+  | { type: "thread"; thread: ResolvedThread; top: number };
 
 export function CommentPanel({
   threads,
-  suggestions = [],
   currentUserId,
   onClose,
   onScrollTo,
@@ -47,8 +40,6 @@ export function CommentPanel({
   canResolve = true,
   focusedThreadId,
   focusedSuggestionId,
-  onAcceptSuggestion,
-  onRejectSuggestion,
 }: CommentPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<"open" | "resolved">("open");
@@ -62,7 +53,6 @@ export function CommentPanel({
       type: "thread", thread,
       top: thread.from > 0 ? thread.from : Number.MAX_SAFE_INTEGER,
     })),
-    ...(tab === "open" ? suggestions.map((entry): ListItem => ({ type: "suggestion", entry, top: entry.top })) : []),
   ].sort((a, b) => a.top - b.top);
 
   const focusedId = focusedThreadId || focusedSuggestionId;
@@ -124,7 +114,7 @@ export function CommentPanel({
               transition: "all 120ms ease-out",
             }}
           >
-            {t === "open" ? `Open${openThreads.length + suggestions.length > 0 ? ` (${openThreads.length + suggestions.length})` : ""}` : `Resolved${resolvedThreads.length > 0 ? ` (${resolvedThreads.length})` : ""}`}
+            {t === "open" ? `Open${openThreads.length > 0 ? ` (${openThreads.length})` : ""}` : `Resolved${resolvedThreads.length > 0 ? ` (${resolvedThreads.length})` : ""}`}
           </button>
         ))}
       </div>
@@ -155,17 +145,7 @@ export function CommentPanel({
               onFinish={onFinish}
               onMention={onMention}
             />
-          ) : (
-            <SuggestionCard
-              key={item.entry.id}
-              entry={item.entry}
-              readOnly={readOnly}
-              focused={item.entry.id === focusedSuggestionId}
-              onScrollTo={onScrollTo}
-              onAccept={onAcceptSuggestion}
-              onReject={onRejectSuggestion}
-            />
-          )
+          ) : null
         )}
       </div>
     </div>
@@ -497,85 +477,6 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
   );
 }
 
-// ─── SuggestionCard ───────────────────────────────────────
-
-function SuggestionCard({
-  entry,
-  readOnly,
-  focused,
-  onScrollTo,
-  onAccept,
-  onReject,
-}: {
-  entry: SuggestionEntry;
-  readOnly: boolean;
-  focused: boolean;
-  onScrollTo: (pos: number) => void;
-  onAccept?: (entry: SuggestionEntry) => void;
-  onReject?: (entry: SuggestionEntry) => void;
-}) {
-  const [animating, setAnimating] = useState(false);
-  useEffect(() => {
-    if (focused) { setAnimating(true); const t = setTimeout(() => setAnimating(false), 1000); return () => clearTimeout(t); }
-  }, [focused]);
-
-  const accentColor = entry.kind === "addition" ? "#22c55e" : entry.kind === "deletion" ? "#ef4444" : "#f59e0b";
-
-  return (
-    <div
-      data-item-id={entry.id}
-      onClick={() => onScrollTo(entry.fullFrom)}
-      style={{
-        borderRadius: "10px",
-        border: `1px solid ${animating ? accentColor : "color-mix(in srgb, var(--fg) 10%, transparent)"}`,
-        background: animating ? `color-mix(in srgb, ${accentColor} 6%, var(--bg))` : "var(--bg)",
-        padding: "0.75rem 0.85rem",
-        marginBottom: "0.6rem",
-        cursor: "pointer",
-        transition: "border-color 600ms ease-out, background 600ms ease-out",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
-        <span style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: accentColor }}>
-          {entry.kind}
-        </span>
-        {entry.author && (
-          <span style={{ fontSize: "0.72rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)" }}>· {entry.author}</span>
-        )}
-      </div>
-      <div style={{ fontSize: "0.8rem", lineHeight: 1.4, wordBreak: "break-word" }}>
-        {entry.kind === "addition" && (
-          <span style={{ color: "#22c55e", background: "color-mix(in srgb, #22c55e 12%, transparent)", borderRadius: "3px", padding: "0.1rem 0.25rem" }}>
-            +{(entry.addedText ?? "").length > 80 ? entry.addedText!.slice(0, 80) + "…" : entry.addedText}
-          </span>
-        )}
-        {entry.kind === "deletion" && (
-          <span style={{ color: "#ef4444", textDecoration: "line-through", background: "color-mix(in srgb, #ef4444 10%, transparent)", borderRadius: "3px", padding: "0.1rem 0.25rem" }}>
-            {(entry.deletedText ?? "").length > 80 ? entry.deletedText!.slice(0, 80) + "…" : entry.deletedText}
-          </span>
-        )}
-        {entry.kind === "substitution" && (
-          <>
-            <span style={{ color: "#ef4444", textDecoration: "line-through", opacity: 0.7 }}>{(entry.oldText ?? "").slice(0, 60)}</span>
-            <span style={{ opacity: 0.3, margin: "0 0.3rem" }}>→</span>
-            <span style={{ color: "#22c55e", background: "color-mix(in srgb, #22c55e 12%, transparent)", borderRadius: "3px", padding: "0.1rem 0.25rem" }}>{(entry.newText ?? "").slice(0, 60)}</span>
-          </>
-        )}
-      </div>
-      {!readOnly && (
-        <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.5rem" }} onClick={e => e.stopPropagation()}>
-          <button onClick={() => onAccept?.(entry)} style={{ fontSize: "0.72rem", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid #22c55e", color: "#22c55e", background: "none", cursor: "pointer", fontFamily: "var(--font-ui)" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, #22c55e 10%, transparent)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "none"; }}>Accept</button>
-          <button onClick={() => onReject?.(entry)} style={{ fontSize: "0.72rem", padding: "0.2rem 0.6rem", borderRadius: "6px", border: "1px solid #ef4444", color: "#ef4444", background: "none", cursor: "pointer", fontFamily: "var(--font-ui)" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, #ef4444 10%, transparent)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "none"; }}>Reject</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Helpers ──────────────────────────────────────────────
 
 const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
@@ -593,7 +494,7 @@ function renderBodyWithMentions(body: string): React.ReactNode {
     if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
     const name = match[1];
     parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: authorColorFromName(name) }}>@{name}</span>
+      <span key={match.index} style={{ fontWeight: 700, color: "#D0A215" }}>@{name}</span>
     );
     lastIndex = re.lastIndex;
   }

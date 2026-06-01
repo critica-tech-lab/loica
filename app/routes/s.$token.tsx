@@ -17,7 +17,6 @@ import { PresenceIndicator } from "~/components/PresenceIndicator";
 import { CommentPanel } from "~/components/CommentPanel";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
 import type { ConnectionStatus } from "~/components/DocActionBar";
-import type { SuggestionEntry } from "~/components/criticmarkup";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { LogoIcon } from "~/components/icons";
 import { getDocumentType } from "~/lib/templates";
@@ -254,7 +253,6 @@ export default function SharePage() {
   // All hooks must be called unconditionally (rules of hooks)
   const [peers, setPeers] = useState<Peer[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
-  const [suggestionMode, setSuggestionMode] = useState(trackChanges);
   const [saving, setSaving] = useState(false);
   const randomIdentity = useMemo(() => randomGuestIdentity(), []);
   const guestIdentity = useMemo(() => {
@@ -337,8 +335,6 @@ export default function SharePage() {
           guestIdentity={guestIdentity}
           onPresenceChange={setPeers}
           onConnectionStatus={setConnectionStatus}
-          suggestionMode={suggestionMode}
-          onToggleSuggestionMode={() => setSuggestionMode((s) => !s)}
           onSavingChange={setSaving}
         />
       ) : (
@@ -453,8 +449,6 @@ function EditableView({
   guestIdentity,
   onPresenceChange,
   onConnectionStatus,
-  suggestionMode,
-  onToggleSuggestionMode,
   onSavingChange,
 }: {
   document: { id: string; content: string };
@@ -463,8 +457,6 @@ function EditableView({
   guestIdentity: { name: string; color: string };
   onPresenceChange: (peers: Peer[]) => void;
   onConnectionStatus: (status: ConnectionStatus) => void;
-  suggestionMode: boolean;
-  onToggleSuggestionMode: () => void;
   onSavingChange: (saving: boolean) => void;
 }) {
   const fetcher = useFetcher();
@@ -494,7 +486,6 @@ function EditableView({
   }, []);
 
   const [threads, setThreads] = useState<ResolvedThread[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
@@ -518,22 +509,18 @@ function EditableView({
     unresolveThread: (threadId: string) => void;
     scrollToPos: (pos: number) => void;
     focus: () => void;
-    addSuggestion: (type: "addition" | "deletion" | "substitution") => void;
-    acceptSuggestion: (entry: SuggestionEntry) => void;
-    rejectSuggestion: (entry: SuggestionEntry) => void;
-    getSuggestions: () => SuggestionEntry[];
   } | null>(null);
 
   // Auto-show/hide sidebar
   useEffect(() => {
-    const hasItems = threads.some((t) => !t.resolved) || suggestions.length > 0;
+    const hasItems = threads.some((t) => !t.resolved);
     if (hasItems && !showComments) setShowComments(true);
     if (!hasItems && showComments) {
       setShowComments(false);
       setFocusedThreadId(null);
       setFocusedSuggestionId(null);
     }
-  }, [threads, suggestions.length]);
+  }, [threads]);
 
   const docType = getDocumentType(document.content || "");
   const ExtensionEditor = useDocTypeExtension(docType)?.EditorView ?? null;
@@ -546,8 +533,6 @@ function EditableView({
           : <Toolbar
               onFormat={(b, a) => editorApi.current?.format(b, a)}
               onFormatLine={(p) => editorApi.current?.formatLine(p)}
-              suggestionMode={suggestionMode}
-              onToggleSuggestionMode={onToggleSuggestionMode}
               onLink={() => setLinkModal({
                 mode: "add",
                 onApply: (url) => { editorApi.current?.format("[", `](${url})`); },
@@ -626,16 +611,10 @@ function EditableView({
               scheduleSave(val);
             }}
             onThreadsChange={setThreads}
-            onSuggestionsChange={setSuggestions}
             onThreadClick={(thread) => {
               setShowComments(true);
               setFocusedThreadId(thread.id);
               setFocusedSuggestionId(null);
-            }}
-            onSuggestionClick={(entry) => {
-              setShowComments(true);
-              setFocusedSuggestionId(entry.id);
-              setFocusedThreadId(null);
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
@@ -652,7 +631,6 @@ function EditableView({
             wsUrl={wsUrl}
             wsParams={{ token: shareToken }}
             userInfo={guestIdentity}
-            suggestionMode={suggestionMode}
             userName={guestIdentity.name}
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
           />
@@ -688,7 +666,6 @@ function EditableView({
         {showComments && (
           <CommentPanel
             threads={threads}
-            suggestions={suggestions}
             focusedThreadId={focusedThreadId}
             focusedSuggestionId={focusedSuggestionId}
             canResolve={false}
@@ -700,8 +677,6 @@ function EditableView({
             onResolveThread={(threadId) => editorApi.current?.resolveThread(threadId)}
             onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
             onFinish={() => editorApi.current?.focus()}
-            onAcceptSuggestion={(entry) => editorApi.current?.acceptSuggestion(entry)}
-            onRejectSuggestion={(entry) => editorApi.current?.rejectSuggestion(entry)}
           />
         )}
       </div>
