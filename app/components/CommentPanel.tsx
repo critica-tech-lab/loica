@@ -257,12 +257,9 @@ function ThreadCard({
           : focused
           ? "color-mix(in srgb, var(--accent) 10%, var(--bg))"
           : "var(--bg)",
-        borderLeft: focused
-          ? "3px solid var(--accent)"
-          : "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         padding: "0.75rem 0.85rem",
         marginBottom: "0.6rem",
-        transition: "border-color 200ms ease-out, background 300ms ease-out, border-left 200ms ease-out",
+        transition: "border-color 200ms ease-out, background 300ms ease-out",
         opacity: thread.resolved ? 0.6 : 1,
       }}
     >
