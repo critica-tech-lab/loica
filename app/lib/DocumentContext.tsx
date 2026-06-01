@@ -69,6 +69,15 @@ export interface EditorApi {
   uploadImage: (file: File) => void;
   insertAt: (pos: number, text: string) => void;
   replaceContent: (newContent: string, cursorPos?: number) => void;
+  // ProseMirror-only (optional — undefined in CodeMirror editor)
+  exportDocx?: (filename?: string) => Promise<void>;
+  setHeading?: (level: number) => void;
+  clearFormatting?: () => void;
+  toggleBlockquote?: () => void;
+  toggleBulletList?: () => void;
+  toggleOrderedList?: () => void;
+  insertTable?: () => void;
+  insertHr?: () => void;
 }
 
 export interface DocumentContextValue {

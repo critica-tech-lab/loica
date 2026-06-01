@@ -40,11 +40,25 @@ export default defineConfig({
       // CodeMirror's transitive deps. Vite's scanner doesn't follow into
       // them eagerly, so each one would otherwise trigger its own reload.
       "@marijn/find-cluster-break", "style-mod", "w3c-keyname", "crelt",
+      // ProseMirror core
+      "prosemirror-state", "prosemirror-view", "prosemirror-model",
+      "prosemirror-transform", "prosemirror-commands", "prosemirror-history",
+      "prosemirror-keymap", "prosemirror-inputrules", "prosemirror-gapcursor",
+      "prosemirror-schema-basic", "prosemirror-schema-list",
+      "prosemirror-dropcursor", "prosemirror-tables", "prosemirror-markdown",
+      "prosemirror-trailing-node", "prosemirror-resizable-view",
+      "prosemirror-docx", "docx",
+      "y-prosemirror",
+      "orderedmap",
     ],
     // Eagerly scan the doc-editor entry so any *further* transitive deps are
     // discovered up-front rather than during a navigation. The workspace and
     // settings entries are picked up automatically via the route manifest.
-    entries: ["app/components/Editor.tsx", "app/components/DocEditorView.tsx"],
+    entries: [
+      "app/components/Editor.tsx",
+      "app/components/ProseMirrorEditor.tsx",
+      "app/components/DocEditorView.tsx",
+    ],
   },
   ssr: {
     external: ["better-sqlite3", "@node-rs/argon2"],
@@ -56,7 +70,25 @@ export default defineConfig({
       "y-websocket",
       "y-codemirror.next",
       "y-protocols",
+      "y-prosemirror",
       "lib0",
+      "prosemirror-state",
+      "prosemirror-view",
+      "prosemirror-model",
+      "prosemirror-transform",
+      "prosemirror-commands",
+      "prosemirror-history",
+      "prosemirror-keymap",
+      "prosemirror-inputrules",
+      "prosemirror-gapcursor",
+      "prosemirror-schema-basic",
+      "prosemirror-schema-list",
+      "prosemirror-dropcursor",
+      "prosemirror-tables",
+      "prosemirror-markdown",
+      "prosemirror-trailing-node",
+      "prosemirror-resizable-view",
+      "orderedmap",
     ],
   },
 });

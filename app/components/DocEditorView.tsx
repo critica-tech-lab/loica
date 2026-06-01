@@ -1,4 +1,7 @@
 import { AppShell } from "~/components/AppShell";
+import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
+import { PMToolbar } from "~/components/PMToolbar";
+import type { PMActiveState } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
 import type { DocMenuItem } from "~/components/DocMenu";
@@ -19,6 +22,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { diffWords } from "diff";
 
 const TOOLBAR_OPEN_KEY = "loica.docToolbar.open";
+const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
 export type { DocumentProps as DocEditorViewProps };
 
 export function DocEditorView(_props: DocumentProps) {
@@ -40,6 +44,7 @@ export function DocEditorView(_props: DocumentProps) {
     setSuggestions,
     activePanel,
     setActivePanel,
+    focusedCommentId,
     setFocusedCommentId,
     setFocusedSuggestionId,
     suggestionMode,
@@ -66,6 +71,7 @@ export function DocEditorView(_props: DocumentProps) {
   // Default visible — users who want it hidden dismiss with ×, preference sticks.
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
+  const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
 
   // ── Undo-create toast ─────────────────────────────────
   // If this doc was just created (flash arming happens at the caller before
@@ -204,8 +210,10 @@ export function DocEditorView(_props: DocumentProps) {
             currentContent={historyPreview.currentContent}
           />
         )}
-        {!hasCustomEditor && toolbarOpen && (
-          <Toolbar variant="pill" onLink={openLinkModal} />
+        {!hasCustomEditor && (
+          USE_PM
+            ? <PMToolbar activeState={pmActiveState} onLink={openLinkModal} />
+            : toolbarOpen && <Toolbar variant="pill" onLink={openLinkModal} />
         )}
         {(() => {
           const Banner = docTypeExtension?.EditorBanner;
@@ -231,6 +239,35 @@ export function DocEditorView(_props: DocumentProps) {
             userInfo={{ name: user.name, color: userColor(user.id) }}
             onConnectionStatus={setConnectionStatus}
             onPresenceChange={setPeers}
+          />
+        ) : USE_PM ? (
+          <ProseMirrorEditor
+            key={editorKey}
+            docId={document.id}
+            wsUrl={wsUrl}
+            userInfo={{ name: user.name, color: userColor(user.id) }}
+            currentUserId={user.id}
+            readOnly={!canEdit}
+            autoFocus={canEdit}
+            onReady={(api) => registerEditorApi(api)}
+            onPresenceChange={setPeers}
+            onConnectionStatus={setConnectionStatus}
+            onChange={handleContentChange}
+            onStateChange={setPmActiveState}
+            focusedCommentId={focusedCommentId}
+            onThreadsChange={setComments}
+            onThreadClick={(thread) => {
+              setActivePanel("comments");
+              setFocusedCommentId(thread.id);
+              setFocusedSuggestionId(null);
+            }}
+            onSelectionChange={(sel) => {
+              if (sel && sel.to > sel.from) {
+                setSelectionBubble({ top: sel.top, left: sel.left });
+              } else {
+                setSelectionBubble(null);
+              }
+            }}
           />
         ) : (
           <Editor
@@ -449,9 +486,9 @@ function SelectionBubble({ onLink }: { onLink: () => void }) {
         label="Comment"
         title="Add comment"
         onActivate={() => {
-          editorApi.current?.addComment();
+          const id = editorApi.current?.addComment() ?? null;
           setActivePanel("comments");
-          setFocusedCommentId(null);
+          setFocusedCommentId(id);
           dismiss();
         }}
       />
@@ -657,7 +694,12 @@ function DocNavActions({
   // First comment is created via the selection bubble (+ Comment).
   const hasComments = comments.length + suggestions.length > 0;
 
+  const { editorApi, title } = useDocument();
   const download = (kind: "md" | "pdf" | "docx") => {
+    if (USE_PM && kind === "docx") {
+      editorApi.current?.exportDocx?.(`${title || "document"}.docx`);
+      return;
+    }
     const path =
       kind === "md" ? `/api/doc-download/${document.id}` :
       kind === "pdf" ? `/api/doc-pdf/${document.id}` :

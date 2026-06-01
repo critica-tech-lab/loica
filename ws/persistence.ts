@@ -390,5 +390,26 @@ export function getDocContent(doc: Y.Doc): string {
     return `---\ntype: spreadsheet\n---\n${json}`;
   }
 
-  return doc.getText("content").toString();
+  // Legacy markdown docs use Y.Text("content")
+  const markdownText = doc.getText("content").toString();
+  if (markdownText.length > 0) return markdownText;
+
+  // ProseMirror docs use Y.XmlFragment("prosemirror")
+  const pmFrag = doc.getXmlFragment("prosemirror");
+  if (pmFrag.length > 0) return extractTextFromXmlFragment(pmFrag);
+
+  return "";
+}
+
+function extractTextFromXmlFragment(frag: Y.XmlFragment): string {
+  const parts: string[] = [];
+  frag.forEach((child) => parts.push(extractTextFromYNode(child)));
+  return parts.filter(Boolean).join("\n");
+}
+
+function extractTextFromYNode(node: Y.XmlElement | Y.XmlText): string {
+  if (node instanceof Y.XmlText) return node.toString();
+  const parts: string[] = [];
+  node.forEach((child) => parts.push(extractTextFromYNode(child)));
+  return parts.join("");
 }
