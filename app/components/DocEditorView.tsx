@@ -223,7 +223,7 @@ export function DocEditorView(_props: DocumentProps) {
                 activeState={pmActiveState}
                 trackChangesState={trackChangesState}
                 onLink={openLinkModal}
-                onOpenChangesPanel={() => setActivePanel("changes")}
+                onOpenChangesPanel={() => setActivePanel(activePanel === "changes" ? null : "changes")}
               />
             : toolbarOpen && <Toolbar variant="pill" onLink={openLinkModal} />
         )}
