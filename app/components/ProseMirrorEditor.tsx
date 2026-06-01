@@ -21,6 +21,7 @@ interface Props {
   onChange?: (content: string) => void;
   onStateChange?: (state: PMActiveState) => void;
   onTrackChangesStateChange?: (state: TrackChangesActiveState) => void;
+  onTrackChangeClick?: (changeId: string, pos: { x: number; y: number }) => void;
   onThreadsChange?: (threads: ResolvedThread[]) => void;
   onThreadClick?: (thread: ResolvedThread) => void;
   onSelectionChange?: (sel: { from: number; to: number; top: number; left: number } | null) => void;
@@ -65,6 +66,7 @@ export function ProseMirrorEditor({
   onChange,
   onStateChange,
   onTrackChangesStateChange,
+  onTrackChangeClick,
   onThreadsChange,
   onThreadClick: _onThreadClick,
   onSelectionChange,
@@ -86,6 +88,8 @@ export function ProseMirrorEditor({
   onSelectionChangeRef.current = onSelectionChange;
   const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
+  const onTrackChangeClickRef = useRef(onTrackChangeClick);
+  onTrackChangeClickRef.current = onTrackChangeClick;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -258,6 +262,17 @@ export function ProseMirrorEditor({
         handleDOMEvents: {
           click: (_view: any, event: MouseEvent) => {
             const target = event.target as HTMLElement;
+            // Tracked change click → inline popup
+            const trackEl = target.closest("[data-change-id]") as HTMLElement | null;
+            if (trackEl) {
+              const changeId = trackEl.getAttribute("data-change-id");
+              if (changeId && onTrackChangeClickRef.current) {
+                const rect = trackEl.getBoundingClientRect();
+                onTrackChangeClickRef.current(changeId, { x: rect.left + rect.width / 2, y: rect.top });
+                return false;
+              }
+            }
+            // Comment click
             const el = target.closest("[data-comment-id]") as HTMLElement | null;
             if (!el) return false;
             const commentId = el.getAttribute("data-comment-id");
@@ -290,7 +305,13 @@ export function ProseMirrorEditor({
                   op === "insert" ? "insert" : op === "delete" ? "delete" : "other";
                 const text = c.type === "text-change" ? (c.text ?? "") :
                   c.type === "node-change" ? (c.node?.textContent ?? "") : "";
-                return { id: c.id, type, text, authorId: c.dataTracked?.authorID ?? "" };
+                return {
+                  id: c.id, type, text,
+                  authorId: c.dataTracked?.authorID ?? "",
+                  createdAt: c.dataTracked?.createdAt ?? 0,
+                  from: c.from ?? 0,
+                  to: c.to ?? 0,
+                };
               });
               onTrackChangesStateChangeRef.current({
                 enabled: tcState.status === TrackChangesStatus.enabled,

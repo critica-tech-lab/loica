@@ -1,6 +1,7 @@
 import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
+import { TrackChangePopup } from "~/components/TrackChangePopup";
 import type { PMActiveState } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
@@ -74,6 +75,7 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
   }, [setFocusedCommentId]);
@@ -265,6 +267,7 @@ export function DocEditorView(_props: DocumentProps) {
             onChange={handleContentChange}
             onStateChange={setPmActiveState}
             onTrackChangesStateChange={setTrackChangesState}
+            onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
             focusedCommentId={focusedCommentId}
             onThreadsChange={setComments}
             onThreadClick={(thread) => {
@@ -322,6 +325,20 @@ export function DocEditorView(_props: DocumentProps) {
         </div>
 
         <SelectionBubble onLink={openLinkModal} />
+
+        {/* Track change inline popup */}
+        {trackPopup && (() => {
+          const change = trackChangesState?.changes.find(c => c.id === trackPopup.changeId);
+          return change ? (
+            <TrackChangePopup
+              change={change}
+              pos={trackPopup.pos}
+              onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id); }}
+              onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id); }}
+              onDismiss={() => setTrackPopup(null)}
+            />
+          ) : null;
+        })()}
 
         {/* Side panel */}
         {activePanel && <SidePanel />}

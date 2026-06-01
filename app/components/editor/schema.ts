@@ -3,6 +3,7 @@ import OrderedMap from "orderedmap";
 import { nodes as basicNodes, marks as basicMarks } from "prosemirror-schema-basic";
 import { addListNodes } from "prosemirror-schema-list";
 import { tableNodes } from "prosemirror-tables";
+import { authorTrackColor } from "./types";
 
 // dataTracked is required on all block nodes by @manuscripts/track-changes-plugin
 // when track changes is enabled — it stores pending change metadata.
@@ -95,15 +96,27 @@ export const schema = new Schema({
     tracked_insert: {
       attrs: { dataTracked: { default: null } },
       parseDOM: [{ tag: "ins.tracked-insert" }],
-      toDOM() {
-        return ["ins", { class: "tracked-insert" }, 0] as const;
+      toDOM(mark: any) {
+        const dt = mark.attrs.dataTracked;
+        const color = authorTrackColor(dt?.authorID ?? "");
+        return ["ins", {
+          class: "tracked-insert",
+          "data-change-id": dt?.id ?? "",
+          style: `--track-color:${color}`,
+        }, 0] as const;
       },
     },
     tracked_delete: {
       attrs: { dataTracked: { default: null } },
       parseDOM: [{ tag: "del.tracked-delete" }],
-      toDOM() {
-        return ["del", { class: "tracked-delete" }, 0] as const;
+      toDOM(mark: any) {
+        const dt = mark.attrs.dataTracked;
+        const color = authorTrackColor(dt?.authorID ?? "");
+        return ["del", {
+          class: "tracked-delete",
+          "data-change-id": dt?.id ?? "",
+          style: `--track-color:${color}`,
+        }, 0] as const;
       },
     },
   },
