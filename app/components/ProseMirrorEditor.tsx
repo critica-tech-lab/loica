@@ -252,6 +252,10 @@ export function ProseMirrorEditor({
             }
             return false;
           },
+          blur: () => {
+            onSelectionChangeRef.current?.(null);
+            return false;
+          },
         },
         dispatchTransaction(tr: any) {
           if (!view) return;
