@@ -276,7 +276,14 @@ export function DocEditorView(_props: DocumentProps) {
               setFocusedSuggestionId(null);
             }}
             onSelectionChange={(sel) => {
-              if (sel && sel.to > sel.from) {
+              if (!sel) {
+                // Editor blurred (click into panel etc) — clear bubble/focus but keep panel open
+                setSelectionBubble(null);
+                focusComment(null);
+                return;
+              }
+              if (sel.to > sel.from) {
+                // Range selection
                 setSelectionBubble({ top: sel.top, left: sel.left });
                 const hit = comments.find(
                   t => !t.resolved && t.from > 0 && t.to > t.from
@@ -285,8 +292,10 @@ export function DocEditorView(_props: DocumentProps) {
                 focusComment(hit?.id ?? null);
                 if (hit) setActivePanel("comments");
               } else {
+                // Cursor click inside editor — close comments panel if cursor not on commented text
                 setSelectionBubble(null);
                 focusComment(null);
+                if (activePanel === "comments") setActivePanel(null);
               }
             }}
           />

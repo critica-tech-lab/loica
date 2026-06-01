@@ -350,8 +350,9 @@ export function ProseMirrorEditor({
               try { const c = view.coordsAtPos(from); top = c.top; left = c.left; } catch {}
               onSelectionChangeRef.current({ from, to, top, left });
             } else if (!pendingClickId) {
-              // Skip null emission for the same click that just focused a comment
-              onSelectionChangeRef.current(null);
+              // Emit cursor position (from === to) so parent can distinguish
+              // "cursor moved inside editor" from "editor blurred" (which stays null)
+              onSelectionChangeRef.current({ from, to: from, top: 0, left: 0 });
             }
           }
         },
