@@ -155,6 +155,7 @@ export function ProseMirrorEditor({
       const ydoc = new Y.Doc();
       const yXmlFragment = ydoc.getXmlFragment("prosemirror");
       const commentsMap = ydoc.getMap("comments");
+      const metaMap = ydoc.getMap("meta");
 
       const provider = new WebsocketProvider(wsUrl, docId, ydoc, {
         connect: true,
@@ -335,6 +336,24 @@ export function ProseMirrorEditor({
         },
       });
       viewRef.current = view;
+
+      // Sync track-changes on/off from Yjs — so collaborators share the same state.
+      // Also runs on initial sync to restore state from the document.
+      const syncTCFromYjs = () => {
+        if (readOnlyRef.current || !view) return;
+        const enabled = metaMap.get("trackChanges") === true;
+        const tcState = trackChangesPluginKey.getState(view.state);
+        if (!tcState) return;
+        const isEnabled = tcState.status === TrackChangesStatus.enabled;
+        if (enabled !== isEnabled) {
+          trackCommands.setTrackingStatus(
+            enabled ? TrackChangesStatus.enabled : TrackChangesStatus.disabled
+          )(view.state, view.dispatch);
+        }
+      };
+      metaMap.observe(syncTCFromYjs);
+      // Apply once after first Yjs sync
+      provider.once("sync", syncTCFromYjs);
 
       if (autoFocus && !readOnlyRef.current) view.focus();
 
@@ -559,6 +578,8 @@ export function ProseMirrorEditor({
             ? TrackChangesStatus.disabled
             : TrackChangesStatus.enabled;
           trackCommands.setTrackingStatus(next)(view.state, view.dispatch);
+          // Sync to Yjs so all collaborators see the same state
+          metaMap.set("trackChanges", next === TrackChangesStatus.enabled);
           view.focus();
         },
 
