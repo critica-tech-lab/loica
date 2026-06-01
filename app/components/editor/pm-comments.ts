@@ -26,8 +26,6 @@ export function pmCommentPlugin(
           try {
           decos.push(Decoration.inline(from, to, {
             class: "pm-comment-highlight",
-            style: `background-color:color-mix(in srgb,#f59e0b 20%,transparent);` +
-                   `border-bottom:1.5px solid color-mix(in srgb,#f59e0b 60%,transparent);`,
             "data-comment-id": id,
           }));
         } catch {}
