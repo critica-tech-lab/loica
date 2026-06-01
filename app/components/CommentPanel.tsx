@@ -249,12 +249,13 @@ function ThreadCard({
       ref={cardRef}
       data-item-id={thread.id}
       style={{
-        borderRadius: "10px",
+        borderRadius: "6px",
         border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         background: "var(--bg)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
         padding: "0.75rem 0.85rem",
-        marginBottom: "0.6rem",
-        opacity: thread.resolved ? 0.6 : 1,
+        marginBottom: "0.5rem",
+        opacity: thread.resolved ? 0.55 : 1,
       }}
     >
       {/* New empty comment — textarea to type */}
