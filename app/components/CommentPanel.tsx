@@ -60,7 +60,7 @@ export function CommentPanel({
   const mergedItems: ListItem[] = [
     ...visibleThreads.map((thread): ListItem => ({
       type: "thread", thread,
-      top: thread.from > 0 ? thread.from : thread.top,
+      top: thread.from > 0 ? thread.from : Number.MAX_SAFE_INTEGER,
     })),
     ...(tab === "open" ? suggestions.map((entry): ListItem => ({ type: "suggestion", entry, top: entry.top })) : []),
   ].sort((a, b) => a.top - b.top);

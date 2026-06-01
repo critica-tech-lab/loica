@@ -233,6 +233,18 @@ export function ProseMirrorEditor({
         nodeViews: {
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
         },
+        handleDOMEvents: {
+          click: (_view: any, event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            const el = target.closest("[data-comment-id]") as HTMLElement | null;
+            if (!el) return false;
+            const commentId = el.getAttribute("data-comment-id");
+            if (!commentId) return false;
+            const thread = threadsRef.current.find(t => t.id === commentId);
+            if (thread) onThreadClickRef.current?.(thread);
+            return false;
+          },
+        },
         dispatchTransaction(tr: any) {
           if (!view) return;
           const newState = view.state.apply(tr);
@@ -245,12 +257,9 @@ export function ProseMirrorEditor({
           const { from, to } = view.state.selection;
           if (onSelectionChangeRef.current) {
             if (to > from) {
-              try {
-                const coords = view.coordsAtPos(from);
-                onSelectionChangeRef.current({ from, to, top: coords.top, left: coords.left });
-              } catch {
-                onSelectionChangeRef.current(null);
-              }
+              let top = 0, left = 0;
+              try { const c = view.coordsAtPos(from); top = c.top; left = c.left; } catch {}
+              onSelectionChangeRef.current({ from, to, top, left });
             } else {
               onSelectionChangeRef.current(null);
             }
