@@ -208,6 +208,7 @@ function ThreadCard({
   const [newCommentText, setNewCommentText] = useState("");
   const cardRef = useRef<HTMLDivElement>(null);
   const [isWriting, setIsWriting] = useState(false);
+  const wasWritingRef = useRef(false);
 
   const isNew = !thread.body && thread.replies.length === 0;
   const isOwn = currentUserId === thread.userId;
@@ -226,7 +227,9 @@ function ThreadCard({
 
   // When user stops writing, trigger fade from the persisted highlight
   useEffect(() => {
-    if (isWriting || !cardRef.current) return;
+    if (isWriting) { wasWritingRef.current = true; return; }
+    if (!wasWritingRef.current || !cardRef.current) return;
+    wasWritingRef.current = false;
     const el = cardRef.current;
     el.classList.remove("comment-thread-writing");
     el.classList.remove("comment-thread-focused");
