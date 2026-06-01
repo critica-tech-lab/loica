@@ -1823,6 +1823,24 @@ del.tracked-delete:hover {
   border-radius: 2px;
 }
 
+/* Hide markup mode: show final version without decorations */
+.hide-markup ins.tracked-insert {
+  text-decoration: none !important;
+  color: inherit !important;
+  background: none !important;
+}
+.hide-markup del.tracked-delete {
+  display: none !important;
+}
+.hide-markup .ProseMirror p,
+.hide-markup .ProseMirror h1,
+.hide-markup .ProseMirror h2,
+.hide-markup .ProseMirror h3 {
+  border-left: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
 /* Change bar in left margin for paragraphs containing tracked changes */
 .pm-editor-mount .ProseMirror p:has(ins.tracked-insert),
 .pm-editor-mount .ProseMirror p:has(del.tracked-delete),

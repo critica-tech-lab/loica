@@ -208,7 +208,10 @@ export function ProseMirrorEditor({
         ...(readOnlyRef.current ? [] : [
           trackChangesPlugin({
             userID: currentUserId ?? "anonymous",
-            initialStatus: TrackChangesStatus.disabled,
+            // Restore per-user TC preference from localStorage
+            initialStatus: (() => {
+              try { return localStorage.getItem(`loica.tc.${docId}`) === "1" ? TrackChangesStatus.enabled : TrackChangesStatus.disabled; } catch { return TrackChangesStatus.disabled; }
+            })(),
             skipTrsWithMetas: [ySyncPluginKey],
           }),
         ]),
@@ -336,24 +339,6 @@ export function ProseMirrorEditor({
         },
       });
       viewRef.current = view;
-
-      // Sync track-changes on/off from Yjs — so collaborators share the same state.
-      // Also runs on initial sync to restore state from the document.
-      const syncTCFromYjs = () => {
-        if (readOnlyRef.current || !view) return;
-        const enabled = metaMap.get("trackChanges") === true;
-        const tcState = trackChangesPluginKey.getState(view.state);
-        if (!tcState) return;
-        const isEnabled = tcState.status === TrackChangesStatus.enabled;
-        if (enabled !== isEnabled) {
-          trackCommands.setTrackingStatus(
-            enabled ? TrackChangesStatus.enabled : TrackChangesStatus.disabled
-          )(view.state, view.dispatch);
-        }
-      };
-      metaMap.observe(syncTCFromYjs);
-      // Apply once after first Yjs sync
-      provider.once("sync", syncTCFromYjs);
 
       if (autoFocus && !readOnlyRef.current) view.focus();
 
@@ -571,6 +556,11 @@ export function ProseMirrorEditor({
 
         focus: () => view.focus(),
 
+        // Toggle markup visibility — CSS class hides ins/del styling without accepting/rejecting
+        setShowMarkup: (show: boolean) => {
+          mountRef.current?.classList.toggle("hide-markup", !show);
+        },
+
         toggleTrackChanges: () => {
           const tcState = trackChangesPluginKey.getState(view.state);
           if (!tcState) return;
@@ -578,8 +568,8 @@ export function ProseMirrorEditor({
             ? TrackChangesStatus.disabled
             : TrackChangesStatus.enabled;
           trackCommands.setTrackingStatus(next)(view.state, view.dispatch);
-          // Sync to Yjs so all collaborators see the same state
-          metaMap.set("trackChanges", next === TrackChangesStatus.enabled);
+          // Persist per-user preference (per-doc) — TC state is per-user, not document-level
+          try { localStorage.setItem(`loica.tc.${docId}`, next === TrackChangesStatus.enabled ? "1" : "0"); } catch {}
           view.focus();
         },
 

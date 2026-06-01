@@ -78,6 +78,7 @@ export interface EditorApi {
   rejectAllChanges?: () => void;
   acceptChangeById?: (id: string) => void;
   rejectChangeById?: (id: string) => void;
+  setShowMarkup?: (show: boolean) => void;
 }
 
 export interface DocumentContextValue {
