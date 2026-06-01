@@ -148,11 +148,11 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
 
       <Sep />
 
-      {/* Track changes */}
+      {/* Track changes — opens panel; active indicator when suggesting mode is on */}
       <Btn
-        title={trackChangesState?.enabled ? "Track changes: on (click to disable)" : "Track changes: off (click to enable)"}
+        title="Track changes"
         active={trackChangesState?.enabled ?? false}
-        onActivate={run(() => { api?.toggleTrackChanges?.(); onOpenChangesPanel?.(); })}
+        onActivate={run(() => onOpenChangesPanel?.())}
         icon={
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9" />
@@ -160,34 +160,6 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
           </svg>
         }
       />
-      {trackChangesState?.enabled && trackChangesState.pendingCount > 0 && (
-        <>
-          <Btn
-            title={`Review ${trackChangesState.pendingCount} pending change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
-            active={false}
-            onActivate={run(() => onOpenChangesPanel?.())}
-            style={{ fontSize: "0.72rem", fontWeight: 600 }}
-          >
-            Review ({trackChangesState.pendingCount})
-          </Btn>
-          <Btn
-            title={`Accept all ${trackChangesState.pendingCount} change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
-            active={false}
-            onActivate={run(() => api?.acceptAllChanges?.())}
-            style={{ color: "#16a34a", fontSize: "0.72rem", fontWeight: 600 }}
-          >
-            ✓ All
-          </Btn>
-          <Btn
-            title={`Reject all ${trackChangesState.pendingCount} change${trackChangesState.pendingCount > 1 ? "s" : ""}`}
-            active={false}
-            onActivate={run(() => api?.rejectAllChanges?.())}
-            style={{ color: "#dc2626", fontSize: "0.72rem", fontWeight: 600 }}
-          >
-            ✗ All
-          </Btn>
-        </>
-      )}
     </div>
   );
 }
