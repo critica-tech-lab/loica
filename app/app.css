@@ -1775,6 +1775,12 @@ html {
 .comment-thread-focused {
   animation: comment-thread-flash 2.5s ease-out forwards;
 }
+.comment-thread-writing {
+  animation: none !important;
+  background: #fffde7 !important;
+  border-color: rgba(249, 171, 0, 0.5) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.13) !important;
+}
 
 /* ─── PM comment highlights (Google Docs style) ─────────── */
 .pm-comment-highlight {

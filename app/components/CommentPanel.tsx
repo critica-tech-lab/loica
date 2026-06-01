@@ -207,6 +207,7 @@ function ThreadCard({
   const newCommentRef = useRef<HTMLTextAreaElement>(null);
   const [newCommentText, setNewCommentText] = useState("");
   const cardRef = useRef<HTMLDivElement>(null);
+  const [isWriting, setIsWriting] = useState(false);
 
   const isNew = !thread.body && thread.replies.length === 0;
   const isOwn = currentUserId === thread.userId;
@@ -219,9 +220,19 @@ function ThreadCard({
     if (!focused || !cardRef.current) return;
     const el = cardRef.current;
     el.classList.remove("comment-thread-focused");
-    void el.offsetWidth; // force reflow to restart animation
+    void el.offsetWidth;
     el.classList.add("comment-thread-focused");
   }, [focused]);
+
+  // When user stops writing, trigger fade from the persisted highlight
+  useEffect(() => {
+    if (isWriting || !cardRef.current) return;
+    const el = cardRef.current;
+    el.classList.remove("comment-thread-writing");
+    el.classList.remove("comment-thread-focused");
+    void el.offsetWidth;
+    el.classList.add("comment-thread-focused");
+  }, [isWriting]);
 
   const handleNewSave = () => {
     const body = newCommentText.trim();
@@ -248,6 +259,16 @@ function ThreadCard({
     <div
       ref={cardRef}
       data-item-id={thread.id}
+      onFocus={(e) => {
+        if ((e.target as HTMLElement).tagName === "TEXTAREA") {
+          setIsWriting(true);
+          cardRef.current?.classList.add("comment-thread-writing");
+          cardRef.current?.classList.remove("comment-thread-focused");
+        }
+      }}
+      onBlur={(e) => {
+        if ((e.target as HTMLElement).tagName === "TEXTAREA") setIsWriting(false);
+      }}
       style={{
         borderRadius: "6px",
         border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
