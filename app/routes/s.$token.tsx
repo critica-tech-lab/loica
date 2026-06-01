@@ -7,7 +7,12 @@ import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
 import { useDocTypeExtension } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
+import { PMToolbar } from "~/components/PMToolbar";
+import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
+import type { PMActiveState } from "~/components/editor/types";
 import { LinkModal } from "~/components/LinkModal";
+
+const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
 import { CommentPanel } from "~/components/CommentPanel";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
@@ -375,7 +380,7 @@ function LiveReadOnlyView({
   return (
     <>
     <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0, position: "relative", cursor: "default" }}>
-      {!editorReady && document.content && !ExtensionEditor && (
+      {!USE_PM && !editorReady && document.content && !ExtensionEditor && (
         <pre
           style={{
             position: "absolute",
@@ -408,6 +413,17 @@ function LiveReadOnlyView({
           userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
           onPresenceChange={onPresenceChange}
           onConnectionStatus={onConnectionStatus}
+        />
+      ) : USE_PM ? (
+        <ProseMirrorEditor
+          readOnly
+          docId={document.id}
+          wsUrl={wsUrl}
+          wsParams={{ token: shareToken }}
+          userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
+          onPresenceChange={onPresenceChange}
+          onConnectionStatus={onConnectionStatus}
+          onReady={() => { setEditorReady(true); }}
         />
       ) : (
         <Editor
@@ -482,6 +498,7 @@ function EditableView({
   const [showComments, setShowComments] = useState(false);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
+  const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [selectionBubble, setSelectionBubble] = useState<{ top: number; left: number } | null>(null);
   const [linkModal, setLinkModal] = useState<
@@ -524,19 +541,21 @@ function EditableView({
   return (
     <>
       {!ExtensionEditor && (
-        <Toolbar
-          onFormat={(b, a) => editorApi.current?.format(b, a)}
-          onFormatLine={(p) => editorApi.current?.formatLine(p)}
-          suggestionMode={suggestionMode}
-          onToggleSuggestionMode={onToggleSuggestionMode}
-          onLink={() => setLinkModal({
-            mode: "add",
-            onApply: (url) => { editorApi.current?.format("[", `](${url})`); },
-          })}
-        />
+        USE_PM
+          ? <PMToolbar activeState={pmActiveState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
+          : <Toolbar
+              onFormat={(b, a) => editorApi.current?.format(b, a)}
+              onFormatLine={(p) => editorApi.current?.formatLine(p)}
+              suggestionMode={suggestionMode}
+              onToggleSuggestionMode={onToggleSuggestionMode}
+              onLink={() => setLinkModal({
+                mode: "add",
+                onApply: (url) => { editorApi.current?.format("[", `](${url})`); },
+              })}
+            />
       )}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0, position: "relative" }}>
-        {!editorReady && document.content && !ExtensionEditor && (
+        {!USE_PM && !editorReady && document.content && !ExtensionEditor && (
           <pre
             style={{
               position: "absolute",
@@ -571,6 +590,33 @@ function EditableView({
             userInfo={guestIdentity}
             onPresenceChange={onPresenceChange}
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
+          />
+        ) : USE_PM ? (
+          <ProseMirrorEditor
+            docId={document.id}
+            wsUrl={wsUrl}
+            wsParams={{ token: shareToken }}
+            userInfo={guestIdentity}
+            onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
+            onPresenceChange={onPresenceChange}
+            onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
+            onChange={(val) => { setContent(val); scheduleSave(val); }}
+            onStateChange={setPmActiveState}
+            onThreadsChange={setThreads}
+            onThreadClick={(thread) => {
+              setShowComments(true);
+              setFocusedThreadId(thread.id);
+              setFocusedSuggestionId(null);
+            }}
+            focusedCommentId={focusedThreadId}
+            onSelectionChange={(sel) => {
+              if (sel && sel.to > sel.from) {
+                setSelectionBubble({ top: sel.top, left: sel.left });
+              } else {
+                setSelectionBubble(null);
+              }
+            }}
+            autoFocus
           />
         ) : (
           <Editor

@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 interface Props {
   docId: string;
   wsUrl: string;
+  wsParams?: Record<string, string>;
   userInfo: { name: string; color: string };
   currentUserId?: string;
   readOnly?: boolean;
@@ -53,6 +54,7 @@ function loadDeps() {
 export function ProseMirrorEditor({
   docId,
   wsUrl,
+  wsParams,
   userInfo,
   readOnly = false,
   autoFocus = false,
@@ -139,6 +141,7 @@ export function ProseMirrorEditor({
 
       const provider = new WebsocketProvider(wsUrl, docId, ydoc, {
         connect: true,
+        params: wsParams ?? {},
       });
       providerRef.current = provider;
 
