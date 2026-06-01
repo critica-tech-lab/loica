@@ -250,16 +250,19 @@ function ThreadCard({
       style={{
         borderRadius: "10px",
         border: focused
-          ? "1px solid color-mix(in srgb, var(--accent) 35%, transparent)"
+          ? "1px solid color-mix(in srgb, var(--accent) 65%, transparent)"
           : "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         background: animating
-          ? "color-mix(in srgb, var(--accent) 6%, var(--bg))"
+          ? "color-mix(in srgb, var(--accent) 14%, var(--bg))"
           : focused
-          ? "color-mix(in srgb, var(--accent) 3%, var(--bg))"
+          ? "color-mix(in srgb, var(--accent) 10%, var(--bg))"
           : "var(--bg)",
+        borderLeft: focused
+          ? "3px solid var(--accent)"
+          : "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         padding: "0.75rem 0.85rem",
         marginBottom: "0.6rem",
-        transition: "border-color 200ms ease-out, background 600ms ease-out",
+        transition: "border-color 200ms ease-out, background 300ms ease-out, border-left 200ms ease-out",
         opacity: thread.resolved ? 0.6 : 1,
       }}
     >
