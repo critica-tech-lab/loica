@@ -73,14 +73,8 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
-  const commentFocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const focusComment = useCallback((id: string | null) => {
-    if (commentFocusTimer.current) clearTimeout(commentFocusTimer.current);
     setFocusedCommentId(id);
-    if (id) {
-      commentFocusTimer.current = setTimeout(() => setFocusedCommentId(null), 3000);
-    }
   }, [setFocusedCommentId]);
 
   // ── Undo-create toast ─────────────────────────────────

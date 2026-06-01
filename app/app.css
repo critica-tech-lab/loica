@@ -1766,6 +1766,16 @@ html {
   pointer-events: none;
 }
 
+/* ─── Comment thread card focus flash ───────────────────── */
+@keyframes comment-thread-flash {
+  0%   { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); }
+  60%  { background: color-mix(in srgb, var(--accent) 8%, var(--bg));  border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  100% { background: var(--bg); border-color: color-mix(in srgb, var(--fg) 10%, transparent); }
+}
+.comment-thread-focused {
+  animation: comment-thread-flash 2.5s ease-out forwards;
+}
+
 /* ─── PM comment highlights ──────────────────────────────── */
 .pm-comment-highlight {
   background-color: color-mix(in srgb, #f59e0b 22%, transparent);

@@ -204,9 +204,9 @@ function ThreadCard({
   onMention?: (body: string) => void;
 }) {
   const [replyText, setReplyText] = useState("");
-  const [animating, setAnimating] = useState(false);
   const newCommentRef = useRef<HTMLTextAreaElement>(null);
   const [newCommentText, setNewCommentText] = useState("");
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const isNew = !thread.body && thread.replies.length === 0;
   const isOwn = currentUserId === thread.userId;
@@ -216,11 +216,11 @@ function ThreadCard({
   }, []);
 
   useEffect(() => {
-    if (focused) {
-      setAnimating(true);
-      const t = setTimeout(() => setAnimating(false), 1000);
-      return () => clearTimeout(t);
-    }
+    if (!focused || !cardRef.current) return;
+    const el = cardRef.current;
+    el.classList.remove("comment-thread-focused");
+    void el.offsetWidth; // force reflow to restart animation
+    el.classList.add("comment-thread-focused");
   }, [focused]);
 
   const handleNewSave = () => {
@@ -246,20 +246,14 @@ function ThreadCard({
 
   return (
     <div
+      ref={cardRef}
       data-item-id={thread.id}
       style={{
         borderRadius: "10px",
-        border: focused
-          ? "1px solid color-mix(in srgb, var(--accent) 65%, transparent)"
-          : "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
-        background: animating
-          ? "color-mix(in srgb, var(--accent) 14%, var(--bg))"
-          : focused
-          ? "color-mix(in srgb, var(--accent) 10%, var(--bg))"
-          : "var(--bg)",
+        border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
+        background: "var(--bg)",
         padding: "0.75rem 0.85rem",
         marginBottom: "0.6rem",
-        transition: "border-color 200ms ease-out, background 300ms ease-out",
         opacity: thread.resolved ? 0.6 : 1,
       }}
     >
