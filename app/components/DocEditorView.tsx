@@ -2,7 +2,7 @@ import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
 import { TrackChangePopup } from "~/components/TrackChangePopup";
-import type { PMActiveState } from "~/components/editor/types";
+import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
 import type { DocMenuItem } from "~/components/DocMenu";
@@ -75,6 +75,7 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [editingMode, setEditingMode] = useState<EditingMode>("editing");
   const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
@@ -209,6 +210,25 @@ export function DocEditorView(_props: DocumentProps) {
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity 150ms ease-out", position: "relative" }}>
+        {/* Suggesting mode banner */}
+        {editingMode === "suggesting" && (
+          <div style={{
+            padding: "0.3rem 1rem",
+            background: "color-mix(in srgb, #16a34a 10%, transparent)",
+            borderBottom: "1px solid color-mix(in srgb, #16a34a 25%, transparent)",
+            fontSize: "0.75rem",
+            color: "#15803d",
+            fontFamily: "var(--font-ui)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            flexShrink: 0,
+          }}>
+            <span>💬</span>
+            <span><strong>You&apos;re suggesting.</strong> Your edits will be tracked and can be accepted or rejected.</span>
+          </div>
+        )}
+
         {historyPreview && (
           <HistoryPreviewPane
             content={historyPreview.content}
@@ -222,8 +242,24 @@ export function DocEditorView(_props: DocumentProps) {
             ? <PMToolbar
                 activeState={pmActiveState}
                 trackChangesState={trackChangesState}
+                editingMode={editingMode}
                 onLink={openLinkModal}
                 onOpenChangesPanel={() => setActivePanel(activePanel === "changes" ? null : "changes")}
+                onModeChange={(mode) => {
+                  const prev = editingMode;
+                  setEditingMode(mode);
+                  const api = ctx.editorApi.current;
+                  if (mode === "suggesting" && prev !== "suggesting") {
+                    if (!trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(false);
+                  } else if (mode === "editing") {
+                    if (trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(false);
+                  } else if (mode === "viewing") {
+                    if (trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(true);
+                  }
+                }}
               />
             : toolbarOpen && <Toolbar variant="pill" onLink={openLinkModal} />
         )}

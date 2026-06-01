@@ -26,6 +26,8 @@ export interface TrackChangesActiveState {
   changes: TrackedChangeEntry[];
 }
 
+export type EditingMode = "editing" | "suggesting" | "viewing";
+
 // Deterministic author color — same palette Word uses for the first 7 authors.
 const AUTHOR_COLORS = ["#2563eb","#dc2626","#16a34a","#7c3aed","#d97706","#0891b2","#be185d"];
 export function authorTrackColor(authorId: string): string {

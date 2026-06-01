@@ -73,6 +73,7 @@ export interface EditorApi {
   toggleOrderedList?: () => void;
   insertTable?: () => void;
   insertHr?: () => void;
+  setViewOnly?: (on: boolean) => void;
   toggleTrackChanges?: () => void;
   acceptAllChanges?: () => void;
   rejectAllChanges?: () => void;

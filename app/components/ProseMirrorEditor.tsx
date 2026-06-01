@@ -575,6 +575,10 @@ export function ProseMirrorEditor({
 
         focus: () => view.focus(),
 
+        setViewOnly: (on: boolean) => {
+          view.setProps({ editable: () => !on && !readOnlyRef.current });
+        },
+
         // Toggle markup visibility — CSS class hides ins/del styling without accepting/rejecting
         setShowMarkup: (show: boolean) => {
           mountRef.current?.classList.toggle("hide-markup", !show);

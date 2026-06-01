@@ -1,15 +1,18 @@
+import { useState, useEffect, useRef } from "react";
 import { useOptionalDocument } from "~/lib/DocumentContext";
-import type { PMActiveState, TrackChangesActiveState } from "./editor/types";
+import type { PMActiveState, TrackChangesActiveState, EditingMode } from "./editor/types";
 
 interface Props {
   activeState: PMActiveState | null;
   trackChangesState?: TrackChangesActiveState | null;
+  editingMode?: EditingMode;
   onLink?: () => void;
   onImageUpload?: (file: File) => void;
   onOpenChangesPanel?: () => void;
+  onModeChange?: (mode: EditingMode) => void;
 }
 
-export function PMToolbar({ activeState, trackChangesState, onLink, onImageUpload, onOpenChangesPanel }: Props) {
+export function PMToolbar({ activeState, trackChangesState, editingMode = "editing", onLink, onImageUpload, onOpenChangesPanel, onModeChange }: Props) {
   const ctx = useOptionalDocument();
   const api = ctx?.editorApi.current;
   const canEdit = ctx?.canEdit ?? false;
@@ -148,18 +151,8 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
 
       <Sep />
 
-      {/* Track changes — opens panel; active indicator when suggesting mode is on */}
-      <Btn
-        title="Track changes"
-        active={trackChangesState?.enabled ?? false}
-        onActivate={run(() => onOpenChangesPanel?.())}
-        icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-          </svg>
-        }
-      />
+      {/* Editing mode dropdown — Google Docs style */}
+      <ModeDropdown mode={editingMode} onModeChange={onModeChange} onOpenChangesPanel={onOpenChangesPanel} />
     </div>
   );
 }
@@ -212,5 +205,120 @@ function Btn({
     >
       {icon ?? children}
     </button>
+  );
+}
+
+const MODE_META: Record<EditingMode, { label: string; icon: string; color?: string }> = {
+  editing:    { label: "Editing",    icon: "✏" },
+  suggesting: { label: "Suggesting", icon: "💬", color: "#16a34a" },
+  viewing:    { label: "Viewing",    icon: "👁" },
+};
+
+function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
+  mode: EditingMode;
+  onModeChange?: (m: EditingMode) => void;
+  onOpenChangesPanel?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const meta = MODE_META[mode];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const select = (m: EditingMode) => {
+    setOpen(false);
+    onModeChange?.(m);
+    if (m === "suggesting") onOpenChangesPanel?.();
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        type="button"
+        onMouseDown={(e) => { e.preventDefault(); setOpen(v => !v); }}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.25rem",
+          padding: "0.18rem 0.45rem",
+          border: `1px solid ${meta.color ? meta.color + "50" : "color-mix(in srgb, var(--fg) 14%, transparent)"}`,
+          borderRadius: "6px",
+          background: meta.color ? `color-mix(in srgb, ${meta.color} 10%, transparent)` : "transparent",
+          color: meta.color ?? "var(--fg)",
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          cursor: "pointer",
+          fontFamily: "var(--font-ui)",
+          transition: "background 100ms",
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span style={{ fontSize: "0.8rem" }}>{meta.icon}</span>
+        <span>{meta.label}</span>
+        <span style={{ fontSize: "0.6rem", opacity: 0.6, marginLeft: "1px" }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            minWidth: 160,
+            background: "var(--bg)",
+            border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
+            borderRadius: "8px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+            zIndex: 100,
+            overflow: "hidden",
+            fontFamily: "var(--font-ui)",
+          }}
+        >
+          {(["editing", "suggesting", "viewing"] as EditingMode[]).map((m) => {
+            const item = MODE_META[m];
+            const active = m === mode;
+            return (
+              <button
+                key={m}
+                role="option"
+                aria-selected={active}
+                onMouseDown={(e) => { e.preventDefault(); select(m); }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  padding: "0.5rem 0.75rem",
+                  border: "none",
+                  background: active ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent",
+                  color: item.color ?? "var(--fg)",
+                  fontSize: "0.8rem",
+                  fontWeight: active ? 600 : 400,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "var(--font-ui)",
+                  transition: "background 80ms",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = active ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent"; }}
+              >
+                <span style={{ fontSize: "0.9rem", width: 18, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {active && <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
