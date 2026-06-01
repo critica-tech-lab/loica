@@ -43,14 +43,6 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
         background: "var(--bg)",
       }}
     >
-      {/* Headings */}
-      <Btn title="Heading 1 (Ctrl+Alt+1)" active={blockType === "h1"} style={{ fontWeight: 700, fontSize: "0.95rem" }} onActivate={run(() => api?.setHeading?.(1))}>H1</Btn>
-      <Btn title="Heading 2 (Ctrl+Alt+2)" active={blockType === "h2"} style={{ fontWeight: 700, fontSize: "0.88rem" }} onActivate={run(() => api?.setHeading?.(2))}>H2</Btn>
-      <Btn title="Heading 3 (Ctrl+Alt+3)" active={blockType === "h3"} style={{ fontWeight: 700, fontSize: "0.8rem" }} onActivate={run(() => api?.setHeading?.(3))}>H3</Btn>
-      <Btn title="Heading 4 (Ctrl+Alt+4)" active={blockType === "h4"} style={{ fontWeight: 700, fontSize: "0.75rem" }} onActivate={run(() => api?.setHeading?.(4))}>H4</Btn>
-
-      <Sep />
-
       {/* Inline marks */}
       <Btn title="Bold (Ctrl+B)" active={active?.strong} style={{ fontWeight: 700 }} onActivate={fmt("**")}>B</Btn>
       <Btn title="Italic (Ctrl+I)" active={active?.em} style={{ fontStyle: "italic" }} onActivate={fmt("*")}>I</Btn>
@@ -74,6 +66,14 @@ export function PMToolbar({ activeState, onLink, onImageUpload }: Props) {
         }
       />
       <Btn title="Link (Ctrl+K)" active={false} onActivate={run(() => onLink?.())} style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>Link</Btn>
+
+      <Sep />
+
+      {/* Headings */}
+      <Btn title="Heading 1 (Ctrl+Alt+1)" active={blockType === "h1"} style={{ fontWeight: 700, fontSize: "0.95rem" }} onActivate={run(() => api?.setHeading?.(1))}>H1</Btn>
+      <Btn title="Heading 2 (Ctrl+Alt+2)" active={blockType === "h2"} style={{ fontWeight: 700, fontSize: "0.88rem" }} onActivate={run(() => api?.setHeading?.(2))}>H2</Btn>
+      <Btn title="Heading 3 (Ctrl+Alt+3)" active={blockType === "h3"} style={{ fontWeight: 700, fontSize: "0.8rem" }} onActivate={run(() => api?.setHeading?.(3))}>H3</Btn>
+      <Btn title="Heading 4 (Ctrl+Alt+4)" active={blockType === "h4"} style={{ fontWeight: 700, fontSize: "0.75rem" }} onActivate={run(() => api?.setHeading?.(4))}>H4</Btn>
 
       <Sep />
 
