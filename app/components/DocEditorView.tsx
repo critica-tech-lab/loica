@@ -271,6 +271,7 @@ export function DocEditorView(_props: DocumentProps) {
                     && sel.from < t.to && sel.to > t.from
                 );
                 if (hit) {
+                  setActivePanel("comments");
                   setFocusedCommentId(hit.id);
                   selectionFocusedIdRef.current = hit.id;
                 } else if (selectionFocusedIdRef.current) {
