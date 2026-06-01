@@ -262,7 +262,7 @@ export function DocEditorView(_props: DocumentProps) {
               setActivePanel("comments");
               setFocusedCommentId(thread.id);
               setFocusedSuggestionId(null);
-              selectionFocusedIdRef.current = null;
+              selectionFocusedIdRef.current = thread.id;
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {

@@ -226,6 +226,10 @@ export function ProseMirrorEditor({
         };
       }
 
+      // Set to a commentId during the synchronous click→dispatchTransaction window
+      // so we can suppress the null-selection emission for that same click.
+      let pendingClickId: string | null = null;
+
       let view: any = null;
       view = new EditorView(mountRef.current, {
         state,
@@ -241,7 +245,11 @@ export function ProseMirrorEditor({
             const commentId = el.getAttribute("data-comment-id");
             if (!commentId) return false;
             const thread = threadsRef.current.find(t => t.id === commentId);
-            if (thread) onThreadClickRef.current?.(thread);
+            if (thread) {
+              pendingClickId = commentId;
+              Promise.resolve().then(() => { pendingClickId = null; });
+              onThreadClickRef.current?.(thread);
+            }
             return false;
           },
         },
@@ -260,7 +268,8 @@ export function ProseMirrorEditor({
               let top = 0, left = 0;
               try { const c = view.coordsAtPos(from); top = c.top; left = c.left; } catch {}
               onSelectionChangeRef.current({ from, to, top, left });
-            } else {
+            } else if (!pendingClickId) {
+              // Skip null emission for the same click that just focused a comment
               onSelectionChangeRef.current(null);
             }
           }
