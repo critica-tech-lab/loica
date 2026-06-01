@@ -152,7 +152,7 @@ export function PMToolbar({ activeState, trackChangesState, onLink, onImageUploa
       <Btn
         title={trackChangesState?.enabled ? "Track changes: on (click to disable)" : "Track changes: off (click to enable)"}
         active={trackChangesState?.enabled ?? false}
-        onActivate={run(() => api?.toggleTrackChanges?.())}
+        onActivate={run(() => { api?.toggleTrackChanges?.(); onOpenChangesPanel?.(); })}
         icon={
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9" />
