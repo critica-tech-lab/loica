@@ -18,7 +18,7 @@ import { SidePanel } from "~/components/SidePanel";
 import { CommentIcon, ShareIcon, StarIcon, ClockIcon, DocIcon, TrashIcon } from "~/components/icons";
 import { useDocument, userColor } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { diffWords } from "diff";
 
 const TOOLBAR_OPEN_KEY = "loica.docToolbar.open";
@@ -73,6 +73,7 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const selectionFocusedIdRef = useRef<string | null>(null);
 
   // ── Undo-create toast ─────────────────────────────────
   // If this doc was just created (flash arming happens at the caller before
@@ -261,6 +262,7 @@ export function DocEditorView(_props: DocumentProps) {
               setActivePanel("comments");
               setFocusedCommentId(thread.id);
               setFocusedSuggestionId(null);
+              selectionFocusedIdRef.current = null;
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
@@ -269,9 +271,19 @@ export function DocEditorView(_props: DocumentProps) {
                   t => !t.resolved && t.from > 0 && t.to > t.from
                     && sel.from < t.to && sel.to > t.from
                 );
-                if (hit) setFocusedCommentId(hit.id);
+                if (hit) {
+                  setFocusedCommentId(hit.id);
+                  selectionFocusedIdRef.current = hit.id;
+                } else if (selectionFocusedIdRef.current) {
+                  setFocusedCommentId(null);
+                  selectionFocusedIdRef.current = null;
+                }
               } else {
                 setSelectionBubble(null);
+                if (selectionFocusedIdRef.current) {
+                  setFocusedCommentId(null);
+                  selectionFocusedIdRef.current = null;
+                }
               }
             }}
           />
