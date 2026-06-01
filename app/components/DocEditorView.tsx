@@ -18,7 +18,7 @@ import { SidePanel } from "~/components/SidePanel";
 import { CommentIcon, ShareIcon, StarIcon, ClockIcon, DocIcon, TrashIcon } from "~/components/icons";
 import { useDocument, userColor } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { diffWords } from "diff";
 
 const TOOLBAR_OPEN_KEY = "loica.docToolbar.open";
@@ -73,6 +73,15 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const commentFocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const focusComment = useCallback((id: string | null) => {
+    if (commentFocusTimer.current) clearTimeout(commentFocusTimer.current);
+    setFocusedCommentId(id);
+    if (id) {
+      commentFocusTimer.current = setTimeout(() => setFocusedCommentId(null), 3000);
+    }
+  }, [setFocusedCommentId]);
 
   // ── Undo-create toast ─────────────────────────────────
   // If this doc was just created (flash arming happens at the caller before
@@ -259,7 +268,7 @@ export function DocEditorView(_props: DocumentProps) {
             onThreadsChange={setComments}
             onThreadClick={(thread) => {
               setActivePanel("comments");
-              setFocusedCommentId(thread.id);
+              focusComment(thread.id);
               setFocusedSuggestionId(null);
             }}
             onSelectionChange={(sel) => {
@@ -269,15 +278,11 @@ export function DocEditorView(_props: DocumentProps) {
                   t => !t.resolved && t.from > 0 && t.to > t.from
                     && sel.from < t.to && sel.to > t.from
                 );
-                if (hit) {
-                  setActivePanel("comments");
-                  setFocusedCommentId(hit.id);
-                } else {
-                  setFocusedCommentId(null);
-                }
+                focusComment(hit?.id ?? null);
+                if (hit) setActivePanel("comments");
               } else {
                 setSelectionBubble(null);
-                setFocusedCommentId(null);
+                focusComment(null);
               }
             }}
           />
