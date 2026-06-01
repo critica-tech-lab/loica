@@ -4,15 +4,38 @@ import { nodes as basicNodes, marks as basicMarks } from "prosemirror-schema-bas
 import { addListNodes } from "prosemirror-schema-list";
 import { tableNodes } from "prosemirror-tables";
 
-// Extend image node to carry width/height for ResizableNodeView
+// dataTracked is required on all block nodes by @manuscripts/track-changes-plugin
+// when track changes is enabled — it stores pending change metadata.
+const DT = { dataTracked: { default: null } };
+
+function withDT(spec: any): any {
+  return { ...spec, attrs: { ...spec.attrs, ...DT } };
+}
+
+// Extend block nodes from prosemirror-schema-basic with dataTracked attr
+const extendedBasicNodes = {
+  ...basicNodes,
+  doc:        withDT(basicNodes.doc),
+  paragraph:  withDT(basicNodes.paragraph),
+  blockquote: withDT(basicNodes.blockquote),
+  horizontal_rule: withDT(basicNodes.horizontal_rule),
+  heading:    withDT(basicNodes.heading),
+  code_block: withDT(basicNodes.code_block),
+  // image extended below for width/height
+  hard_break: withDT(basicNodes.hard_break),
+  text:       basicNodes.text, // text node has no attrs
+};
+
+// Extend image node to carry width/height + dataTracked
 const extendedImage = {
-  ...basicNodes.image,
+  ...extendedBasicNodes.image,
   attrs: {
     src: {},
     alt: { default: null },
     title: { default: null },
     width: { default: null },
     height: { default: null },
+    ...DT,
   },
   toDOM(node: any) {
     const { src, alt, title, width, height } = node.attrs;
@@ -20,16 +43,24 @@ const extendedImage = {
   },
 };
 
-const withTables = OrderedMap.from({ ...basicNodes, image: extendedImage }).append(tableNodes({
-  tableGroup: "block",
-  cellContent: "block+",
-  cellAttributes: {},
-}));
+// Extend table nodes with dataTracked
+const rawTableNodes = tableNodes({ tableGroup: "block", cellContent: "block+", cellAttributes: {} });
+const extendedTableNodes: Record<string, any> = {};
+for (const [name, spec] of Object.entries(rawTableNodes)) {
+  extendedTableNodes[name] = withDT(spec);
+}
+
+const withTables = OrderedMap.from({ ...extendedBasicNodes, image: extendedImage }).append(extendedTableNodes);
 
 const allNodes = addListNodes(withTables, "paragraph block*", "block");
 
+// addListNodes adds bullet_list, ordered_list, list_item — extend those too
+const allNodesWithDT = allNodes.update("bullet_list",  withDT(allNodes.get("bullet_list")!))
+                               .update("ordered_list", withDT(allNodes.get("ordered_list")!))
+                               .update("list_item",    withDT(allNodes.get("list_item")!));
+
 export const schema = new Schema({
-  nodes: allNodes,
+  nodes: allNodesWithDT,
   marks: {
     ...basicMarks,
     underline: {
