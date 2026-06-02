@@ -12,6 +12,7 @@ export interface PMActiveState {
 
 export interface TrackedChangeEntry {
   id: string;
+  ids: string[]; // all segment IDs merged into this entry
   type: "insert" | "delete" | "other";
   text: string;
   authorId: string;

@@ -80,6 +80,10 @@ export function ProseMirrorEditor({
   const providerRef = useRef<any>(null);
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
+  const userInfoRef = useRef(userInfo);
+  userInfoRef.current = userInfo;
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
   // Stable ref to current threads — lets addComment() append without going through the plugin
   const threadsRef = useRef<ResolvedThread[]>([]);
   const onThreadsChangeRef = useRef(onThreadsChange);
@@ -168,6 +172,7 @@ export function ProseMirrorEditor({
       provider.awareness.setLocalStateField("user", {
         name: userInfo.name,
         color: userInfo.color,
+        userId: currentUserId,
       });
 
       provider.on("status", ({ status }: { status: string }) => {
@@ -254,6 +259,114 @@ export function ProseMirrorEditor({
         };
       }
 
+      // Cache the last doc used for the disabled-TC scan so we skip re-scanning
+      // when only cursor/selection changed (doc identity is stable in that case).
+      let lastScannedDoc: any = null;
+      let lastScannedPending: any[] = [];
+
+      function emitTCState(pmState: any) {
+        if (!onTrackChangesStateChangeRef.current) return;
+        const tcState = trackChangesPluginKey.getState(pmState);
+        if (!tcState) return;
+        // When TC is disabled the plugin resets changeSet to empty on every transaction.
+        // Fall back to scanning the doc directly for pending tracked marks/nodes.
+        const isEnabled = tcState.status === TrackChangesStatus.enabled;
+        let pending = tcState.changeSet.pending;
+        if (!isEnabled && pending.length === 0) {
+          if (pmState.doc === lastScannedDoc) {
+            pending = lastScannedPending;
+          } else {
+            const docPending: any[] = [];
+            pmState.doc.descendants((node: any, pos: number) => {
+            // Inline text: tracked_insert / tracked_delete marks
+            if (node.isText) {
+              node.marks.forEach((mark: any) => {
+                if (
+                  (mark.type === pmState.schema.marks.tracked_insert ||
+                   mark.type === pmState.schema.marks.tracked_delete) &&
+                  mark.attrs.dataTracked?.status === "pending"
+                ) {
+                  const dt = mark.attrs.dataTracked;
+                  docPending.push({
+                    id: dt.id,
+                    type: mark.type === pmState.schema.marks.tracked_insert ? "text-change" : "text-change",
+                    from: pos,
+                    to: pos + node.nodeSize,
+                    text: node.text ?? "",
+                    dataTracked: dt,
+                  });
+                }
+              });
+            } else {
+              // Block nodes with dataTracked
+              const dt = node.attrs?.dataTracked;
+              if (dt?.id && dt?.status === "pending") {
+                docPending.push({
+                  id: dt.id,
+                  type: "node-change",
+                  from: pos,
+                  to: pos + node.nodeSize,
+                  text: node.textContent ?? "",
+                  dataTracked: dt,
+                  node,
+                });
+              }
+            }
+            });
+            lastScannedDoc = pmState.doc;
+            lastScannedPending = docPending;
+            pending = docPending;
+          }
+        }
+        // Build userId → displayName map from awareness + current user
+        const userIdToName = new Map<string, string>();
+        const uid = currentUserIdRef.current;
+        if (uid) userIdToName.set(uid, userInfoRef.current.name);
+        providerRef.current?.awareness?.getStates().forEach((state: any) => {
+          if (state.user?.userId && state.user?.name) {
+            userIdToName.set(state.user.userId, state.user.name);
+          }
+        });
+
+        const raw: TrackedChangeEntry[] = pending.map((c: any) => {
+          const op = c.dataTracked?.operation ?? "";
+          const type: TrackedChangeEntry["type"] =
+            op === "insert" ? "insert" : op === "delete" ? "delete" : "other";
+          const text = c.text ?? c.node?.textContent ?? c.mark?.attrs?.dataTracked?.text ?? "";
+          const authorId = c.dataTracked?.authorID ?? "";
+          return {
+            id: c.id, ids: [c.id], type, text,
+            authorId,
+            authorName: userIdToName.get(authorId) ?? authorId,
+            createdAt: c.dataTracked?.createdAt ?? 0,
+            from: c.from ?? 0,
+            to: c.to ?? 0,
+          };
+        });
+        const changes: TrackedChangeEntry[] = [];
+        for (const c of raw) {
+          const last = changes[changes.length - 1];
+          if (
+            last &&
+            last.type === c.type &&
+            last.type !== "other" &&
+            last.authorId === c.authorId &&
+            c.from <= last.to + 2
+          ) {
+            last.to = c.to;
+            last.text = (last.text + c.text).trimStart();
+            last.ids.push(c.id);
+          } else {
+            changes.push({ ...c });
+          }
+        }
+        onTrackChangesStateChangeRef.current({
+          enabled: tcState.status === TrackChangesStatus.enabled,
+          pendingCount: changes.length,
+          changes,
+        });
+      }
+
       // Set to a commentId during the synchronous click→dispatchTransaction window
       // so we can suppress the null-selection emission for that same click.
       let pendingClickId: string | null = null;
@@ -320,50 +433,7 @@ export function ProseMirrorEditor({
           }
           onStateChange?.(computeActiveState(view.state));
           // Emit track-changes state
-          if (onTrackChangesStateChangeRef.current) {
-            const tcState = trackChangesPluginKey.getState(view.state);
-            if (tcState) {
-              const pending = tcState.changeSet.pending;
-              const raw: TrackedChangeEntry[] = pending.map((c: any) => {
-                const op = c.dataTracked?.operation ?? "";
-                const type: TrackedChangeEntry["type"] =
-                  op === "insert" ? "insert" : op === "delete" ? "delete" : "other";
-                // text-change has .text; node-change / mark-change use node textContent
-                const text = c.text ?? c.node?.textContent ?? c.mark?.attrs?.dataTracked?.text ?? "";
-                return {
-                  id: c.id, type, text,
-                  authorId: c.dataTracked?.authorID ?? "",
-                  authorName: c.dataTracked?.authorName ?? c.dataTracked?.authorID ?? "",
-                  createdAt: c.dataTracked?.createdAt ?? 0,
-                  from: c.from ?? 0,
-                  to: c.to ?? 0,
-                };
-              });
-              // Merge adjacent changes from the same author+type into one panel entry.
-              // The plugin often splits a continuous insertion into multiple segments.
-              const changes: TrackedChangeEntry[] = [];
-              for (const c of raw) {
-                const last = changes[changes.length - 1];
-                if (
-                  last &&
-                  last.type === c.type &&
-                  last.type !== "other" &&
-                  last.authorId === c.authorId &&
-                  c.from <= last.to + 2
-                ) {
-                  last.to = c.to;
-                  last.text = (last.text + c.text).trimStart();
-                } else {
-                  changes.push({ ...c });
-                }
-              }
-              onTrackChangesStateChangeRef.current({
-                enabled: tcState.status === TrackChangesStatus.enabled,
-                pendingCount: changes.length,
-                changes,
-              });
-            }
-          }
+          emitTCState(view.state);
           // Emit selection for bubble menu
           const { from, to } = view.state.selection;
           if (onSelectionChangeRef.current) {
@@ -646,13 +716,31 @@ export function ProseMirrorEditor({
           view.focus();
         },
 
-        acceptChangeById: (id: string) => {
-          trackCommands.setChangeStatuses(CHANGE_STATUS.accepted, [id])(view.state, view.dispatch);
+        acceptChangeById: (id: string, allIds?: string[], changeType?: string) => {
+          const ids = allIds ?? [id];
+          // "Accept = keep text": for deletions this means REJECTING the deletion (restoring text)
+          const status = changeType === "delete" ? CHANGE_STATUS.rejected : CHANGE_STATUS.accepted;
+          const tcState = trackChangesPluginKey.getState(view.state);
+          const wasDisabled = tcState?.status === TrackChangesStatus.disabled;
+          if (wasDisabled) trackCommands.setTrackingStatus(TrackChangesStatus.enabled)(view.state, view.dispatch);
+          trackCommands.setChangeStatuses(status, ids)(view.state, view.dispatch);
+          if (wasDisabled) Promise.resolve().then(() => {
+            trackCommands.setTrackingStatus(TrackChangesStatus.disabled)(view.state, view.dispatch);
+          });
           view.focus();
         },
 
-        rejectChangeById: (id: string) => {
-          trackCommands.setChangeStatuses(CHANGE_STATUS.rejected, [id])(view.state, view.dispatch);
+        rejectChangeById: (id: string, allIds?: string[], changeType?: string) => {
+          const ids = allIds ?? [id];
+          // "Reject = remove text": for deletions this means ACCEPTING the deletion (removing text)
+          const status = changeType === "delete" ? CHANGE_STATUS.accepted : CHANGE_STATUS.rejected;
+          const tcState = trackChangesPluginKey.getState(view.state);
+          const wasDisabled = tcState?.status === TrackChangesStatus.disabled;
+          if (wasDisabled) trackCommands.setTrackingStatus(TrackChangesStatus.enabled)(view.state, view.dispatch);
+          trackCommands.setChangeStatuses(status, ids)(view.state, view.dispatch);
+          if (wasDisabled) Promise.resolve().then(() => {
+            trackCommands.setTrackingStatus(TrackChangesStatus.disabled)(view.state, view.dispatch);
+          });
           view.focus();
         },
 
@@ -717,6 +805,7 @@ export function ProseMirrorEditor({
         if (!destroyed) {
           onReady?.(api);
           onStateChange?.(computeActiveState(view.state));
+          emitTCState(view.state);
         }
       });
 

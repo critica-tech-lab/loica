@@ -1,11 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { TrackedChangeEntry } from "~/components/editor/types";
+import { authorTrackColor } from "~/components/editor/types";
+import { timeAgo } from "~/lib/ui-utils";
 
-const TYPE_BG = {
-  insert: "color-mix(in srgb, #66800B 22%, #100F0F)",
-  delete: "color-mix(in srgb, #AF3029 22%, #100F0F)",
-  other:  "#100F0F",
-} as const;
+const POPUP_W = 240;
+const GAP = 8;
 
 interface Props {
   change: TrackedChangeEntry;
@@ -16,7 +15,7 @@ interface Props {
   onDismiss: () => void;
 }
 
-export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss }: Props) {
+export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, editorRef }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,9 +31,14 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss }:
     };
   }, [onDismiss]);
 
-  const bg = TYPE_BG[change.type];
-  const top = pos.y - 42;
-  const left = Math.min(Math.max(pos.x - 60, 8), window.innerWidth - 144);
+  const authorColor = authorTrackColor(change.authorId);
+  const snippet = change.text?.trim().slice(0, 80);
+
+  const editorRight = editorRef?.current?.getBoundingClientRect().right ?? null;
+  const left = editorRight != null
+    ? Math.min(editorRight + GAP, window.innerWidth - POPUP_W - GAP)
+    : Math.min(Math.max(pos.x - 60, GAP), window.innerWidth - POPUP_W - GAP);
+  const top = Math.min(Math.max(pos.y - 20, GAP), window.innerHeight - 160 - GAP);
 
   return (
     <div
@@ -43,48 +47,89 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss }:
         position: "fixed",
         top,
         left,
+        width: POPUP_W,
         zIndex: 400,
-        display: "inline-flex",
-        alignItems: "stretch",
-        background: bg,
-        color: "var(--bg)",
-        borderRadius: "8px",
-        boxShadow: "0 8px 24px rgba(16,15,15,0.25), 0 2px 6px rgba(16,15,15,0.15)",
-        overflow: "hidden",
+        background: "var(--bg)",
+        border: "1.5px solid var(--fg)",
+        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
         fontFamily: "var(--font-ui)",
+        fontSize: "0.82rem",
+        color: "var(--fg)",
       }}
     >
-      <Btn label="Accept" onActivate={() => { onAccept(change.id); onDismiss(); }} />
-      <div style={{ width: "1px", background: "color-mix(in srgb, var(--bg) 15%, transparent)", flexShrink: 0 }} />
-      <Btn label="Reject" onActivate={() => { onReject(change.id); onDismiss(); }} />
+      {/* Author + time */}
+      <div style={{ padding: "10px 12px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: snippet ? "8px" : 0 }}>
+          <Avatar name={change.authorName || "?"} color={authorColor} size={26} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: "0.78rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+              {change.authorName || "Unknown"}
+            </div>
+            <div style={{ fontSize: "0.66rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
+              {timeAgo(change.createdAt)}
+            </div>
+          </div>
+        </div>
+
+        {snippet && (
+          <div style={{
+            padding: "3px 8px",
+            borderLeft: `2px solid ${authorColor}`,
+            fontSize: "0.71rem",
+            color: "color-mix(in srgb, var(--fg) 55%, transparent)",
+            fontStyle: "italic",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            <strong>{change.type === "insert" ? "Add:" : "Remove:"}</strong> "{snippet}"
+          </div>
+        )}
+      </div>
+
+      <div style={{ height: "1px", background: "color-mix(in srgb, var(--fg) 12%, transparent)" }} />
+
+      {/* Accept / Reject */}
+      <div style={{ display: "flex", gap: "8px", padding: "8px 12px" }}>
+        <SmallBtn onClick={() => { onAccept(change.id); onDismiss(); }} primary>Accept</SmallBtn>
+        <SmallBtn onClick={() => { onReject(change.id); onDismiss(); }}>Reject</SmallBtn>
+      </div>
     </div>
   );
 }
 
-function Btn({ label, onActivate }: { label: string; onActivate: () => void }) {
+function Avatar({ name, color, size }: { name: string; color: string; size: number }) {
   return (
-    <button
-      type="button"
-      onMouseDown={(e) => { e.preventDefault(); onActivate(); }}
-      style={{
-        padding: "0 12px",
-        height: "32px",
-        background: "transparent",
-        color: "inherit",
-        border: "none",
-        cursor: "pointer",
-        fontSize: "13px",
-        lineHeight: 1,
-        display: "inline-flex",
-        alignItems: "center",
-        transition: "background 80ms ease-out",
-        fontFamily: "var(--font-ui)",
-        whiteSpace: "nowrap",
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--bg) 15%, transparent)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-    >
-      {label}
+    <span style={{
+      width: size, height: size,
+      borderRadius: "50%",
+      background: color,
+      flexShrink: 0,
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      color: "#fff", fontSize: size * 0.4, fontWeight: 700, userSelect: "none",
+    }}>
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: "3px 10px",
+      border: primary
+        ? "1px solid var(--fg)"
+        : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
+      borderRadius: 0,
+      fontSize: "0.71rem",
+      fontWeight: 600,
+      cursor: "pointer",
+      background: primary ? "var(--fg)" : "transparent",
+      color: primary ? "var(--bg)" : "var(--fg)",
+      fontFamily: "var(--font-ui)",
+      letterSpacing: "0.02em",
+    }}>
+      {children}
     </button>
   );
 }
