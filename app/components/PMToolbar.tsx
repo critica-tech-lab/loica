@@ -235,7 +235,6 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
   const select = (m: EditingMode) => {
     setOpen(false);
     onModeChange?.(m);
-    if (m === "suggesting") onOpenChangesPanel?.();
   };
 
   return (

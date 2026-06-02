@@ -1,10 +1,16 @@
 import { useEffect, useRef } from "react";
 import type { TrackedChangeEntry } from "~/components/editor/types";
-import { authorTrackColor } from "~/components/editor/types";
+
+const TYPE_BG = {
+  insert: "color-mix(in srgb, #66800B 22%, #100F0F)",
+  delete: "color-mix(in srgb, #AF3029 22%, #100F0F)",
+  other:  "#100F0F",
+} as const;
 
 interface Props {
   change: TrackedChangeEntry;
   pos: { x: number; y: number };
+  editorRef?: React.RefObject<HTMLDivElement | null>;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
   onDismiss: () => void;
@@ -12,15 +18,12 @@ interface Props {
 
 export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const color = authorTrackColor(change.authorId);
 
   useEffect(() => {
-    function onDown(e: MouseEvent) {
+    const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onDismiss();
-    }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onDismiss(); };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -29,93 +32,59 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss }:
     };
   }, [onDismiss]);
 
-  const label = change.type === "insert" ? "Insertion" : change.type === "delete" ? "Deletion" : "Change";
-  const date = change.createdAt ? new Date(change.createdAt * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-
-  // Position popup above the click point, clamped to viewport
-  const POPUP_W = 220;
-  const left = Math.min(Math.max(pos.x - POPUP_W / 2, 8), window.innerWidth - POPUP_W - 8);
-  const top = pos.y - 8; // will use translateY(-100%) to go above
+  const bg = TYPE_BG[change.type];
+  const top = pos.y - 42;
+  const left = Math.min(Math.max(pos.x - 60, 8), window.innerWidth - 144);
 
   return (
     <div
       ref={ref}
       style={{
         position: "fixed",
-        left,
         top,
-        transform: "translateY(-100%)",
-        width: POPUP_W,
-        background: "var(--bg)",
-        border: `1px solid ${color}40`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: "6px",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-        zIndex: 200,
-        fontFamily: "var(--font-ui)",
-        fontSize: "0.78rem",
+        left,
+        zIndex: 400,
+        display: "inline-flex",
+        alignItems: "stretch",
+        background: bg,
+        color: "var(--bg)",
+        borderRadius: "8px",
+        boxShadow: "0 8px 24px rgba(16,15,15,0.25), 0 2px 6px rgba(16,15,15,0.15)",
         overflow: "hidden",
+        fontFamily: "var(--font-ui)",
       }}
     >
-      {/* Header */}
-      <div style={{ padding: "0.4rem 0.6rem 0.3rem", borderBottom: `1px solid ${color}20`, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-        <span style={{
-          fontWeight: 700,
-          color,
-          fontSize: "0.7rem",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}>{label}</span>
-        {date && <span style={{ color: "color-mix(in srgb, var(--fg) 45%, transparent)", marginLeft: "auto", fontSize: "0.68rem" }}>{date}</span>}
-      </div>
-
-      {/* Change text preview */}
-      {change.text && (
-        <div style={{
-          padding: "0.3rem 0.6rem",
-          color: "color-mix(in srgb, var(--fg) 75%, transparent)",
-          fontStyle: change.type === "delete" ? "italic" : "normal",
-          textDecoration: change.type === "delete" ? "line-through" : "none",
-          textDecorationColor: color,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          borderBottom: `1px solid color-mix(in srgb, var(--fg) 7%, transparent)`,
-        }}>
-          {change.text.length > 50 ? change.text.slice(0, 50) + "…" : change.text}
-        </div>
-      )}
-
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 0 }}>
-        <button
-          onMouseDown={(e) => { e.preventDefault(); onAccept(change.id); onDismiss(); }}
-          style={actionBtn("#16a34a")}
-        >
-          ✓ Accept
-        </button>
-        <button
-          onMouseDown={(e) => { e.preventDefault(); onReject(change.id); onDismiss(); }}
-          style={actionBtn("#dc2626")}
-        >
-          ✗ Reject
-        </button>
-      </div>
+      <Btn label="Accept" onActivate={() => { onAccept(change.id); onDismiss(); }} />
+      <div style={{ width: "1px", background: "color-mix(in srgb, var(--bg) 15%, transparent)", flexShrink: 0 }} />
+      <Btn label="Reject" onActivate={() => { onReject(change.id); onDismiss(); }} />
     </div>
   );
 }
 
-function actionBtn(color: string): React.CSSProperties {
-  return {
-    flex: 1,
-    padding: "0.3rem",
-    border: "none",
-    background: "transparent",
-    borderTop: `1px solid color-mix(in srgb, var(--fg) 7%, transparent)`,
-    color,
-    fontSize: "0.72rem",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "var(--font-ui)",
-  };
+function Btn({ label, onActivate }: { label: string; onActivate: () => void }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => { e.preventDefault(); onActivate(); }}
+      style={{
+        padding: "0 12px",
+        height: "32px",
+        background: "transparent",
+        color: "inherit",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "13px",
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        transition: "background 80ms ease-out",
+        fontFamily: "var(--font-ui)",
+        whiteSpace: "nowrap",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--bg) 15%, transparent)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+    >
+      {label}
+    </button>
+  );
 }

@@ -1809,7 +1809,11 @@ html {
 .pm-editor-mount .ProseMirror .has-comment-indicator {
   position: relative;
 }
-/* Allow table indicator to escape the table's overflow:hidden */
+/* Allow indicator to escape table overflow — both the table and its wrapper clip */
+.pm-editor-mount .ProseMirror table:has(.has-comment-indicator),
+.pm-editor-mount .tableWrapper:has(.has-comment-indicator) {
+  overflow: visible;
+}
 .pm-editor-mount .ProseMirror table .has-comment-indicator {
   overflow: visible;
 }
@@ -1834,7 +1838,8 @@ ins.tracked-insert {
   cursor: pointer;
   font-style: normal;
 }
-ins.tracked-insert:hover {
+ins.tracked-insert:hover,
+ins.tracked-insert.tc-focused {
   background-color: rgba(21,128,61,0.08);
   border-radius: 2px;
 }
@@ -1846,7 +1851,8 @@ del.tracked-delete {
   background: none;
   cursor: pointer;
 }
-del.tracked-delete:hover {
+del.tracked-delete:hover,
+del.tracked-delete.tc-focused {
   background-color: rgba(185,28,28,0.08);
   border-radius: 2px;
 }
@@ -1869,16 +1875,3 @@ del.tracked-delete:hover {
   margin-left: 0 !important;
 }
 
-/* Subtle left bar for tracked-change paragraphs — thinner, neutral */
-.pm-editor-mount .ProseMirror p:has(ins.tracked-insert),
-.pm-editor-mount .ProseMirror p:has(del.tracked-delete),
-.pm-editor-mount .ProseMirror h1:has(ins.tracked-insert),
-.pm-editor-mount .ProseMirror h2:has(ins.tracked-insert),
-.pm-editor-mount .ProseMirror h3:has(ins.tracked-insert),
-.pm-editor-mount .ProseMirror h1:has(del.tracked-delete),
-.pm-editor-mount .ProseMirror h2:has(del.tracked-delete),
-.pm-editor-mount .ProseMirror h3:has(del.tracked-delete) {
-  border-left: 2px solid color-mix(in srgb, var(--fg) 20%, transparent);
-  padding-left: 0.4rem;
-  margin-left: -0.65rem;
-}

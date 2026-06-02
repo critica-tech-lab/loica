@@ -15,6 +15,7 @@ export interface TrackedChangeEntry {
   type: "insert" | "delete" | "other";
   text: string;
   authorId: string;
+  authorName: string;
   createdAt: number;
   from: number;
   to: number;

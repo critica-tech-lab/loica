@@ -268,17 +268,7 @@ export function ProseMirrorEditor({
         handleDOMEvents: {
           click: (_view: any, event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            // Tracked change click → inline popup
-            const trackEl = target.closest("[data-change-id]") as HTMLElement | null;
-            if (trackEl) {
-              const changeId = trackEl.getAttribute("data-change-id");
-              if (changeId && onTrackChangeClickRef.current) {
-                const rect = trackEl.getBoundingClientRect();
-                onTrackChangeClickRef.current(changeId, { x: rect.left + rect.width / 2, y: rect.top });
-                return false;
-              }
-            }
-            // Comment indicator icon click (the bubble in the margin)
+            // Comment indicator icon (highest priority — always a comment action)
             const indicatorEl = target.closest(".pm-comment-indicator") as HTMLElement | null;
             if (indicatorEl) {
               const commentId = indicatorEl.getAttribute("data-comment-id");
@@ -293,17 +283,30 @@ export function ProseMirrorEditor({
               }
               return false;
             }
-            // Comment highlight click
-            const el = target.closest("[data-comment-id]") as HTMLElement | null;
-            if (!el) return false;
-            const commentId = el.getAttribute("data-comment-id");
-            if (!commentId) return false;
-            const thread = threadsRef.current.find(t => t.id === commentId);
-            if (thread) {
-              const rect = el.getBoundingClientRect();
-              pendingClickId = commentId;
-              Promise.resolve().then(() => { pendingClickId = null; });
-              onThreadClickRef.current?.(thread, { x: rect.right, y: rect.top });
+            // Comment highlight (wins over tracked change when both overlap)
+            const commentEl = target.closest("[data-comment-id]") as HTMLElement | null;
+            if (commentEl) {
+              const commentId = commentEl.getAttribute("data-comment-id");
+              if (commentId) {
+                const thread = threadsRef.current.find(t => t.id === commentId);
+                if (thread) {
+                  const rect = commentEl.getBoundingClientRect();
+                  pendingClickId = commentId;
+                  Promise.resolve().then(() => { pendingClickId = null; });
+                  onThreadClickRef.current?.(thread, { x: rect.right, y: rect.top });
+                }
+              }
+              return false;
+            }
+            // Tracked change click → open changes panel
+            const trackEl = target.closest("[data-change-id]") as HTMLElement | null;
+            if (trackEl) {
+              const changeId = trackEl.getAttribute("data-change-id");
+              if (changeId && onTrackChangeClickRef.current) {
+                const rect = trackEl.getBoundingClientRect();
+                onTrackChangeClickRef.current(changeId, { x: rect.left + rect.width / 2, y: rect.top });
+                return false;
+              }
             }
             return false;
           },
@@ -330,6 +333,7 @@ export function ProseMirrorEditor({
                 return {
                   id: c.id, type, text,
                   authorId: c.dataTracked?.authorID ?? "",
+                  authorName: c.dataTracked?.authorName ?? c.dataTracked?.authorID ?? "",
                   createdAt: c.dataTracked?.createdAt ?? 0,
                   from: c.from ?? 0,
                   to: c.to ?? 0,
@@ -503,6 +507,7 @@ export function ProseMirrorEditor({
             createdAt: now,
             updatedAt: now,
           });
+          view.dispatch(view.state.tr); // rebuild decorations so indicator appears immediately
 
           // Immediately surface the new comment to React without waiting for
           // the plugin observer chain (which may be async or miss first render).
@@ -558,7 +563,7 @@ export function ProseMirrorEditor({
 
         deleteComment: (commentId: string) => {
           commentsMap.delete(commentId);
-          // Remove root thread or reply
+          view.dispatch(view.state.tr); // rebuild decorations
           const withoutThread = threadsRef.current.filter(t => t.id !== commentId);
           const updated = withoutThread.map(t => ({
             ...t, replies: t.replies.filter(r => r.id !== commentId),
@@ -570,6 +575,7 @@ export function ProseMirrorEditor({
         resolveThread: (threadId: string) => {
           const entry = commentsMap.get(threadId);
           if (entry) commentsMap.set(threadId, { ...entry, resolved: 1, updatedAt: Math.floor(Date.now() / 1000) });
+          view.dispatch(view.state.tr); // rebuild decorations
           const updated = threadsRef.current.map(t => t.id === threadId ? { ...t, resolved: true } : t);
           threadsRef.current = updated;
           onThreadsChangeRef.current?.(updated);
@@ -578,6 +584,7 @@ export function ProseMirrorEditor({
         unresolveThread: (threadId: string) => {
           const entry = commentsMap.get(threadId);
           if (entry) commentsMap.set(threadId, { ...entry, resolved: 0, updatedAt: Math.floor(Date.now() / 1000) });
+          view.dispatch(view.state.tr); // rebuild decorations
           const updated = threadsRef.current.map(t => t.id === threadId ? { ...t, resolved: false } : t);
           threadsRef.current = updated;
           onThreadsChangeRef.current?.(updated);

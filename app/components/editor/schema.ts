@@ -10,7 +10,22 @@ import { authorTrackColor } from "./types";
 const DT = { dataTracked: { default: null } };
 
 function withDT(spec: any): any {
-  return { ...spec, attrs: { ...spec.attrs, ...DT } };
+  const origToDOM = spec.toDOM;
+  return {
+    ...spec,
+    attrs: { ...spec.attrs, ...DT },
+    toDOM(node: any) {
+      const base: any[] = origToDOM ? origToDOM.call(this, node) : ["div", 0];
+      const dt = node.attrs?.dataTracked;
+      if (!dt?.id) return base;
+      const [tag, ...rest] = base;
+      // Merge data-change-id into existing attrs object, or insert one
+      if (rest.length > 0 && rest[0] !== null && typeof rest[0] === "object" && !Array.isArray(rest[0])) {
+        return [tag, { ...rest[0], "data-change-id": dt.id }, ...rest.slice(1)];
+      }
+      return [tag, { "data-change-id": dt.id }, ...rest];
+    },
+  };
 }
 
 // Extend block nodes from prosemirror-schema-basic with dataTracked attr

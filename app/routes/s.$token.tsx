@@ -605,6 +605,7 @@ function EditableView({
                   pos={commentPopup.pos}
                   currentUserId={guestIdentity.name}
                   editorApiRef={editorApi as any}
+                  editorRef={editorMountRef}
                   onDismiss={() => { setCommentPopup(null); setFocusedThreadId(null); }}
                 />
               ) : null;

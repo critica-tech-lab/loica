@@ -1,8 +1,8 @@
 import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
-import { TrackChangePopup } from "~/components/TrackChangePopup";
 import { CommentPopup } from "~/components/CommentPopup";
+import { TrackChangePopup } from "~/components/TrackChangePopup";
 import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
@@ -77,8 +77,16 @@ export function DocEditorView(_props: DocumentProps) {
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [editingMode, setEditingMode] = useState<EditingMode>("editing");
-  const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
   const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
+  const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
+
+  useEffect(() => {
+    if (!trackPopup) return;
+    const els = window.document.querySelectorAll<HTMLElement>(`[data-change-id="${trackPopup.changeId}"]`);
+    els.forEach(el => el.classList.add("tc-focused"));
+    return () => { els.forEach(el => el.classList.remove("tc-focused")); };
+  }, [trackPopup]);
+
   const editorMountRef = useRef<HTMLDivElement | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
@@ -332,7 +340,9 @@ export function DocEditorView(_props: DocumentProps) {
                 } else {
                   setSelectionBubble(null);
                   focusComment(null);
-                  setCommentPopup(null);
+                  // Do NOT close commentPopup here — Y.js awareness transactions
+                  // fire cursor-position selection changes after every click, which
+                  // would close the popup before the user can interact with it.
                 }
               }}
             />
@@ -344,7 +354,21 @@ export function DocEditorView(_props: DocumentProps) {
                   pos={commentPopup.pos}
                   currentUserId={user.id}
                   editorApiRef={ctx.editorApi}
+                  editorRef={editorMountRef}
                   onDismiss={() => { setCommentPopup(null); focusComment(null); }}
+                />
+              ) : null;
+            })()}
+            {USE_PM && trackPopup && (() => {
+              const change = trackChangesState?.changes.find(c => c.id === trackPopup.changeId);
+              return change ? (
+                <TrackChangePopup
+                  change={change}
+                  pos={trackPopup.pos}
+                  editorRef={editorMountRef}
+                  onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id); setTrackPopup(null); }}
+                  onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id); setTrackPopup(null); }}
+                  onDismiss={() => setTrackPopup(null)}
                 />
               ) : null;
             })()}
@@ -383,21 +407,8 @@ export function DocEditorView(_props: DocumentProps) {
         )}
         </div>
 
-        <SelectionBubble onLink={openLinkModal} />
+        <SelectionBubble onLink={openLinkModal} onCommentAdded={(id, pos) => setCommentPopup({ threadId: id, pos })} />
 
-        {/* Track change inline popup */}
-        {trackPopup && (() => {
-          const change = trackChangesState?.changes.find(c => c.id === trackPopup.changeId);
-          return change ? (
-            <TrackChangePopup
-              change={change}
-              pos={trackPopup.pos}
-              onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id); }}
-              onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id); }}
-              onDismiss={() => setTrackPopup(null)}
-            />
-          ) : null;
-        })()}
 
         {/* Side panel */}
         {activePanel && <SidePanel />}
@@ -517,7 +528,7 @@ function HistoryPreviewPane({
   );
 }
 
-function SelectionBubble({ onLink }: { onLink: () => void }) {
+function SelectionBubble({ onLink, onCommentAdded }: { onLink: () => void; onCommentAdded?: (id: string, pos: { x: number; y: number }) => void }) {
   const { selectionBubble, setSelectionBubble, editorApi, setActivePanel, setFocusedCommentId, canEdit } = useDocument();
   if (!selectionBubble) return null;
 
@@ -576,6 +587,9 @@ function SelectionBubble({ onLink }: { onLink: () => void }) {
           const id = editorApi.current?.addComment() ?? null;
           setActivePanel("comments");
           setFocusedCommentId(id);
+          if (id && onCommentAdded) {
+            onCommentAdded(id, { x: selectionBubble.left, y: selectionBubble.top });
+          }
           dismiss();
         }}
       />

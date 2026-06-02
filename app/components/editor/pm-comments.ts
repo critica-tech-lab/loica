@@ -26,26 +26,9 @@ function findBlockInfo(doc: any, from: number): { indicatorPos: number; nodeFrom
     for (let d = $pos.depth; d >= 1; d--) {
       const node = $pos.node(d);
 
-      // Inside a table cell — find the last cell in this row
+      // Inside a table cell — skip indicator (table layout clips it; highlight alone is sufficient)
       if (node.type.name === "table_cell" || node.type.name === "table_header") {
-        const rowDepth = d - 1;
-        const rowNode = $pos.node(rowDepth);
-        const rowStart = $pos.before(rowDepth);
-        // Walk the row to find the last cell
-        let lastCellOffset = 0;
-        let lastCellNode: any = null;
-        rowNode.forEach((child: any, offset: number) => {
-          if (child.type.name === "table_cell" || child.type.name === "table_header") {
-            lastCellOffset = offset;
-            lastCellNode = child;
-          }
-        });
-        if (!lastCellNode) break;
-        const cellStart = rowStart + 1 + lastCellOffset; // +1 for row node start
-        const cellEnd = cellStart + lastCellNode.nodeSize;
-        // Widget at end of last cell's content
-        const indicatorPos = cellEnd - 1;
-        return { indicatorPos, nodeFrom: cellStart, nodeTo: cellEnd };
+        return null;
       }
 
       // Regular block
