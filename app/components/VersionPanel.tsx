@@ -54,7 +54,7 @@ export function VersionPanel({
     rows.push({
       type: "session",
       session,
-      sessionId: `s-${session.startedAt}-${session.userId}`,
+      sessionId: `s-${session.startedAt}-${session.userId ?? "anon"}`,
     });
   }
 
@@ -72,7 +72,7 @@ export function VersionPanel({
 
   // Find selected row (could be session or version)
   const selectedSession = selectedId?.startsWith("s-")
-    ? sessions.find(s => `s-${s.startedAt}-${s.userId}` === selectedId)
+    ? sessions.find(s => `s-${s.startedAt}-${s.userId ?? "anon"}` === selectedId)
     : null;
 
   const selectedVersion = !selectedId?.startsWith("s-")

@@ -731,8 +731,10 @@ export async function restoreDocumentVersion(
   // manual-versions view.
   const backupVersionId = createDocumentVersion(docId, userId, true);
 
+  // COALESCE keeps the existing yjs_state when the version is legacy (no yjs_state).
+  // Setting it to NULL would make the WS server reinit as blank for PM docs.
   db.prepare(
-    `UPDATE documents SET title = ?, content = ?, yjs_state = ?, updated_at = unixepoch() WHERE id = ?`
+    `UPDATE documents SET title = ?, content = ?, yjs_state = COALESCE(?, yjs_state), updated_at = unixepoch() WHERE id = ?`
   ).run(version.title, version.content, version.yjs_state ?? null, docId);
 
   // Notify ws-server to reset the room — await so the room is destroyed

@@ -289,7 +289,7 @@ export function ProseMirrorEditor({
                   const dt = mark.attrs.dataTracked;
                   docPending.push({
                     id: dt.id,
-                    type: mark.type === pmState.schema.marks.tracked_insert ? "text-change" : "text-change",
+                    type: mark.type === pmState.schema.marks.tracked_insert ? "insert" : "delete",
                     from: pos,
                     to: pos + node.nodeSize,
                     text: node.text ?? "",
@@ -589,7 +589,7 @@ export function ProseMirrorEditor({
             resolved: false,
             userId: currentUserId ?? "",
             userName: userInfo.name,
-            body: "",
+            body,
             createdAt: now,
             replies: [],
             top,
