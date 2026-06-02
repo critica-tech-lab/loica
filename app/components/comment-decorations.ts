@@ -62,7 +62,7 @@ export function getThreads(view: EditorView): ResolvedThread[] {
 
 // ─── Helpers ──────────────────────────────────────────────
 
-function authorColorFromName(name: string | null): string {
+export function authorColorFromName(name: string | null): string {
   if (!name) return "#facc15"; // default yellow for legacy comments
   let hash = 0;
   for (let i = 0; i < name.length; i++) {

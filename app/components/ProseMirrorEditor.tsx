@@ -13,6 +13,7 @@ interface Props {
   currentUserId?: string;
   readOnly?: boolean;
   autoFocus?: boolean;
+  mountRefOut?: React.RefObject<HTMLDivElement | null>;
   onReady?: (api: EditorApi) => void;
   onPresenceChange?: (peers: Peer[]) => void;
   onConnectionStatus?: (
@@ -60,6 +61,7 @@ export function ProseMirrorEditor({
   userInfo,
   readOnly = false,
   autoFocus = false,
+  mountRefOut,
   onReady,
   onPresenceChange,
   onConnectionStatus,
@@ -575,6 +577,15 @@ export function ProseMirrorEditor({
 
         focus: () => view.focus(),
 
+        getThreadPositions: () =>
+          threadsRef.current
+            .filter(t => !t.resolved && t.from > 0)
+            .map(t => {
+              let top = 0;
+              try { top = view.coordsAtPos(t.from).top; } catch {}
+              return { id: t.id, top };
+            }),
+
         setViewOnly: (on: boolean) => {
           view.setProps({ editable: () => !on && !readOnlyRef.current });
         },
@@ -706,6 +717,11 @@ export function ProseMirrorEditor({
     // docId / wsUrl change → full remount handled by `key` prop from parent
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId, wsUrl]);
+
+  // Forward mount ref to parent if requested
+  useEffect(() => {
+    if (mountRefOut) (mountRefOut as React.MutableRefObject<HTMLDivElement | null>).current = mountRef.current;
+  });
 
   return (
     <div

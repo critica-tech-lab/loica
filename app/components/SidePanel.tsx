@@ -38,25 +38,6 @@ export function SidePanel() {
   const closePanel = () => { setActivePanel(null); setFocusedCommentId(null); setFocusedSuggestionId(null); };
 
   switch (activePanel) {
-    case "comments":
-      return (
-        <CommentPanel
-          threads={comments}
-          currentUserId={user.id}
-          focusedThreadId={focusedCommentId}
-          focusedSuggestionId={focusedSuggestionId}
-          onClose={closePanel}
-          onScrollTo={(pos) => editorApi.current?.scrollToPos(pos)}
-          onReply={(threadId, body) => editorApi.current?.addReply(threadId, body)}
-          onEditComment={(commentId, body) => editorApi.current?.updateComment(commentId, body)}
-          onDeleteComment={(commentId) => editorApi.current?.deleteComment(commentId)}
-          onResolveThread={(threadId) => { editorApi.current?.resolveThread(threadId); setActivePanel(null); setFocusedCommentId(null); }}
-          onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
-          onFinish={() => editorApi.current?.focus()}
-          onMention={sendMention}
-        />
-      );
-
     case "history":
       return (
         <VersionPanel

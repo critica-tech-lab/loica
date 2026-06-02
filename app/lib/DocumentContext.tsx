@@ -61,6 +61,7 @@ export interface EditorApi {
   unresolveThread: (threadId: string) => void;
   scrollToPos: (pos: number) => void;
   focus: () => void;
+  getThreadPositions?: () => Array<{ id: string; top: number }>;
   uploadImage: (file: File) => void;
   insertAt: (pos: number, text: string) => void;
   replaceContent: (newContent: string, cursorPos?: number) => void;

@@ -2,6 +2,7 @@ import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
 import { TrackChangePopup } from "~/components/TrackChangePopup";
+import { FloatingComments } from "~/components/FloatingComments";
 import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
@@ -77,6 +78,7 @@ export function DocEditorView(_props: DocumentProps) {
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [editingMode, setEditingMode] = useState<EditingMode>("editing");
   const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
+  const editorMountRef = useRef<HTMLDivElement | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
   }, [setFocusedCommentId]);
@@ -289,52 +291,57 @@ export function DocEditorView(_props: DocumentProps) {
             onPresenceChange={setPeers}
           />
         ) : USE_PM ? (
-          <ProseMirrorEditor
-            key={editorKey}
-            docId={document.id}
-            wsUrl={wsUrl}
-            userInfo={{ name: user.name, color: userColor(user.id) }}
-            currentUserId={user.id}
-            readOnly={!canEdit}
-            autoFocus={canEdit}
-            onReady={(api) => registerEditorApi(api)}
-            onPresenceChange={setPeers}
-            onConnectionStatus={setConnectionStatus}
-            onChange={handleContentChange}
-            onStateChange={setPmActiveState}
-            onTrackChangesStateChange={setTrackChangesState}
-            onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
-            focusedCommentId={focusedCommentId}
-            onThreadsChange={setComments}
-            onThreadClick={(thread) => {
-              setActivePanel("comments");
-              focusComment(thread.id);
-              setFocusedSuggestionId(null);
-            }}
-            onSelectionChange={(sel) => {
-              if (!sel) {
-                // Editor blurred (click into panel etc) — clear bubble/focus but keep panel open
-                setSelectionBubble(null);
-                focusComment(null);
-                return;
-              }
-              if (sel.to > sel.from) {
-                // Range selection
-                setSelectionBubble({ top: sel.top, left: sel.left });
-                const hit = comments.find(
-                  t => !t.resolved && t.from > 0 && t.to > t.from
-                    && sel.from < t.to && sel.to > t.from
-                );
-                focusComment(hit?.id ?? null);
-                if (hit) setActivePanel("comments");
-              } else {
-                // Cursor click inside editor — close comments panel if cursor not on commented text
-                setSelectionBubble(null);
-                focusComment(null);
-                if (activePanel === "comments") setActivePanel(null);
-              }
-            }}
-          />
+          <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <ProseMirrorEditor
+              key={editorKey}
+              docId={document.id}
+              wsUrl={wsUrl}
+              userInfo={{ name: user.name, color: userColor(user.id) }}
+              currentUserId={user.id}
+              readOnly={!canEdit}
+              autoFocus={canEdit}
+              mountRefOut={editorMountRef}
+              onReady={(api) => registerEditorApi(api)}
+              onPresenceChange={setPeers}
+              onConnectionStatus={setConnectionStatus}
+              onChange={handleContentChange}
+              onStateChange={setPmActiveState}
+              onTrackChangesStateChange={setTrackChangesState}
+              onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
+              focusedCommentId={focusedCommentId}
+              onThreadsChange={setComments}
+              onThreadClick={(thread) => {
+                focusComment(thread.id);
+                setFocusedSuggestionId(null);
+              }}
+              onSelectionChange={(sel) => {
+                if (!sel) {
+                  setSelectionBubble(null);
+                  focusComment(null);
+                  return;
+                }
+                if (sel.to > sel.from) {
+                  setSelectionBubble({ top: sel.top, left: sel.left });
+                  const hit = comments.find(
+                    t => !t.resolved && t.from > 0 && t.to > t.from
+                      && sel.from < t.to && sel.to > t.from
+                  );
+                  focusComment(hit?.id ?? null);
+                } else {
+                  setSelectionBubble(null);
+                  focusComment(null);
+                }
+              }}
+            />
+            {USE_PM && comments.some(t => !t.resolved) && (
+              <FloatingComments
+                threads={comments}
+                focusedId={focusedCommentId}
+                onFocus={focusComment}
+                mountRef={editorMountRef}
+              />
+            )}
+          </div>
         ) : (
           <Editor
             key={editorKey}
