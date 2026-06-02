@@ -76,9 +76,24 @@ export function DocEditorView(_props: DocumentProps) {
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
-  const [editingMode, setEditingMode] = useState<EditingMode>("editing");
+  const [editingMode, setEditingMode] = useState<EditingMode>(() => {
+    if (typeof window === "undefined") return "editing";
+    const stored = localStorage.getItem(`loica.editingMode.${document.id}`);
+    return (stored as EditingMode) ?? "editing";
+  });
   const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
   const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
+
+  // Re-apply mode when editor becomes ready (restores suggesting mode after reload)
+  useEffect(() => {
+    if (!editorReady) return;
+    const api = ctx.editorApi.current;
+    if (editingMode === "suggesting" && !trackChangesState?.enabled) {
+      api?.toggleTrackChanges?.();
+    } else if (editingMode === "viewing") {
+      api?.setViewOnly?.(true);
+    }
+  }, [editorReady]);
 
   useEffect(() => {
     if (!trackPopup) return;
@@ -241,12 +256,23 @@ export function DocEditorView(_props: DocumentProps) {
         )}
 
         {historyPreview && (
-          <HistoryPreviewPane
-            content={historyPreview.content}
-            title={historyPreview.title}
-            label={historyPreview.label}
-            currentContent={historyPreview.currentContent}
-          />
+          USE_PM && historyPreview.yjsState ? (
+            <PMHistoryPreviewPane
+              yjsState={historyPreview.yjsState}
+              label={historyPreview.label}
+              onDismiss={() => ctx.setHistoryPreview(null)}
+              onRestore={historyPreview.versionId ? () => ctx.restoreVersion(historyPreview.versionId!) : undefined}
+            />
+          ) : (
+            <HistoryPreviewPane
+              content={historyPreview.content}
+              title={historyPreview.title}
+              label={historyPreview.label}
+              currentContent={historyPreview.currentContent}
+              onDismiss={() => ctx.setHistoryPreview(null)}
+              onRestore={historyPreview.versionId ? () => ctx.restoreVersion(historyPreview.versionId!) : undefined}
+            />
+          )
         )}
         {!hasCustomEditor && (
           USE_PM
@@ -259,6 +285,7 @@ export function DocEditorView(_props: DocumentProps) {
                 onModeChange={(mode) => {
                   const prev = editingMode;
                   setEditingMode(mode);
+                  try { localStorage.setItem(`loica.editingMode.${document.id}`, mode); } catch {}
                   const api = ctx.editorApi.current;
                   if (mode === "suggesting" && prev !== "suggesting") {
                     if (!trackChangesState?.enabled) api?.toggleTrackChanges?.();
@@ -360,14 +387,14 @@ export function DocEditorView(_props: DocumentProps) {
               ) : null;
             })()}
             {USE_PM && trackPopup && (() => {
-              const change = trackChangesState?.changes.find(c => c.id === trackPopup.changeId);
+              const change = trackChangesState?.changes.find(c => c.ids.includes(trackPopup.changeId));
               return change ? (
                 <TrackChangePopup
                   change={change}
                   pos={trackPopup.pos}
                   editorRef={editorMountRef}
-                  onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id); setTrackPopup(null); }}
-                  onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id); setTrackPopup(null); }}
+                  onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
+                  onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
                   onDismiss={() => setTrackPopup(null)}
                 />
               ) : null;
@@ -428,23 +455,66 @@ export function DocEditorView(_props: DocumentProps) {
   );
 }
 
-function HistoryPreviewPane({
-  content,
-  title,
+function PMHistoryPreviewPane({
+  yjsState,
   label,
-  currentContent,
+  onDismiss,
+  onRestore,
 }: {
-  content: string;
-  title: string;
+  yjsState: string;
   label: string;
-  currentContent: string;
+  onDismiss: () => void;
+  onRestore?: () => void;
 }) {
-  // Merged diff view: walk through each part from diffWords and render it with
-  // styling that reflects what happens if the user restores this version.
-  // - part.removed (in version, not in current) → will be RECOVERED → green
-  // - part.added   (in current, not in version) → will be LOST → red strikethrough
-  // - unchanged                                 → normal
-  const parts = useMemo(() => diffWords(content, currentContent), [content, currentContent]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let destroyed = false;
+    let view: any = null;
+
+    async function init() {
+      const [
+        { EditorState },
+        { EditorView },
+        Y,
+        { ySyncPlugin, ySyncPluginKey },
+        { schema },
+        { buildPlugins },
+      ] = await Promise.all([
+        import("prosemirror-state"),
+        import("prosemirror-view"),
+        import("yjs"),
+        import("y-prosemirror"),
+        import("~/components/editor/schema"),
+        import("~/components/editor/plugins"),
+      ]);
+
+      if (destroyed || !containerRef.current) return;
+
+      const ydoc = new Y.Doc();
+      const stateBytes = Uint8Array.from(atob(yjsState), (c) => c.charCodeAt(0));
+      Y.applyUpdate(ydoc, stateBytes);
+
+      const yXmlFragment = ydoc.getXmlFragment("prosemirror");
+
+      const plugins = [
+        ...buildPlugins(schema, true), // readOnly=true
+        ySyncPlugin(yXmlFragment),
+      ];
+
+      const state = EditorState.create({ schema, plugins });
+      view = new EditorView(containerRef.current, {
+        state,
+        editable: () => false,
+      });
+    }
+
+    init();
+    return () => {
+      destroyed = true;
+      view?.destroy();
+    };
+  }, [yjsState]);
 
   return (
     <div
@@ -467,12 +537,168 @@ function HistoryPreviewPane({
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
+          justifyContent: "space-between",
+          gap: "1rem",
           flexShrink: 0,
         }}
       >
-        <span style={{ color: "var(--accent)", fontWeight: 600 }}>Viewing version:</span>
-        <span>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={{ fontWeight: 600 }}>Viewing version:</span>
+          <span style={{ opacity: 0.7 }}>{label}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+          {onRestore && (
+            <button
+              onClick={() => {
+                if (confirm("Restore this version? Current content will be overwritten.")) {
+                  onRestore();
+                }
+              }}
+              title="Restore this version"
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.3rem 0.6rem",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+                transition: "opacity 120ms ease-out",
+                opacity: 0.9,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.9"; }}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            title="Close preview"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 4px",
+              color: "var(--fg)",
+              opacity: 0.6,
+              fontSize: "1rem",
+              lineHeight: 1,
+              transition: "opacity 120ms ease-out",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        className="pm-editor"
+        style={{ flex: 1, overflow: "auto", padding: "1rem 2rem" }}
+      />
+    </div>
+  );
+}
+
+function HistoryPreviewPane({
+  content,
+  title,
+  label,
+  currentContent,
+  onDismiss,
+  onRestore,
+}: {
+  content: string;
+  title: string;
+  label: string;
+  currentContent: string;
+  onDismiss: () => void;
+  onRestore?: () => void;
+}) {
+  // diffWords(content, currentContent):
+  // - part.removed = in content but not currentContent = added in this snapshot → green
+  // - part.added   = in currentContent but not content = removed in this snapshot → red strikethrough
+  const parts = useMemo(() => diffWords(content, currentContent), [content, currentContent]);
+  const hasChanges = parts.some(p => p.added || p.removed);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 5,
+        background: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "0.5rem 1rem",
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+          borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+          fontSize: "0.75rem",
+          color: "var(--fg)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>Viewing version:</span>
+          <span style={{ opacity: 0.8 }}>{label}</span>
+          {hasChanges && (
+            <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
+              <span style={{ background: "color-mix(in srgb, #22c55e 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+              {" "}
+              <span style={{ background: "color-mix(in srgb, #ef4444 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+          {onRestore && (
+            <button
+              onClick={() => { if (confirm("Restore this version? Current content will be overwritten.")) onRestore(); }}
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.25rem 0.6rem",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+              }}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            title="Close preview"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 4px",
+              color: "var(--fg)",
+              opacity: 0.6,
+              fontSize: "1rem",
+              lineHeight: 1,
+              transition: "opacity 120ms ease-out",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+          >
+            ×
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "2rem 1rem" }}>
         <div
@@ -487,12 +713,22 @@ function HistoryPreviewPane({
             wordBreak: "break-word",
           }}
         >
-          {title && (
+          {title && hasChanges && (
             <h1 style={{ marginTop: 0, fontSize: "1.5rem" }}>
               {title}
             </h1>
           )}
-          {parts.map((p, i) => {
+          {!content && (
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+              Content unavailable — this version predates rich history storage.
+            </p>
+          )}
+          {!hasChanges && content && (
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+              No changes compared to previous snapshot.
+            </p>
+          )}
+          {hasChanges && parts.map((p, i) => {
             if (p.removed) {
               return (
                 <span
@@ -879,15 +1115,6 @@ function DocNavActions({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
       <PresenceIndicator />
-      {hasComments && (
-        <TopbarIconBtn
-          title={unreadComments > 0 ? `Comments · ${unreadComments} unread` : "Comments"}
-          onClick={() => togglePanel("comments")}
-        >
-          <CommentIcon className="h-4 w-4" />
-          {unreadComments > 0 && <TopbarBadge count={unreadComments} />}
-        </TopbarIconBtn>
-      )}
       <TopbarIconBtn title="Share this doc" onClick={() => togglePanel("share")}>
         <ShareIcon className="h-4 w-4" />
       </TopbarIconBtn>

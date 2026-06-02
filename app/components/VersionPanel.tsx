@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "~/components/Toast";
 import { timeAgo } from "~/lib/ui-utils";
 import { useDocument } from "~/lib/DocumentContext";
-import type { DocumentVersionSummary, DocumentVersion } from "~/lib/document.server";
+import type { DocumentVersionSummary, DocumentVersion, UpdateSession } from "~/lib/document.server";
 
 interface VersionPanelProps {
   docId: string;
@@ -13,6 +13,10 @@ interface VersionPanelProps {
   inline?: boolean;
 }
 
+type HistoryRow =
+  | { type: "session"; session: UpdateSession; sessionId: string }
+  | { type: "version"; version: DocumentVersionSummary };
+
 export function VersionPanel({
   docId,
   onClose,
@@ -20,51 +24,87 @@ export function VersionPanel({
   onSaveVersion,
   inline = false,
 }: VersionPanelProps) {
-  const listFetcher = useFetcher<{ versions: DocumentVersionSummary[] }>();
+  const historyFetcher = useFetcher<{ sessions: UpdateSession[] }>();
+  const versionsFetcher = useFetcher<{ versions: DocumentVersionSummary[] }>();
   const versionFetcher = useFetcher<{ version: DocumentVersion }>();
-  // scrubberPos: 0 = oldest, versions.length = Now (rightmost, default).
-  // Stored as a fraction so it survives the list growing from polling.
-  const [scrubberPos, setScrubberPos] = useState(-1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { toast } = useToast();
   const { setHistoryPreview, content: currentContent } = useDocument();
 
-  // Load version list on mount and when docId changes,
-  // then poll every 15s so auto-saves show up without reopening the panel.
+  // Load on mount, poll every 15s
   useEffect(() => {
-    listFetcher.load(`/api/doc-versions/${docId}`);
+    historyFetcher.load(`/api/doc-history/${docId}`);
+    versionsFetcher.load(`/api/doc-versions/${docId}`);
     const interval = setInterval(() => {
-      listFetcher.load(`/api/doc-versions/${docId}`);
+      historyFetcher.load(`/api/doc-history/${docId}`);
+      versionsFetcher.load(`/api/doc-versions/${docId}`);
     }, 15_000);
     return () => clearInterval(interval);
   }, [docId]);
 
-  const versions = listFetcher.data?.versions ?? [];
-  // Default: anchor at "Now" (rightmost) until user moves the slider.
-  const effectivePos = scrubberPos < 0 ? versions.length : scrubberPos;
-  // Convert slider position → version index.
-  // pos === versions.length → Now (no selected version)
-  // pos === 0 → oldest
-  // pos === k → versions[versions.length - 1 - k]
-  const selectedVersion =
-    effectivePos < versions.length
-      ? versions[versions.length - 1 - effectivePos]
-      : null;
+  const sessions = historyFetcher.data?.sessions ?? [];
+  const versions = versionsFetcher.data?.versions ?? [];
   const previewVersion = versionFetcher.data?.version;
 
-  // When the scrubber moves onto a version, fetch its content for the diff.
+  // Show sessions (attributed edits) + manual saves only.
+  // Auto-saves are internal baselines for diffs — not user-meaningful rows.
+  const rows: HistoryRow[] = [];
+
+  for (const session of sessions) {
+    rows.push({
+      type: "session",
+      session,
+      sessionId: `s-${session.startedAt}-${session.userId}`,
+    });
+  }
+
+  for (const v of versions) {
+    if (!v.auto) {
+      rows.push({ type: "version", version: v });
+    }
+  }
+
+  rows.sort((a, b) => {
+    const timeA = a.type === "session" ? a.session.endedAt : a.version.created_at;
+    const timeB = b.type === "session" ? b.session.endedAt : b.version.created_at;
+    return timeB - timeA;
+  });
+
+  // Find selected row (could be session or version)
+  const selectedSession = selectedId?.startsWith("s-")
+    ? sessions.find(s => `s-${s.startedAt}-${s.userId}` === selectedId)
+    : null;
+
+  const selectedVersion = !selectedId?.startsWith("s-")
+    ? versions.find(v => v.id === selectedId)
+    : null;
+
+  // Session selected: diff is already in the session object (contentBefore/contentAfter)
   useEffect(() => {
-    if (!selectedVersion) {
-      setHistoryPreview(null);
+    if (!selectedSession) {
+      if (!selectedVersion) setHistoryPreview(null);
       return;
     }
-    if (previewVersion && previewVersion.id === selectedVersion.id) return;
-    versionFetcher.load(`/api/doc-versions/${docId}?versionId=${selectedVersion.id}`);
-  }, [selectedVersion?.id, docId]);
+    setHistoryPreview({
+      content: selectedSession.contentAfter,
+      title: "",
+      label: `${timeAgo(selectedSession.endedAt)} · ${selectedSession.updateCount} edit${selectedSession.updateCount !== 1 ? "s" : ""} by ${selectedSession.userName || "Anonymous"}`,
+      currentContent: selectedSession.contentBefore,
+      yjsState: undefined,
+      versionId: selectedSession.snapshotVersionId ?? undefined,
+    });
+  }, [selectedId, selectedSession]);
 
-  // Once the version content loads, publish it as the editor preview.
+  // Version selected: load it, then publish preview
   useEffect(() => {
     if (!selectedVersion) return;
-    if (!previewVersion || previewVersion.id !== selectedVersion.id) return;
+    if (previewVersion?.id === selectedVersion.id) return;
+    versionFetcher.load(`/api/doc-versions/${docId}?versionId=${selectedVersion.id}`);
+  }, [selectedId, docId, selectedVersion]);
+
+  // Publish preview for manual version
+  useEffect(() => {
+    if (!selectedVersion || !previewVersion || previewVersion.id !== selectedVersion.id) return;
     setHistoryPreview({
       content: previewVersion.content,
       title: previewVersion.title,
@@ -72,27 +112,39 @@ export function VersionPanel({
         selectedVersion.auto ? "auto-save" : (selectedVersion.creator_name ?? "manual save")
       }`,
       currentContent,
+      yjsState: previewVersion.yjs_state ?? undefined,
+      versionId: selectedVersion.id,
     });
-  }, [selectedVersion?.id, previewVersion?.id, currentContent]);
+  }, [selectedId, previewVersion?.id, currentContent, selectedVersion]);
 
-  // Clear the preview when the panel unmounts (user closes it).
-  useEffect(() => {
-    return () => setHistoryPreview(null);
-  }, []);
+  // Clear on unmount
+  useEffect(() => () => setHistoryPreview(null), []);
+
+  function handleSelect(id: string) {
+    setSelectedId(prev => prev === id ? null : id);
+  }
 
   function handleRestore() {
     if (!selectedVersion) return;
     if (!confirm("Restore this version? Current content will be overwritten.")) return;
     onRestore(selectedVersion.id);
-    // Post-restore toast (with Undo) fires from DocumentContext once the
-    // fetcher completes and returns the backup version id.
-    setScrubberPos(-1);
+    setSelectedId(null);
   }
 
   function handleSave() {
     onSaveVersion();
     toast("Version saved", "success");
-    setTimeout(() => listFetcher.load(`/api/doc-versions/${docId}`), 500);
+    setTimeout(() => versionsFetcher.load(`/api/doc-versions/${docId}`), 500);
+  }
+
+  function getAvatarInitials(name: string | null): string {
+    if (!name) return "?";
+    return name
+      .split(/\s+/)
+      .map(w => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   }
 
   return (
@@ -102,151 +154,126 @@ export function VersionPanel({
         <span style={{ fontWeight: 700, fontSize: "0.85rem" }}>Version history</span>
         <button
           onClick={onClose}
-          aria-label="Close version history"
-          className="cursor-pointer border-none bg-transparent text-fg text-[1.2rem] px-1 opacity-50 transition-opacity hover:opacity-100"
-        >&times;</button>
+          aria-label="Close"
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", opacity: 0.5, padding: "0 2px", color: "var(--fg)" }}
+        >×</button>
       </div>
 
       {/* Save button */}
-      <div style={{ padding: "0 0.75rem 0.5rem" }}>
+      <div style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)" }}>
         <button onClick={handleSave} style={saveBtnStyle}>
           Save current version
         </button>
       </div>
 
-      {/* Scrubber */}
-      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4">
-        {versions.length === 0 && listFetcher.state === "loading" && (
-          <div className="text-xs text-fg/40">Loading versions…</div>
+      {/* History list */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {historyFetcher.state === "loading" && rows.length === 0 && (
+          <div style={{ padding: "1rem 0.75rem", fontSize: "0.78rem", opacity: 0.4 }}>Loading…</div>
         )}
-        {versions.length === 0 && listFetcher.state === "idle" && (
-          <div className="text-xs text-fg/40">No versions yet</div>
+        {historyFetcher.state !== "loading" && rows.length === 0 && (
+          <div style={{ padding: "1rem 0.75rem", fontSize: "0.78rem", opacity: 0.4 }}>
+            No saved versions yet. Versions are saved automatically every minute while editing.
+          </div>
         )}
-        {versions.length > 0 && (
-          <>
-            {/* Header: where you are */}
-            <div className="flex items-baseline justify-between mb-3">
-              <span className="text-base font-semibold">
-                {selectedVersion ? timeAgo(selectedVersion.created_at) : "Now"}
-              </span>
-              <span className="text-[0.68rem] text-fg/50">
-                {selectedVersion
-                  ? selectedVersion.auto
-                    ? "auto-save"
-                    : (selectedVersion.creator_name ?? "manual save")
-                  : "current"}
-              </span>
-            </div>
 
-            {/* Custom slider track */}
-            <div className="relative h-6 select-none">
-              {/* Base track */}
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-fg/10" />
+        {/* "Now" row — always at top, deselects */}
+        {rows.length > 0 && (
+          <button
+            onClick={() => setSelectedId(null)}
+            style={{
+              ...rowStyle,
+              background: selectedId === null ? "color-mix(in srgb, var(--fg) 7%, transparent)" : "transparent",
+              borderBottom: "1px solid color-mix(in srgb, var(--fg) 6%, transparent)",
+            }}
+          >
+            <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>Current version</span>
+            <span style={badgeStyle("live")}>live</span>
+          </button>
+        )}
 
-              {/* Progress fill: from handle to the right (towards Now) */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-accent/20 transition-[left] duration-150"
+        {rows.map((row) => {
+          const rowId = row.type === "session" ? row.sessionId : row.version.id;
+          const isSelected = selectedId === rowId;
+          const isVersionLoading = isSelected && row.type === "version" && versionFetcher.state === "loading";
+
+          if (row.type === "session") {
+            const { session } = row;
+            return (
+              <button
+                key={rowId}
+                onClick={() => handleSelect(rowId)}
                 style={{
-                  left: `${(effectivePos / versions.length) * 100}%`,
-                  right: 0,
+                  ...rowStyle,
+                  background: isSelected ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
+                  borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                  paddingLeft: "calc(0.75rem - 2px)",
                 }}
-              />
-
-              {/* Auto-save tick marks (visual only) */}
-              {versions.length <= 60 &&
-                versions.map((v, i) => {
-                  if (!v.auto) return null;
-                  const pos = versions.length - 1 - i;
-                  const left = `${(pos / versions.length) * 100}%`;
-                  return (
-                    <div
-                      key={v.id}
-                      className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-2 bg-fg/25 pointer-events-none"
-                      style={{ left }}
-                    />
-                  );
-                })}
-
-              {/* Manual-save dots (clickable) */}
-              {versions.map((v, i) => {
-                if (v.auto) return null;
-                const pos = versions.length - 1 - i;
-                const left = `${(pos / versions.length) * 100}%`;
-                const isSelected = effectivePos === pos;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    title={`Manual save · ${timeAgo(v.created_at)}${v.creator_name ? ` · ${v.creator_name}` : ""}`}
-                    onClick={() => setScrubberPos(pos)}
-                    className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-accent ring-2 ring-bg cursor-pointer transition-transform z-20 hover:scale-125 ${
-                      isSelected ? "scale-125" : ""
-                    }`}
-                    style={{ left }}
-                  />
-                );
-              })}
-
-              {/* Visible handle */}
-              <div
-                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-bg border-2 border-accent pointer-events-none z-30 shadow-sm transition-[left] duration-150 ${
-                  selectedVersion ? "ring-2 ring-accent/25" : ""
-                }`}
-                style={{ left: `${(effectivePos / versions.length) * 100}%` }}
-              />
-
-              {/* Invisible native range input drives interaction */}
-              <input
-                type="range"
-                min={0}
-                max={versions.length}
-                step={1}
-                value={effectivePos}
-                onChange={(e) => setScrubberPos(Number(e.target.value))}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                aria-label="Scrub through version history"
-              />
-            </div>
-
-            {/* Axis labels */}
-            <div className="flex justify-between mt-2 text-[0.66rem] text-fg/50">
-              <span>{timeAgo(versions[versions.length - 1].created_at)}</span>
-              <span>Now</span>
-            </div>
-
-            {/* Legend */}
-            <div className="flex gap-4 mt-3 text-xs text-fg/60">
-              <span className="inline-flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-bg" />
-                manual save
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="w-px h-3 bg-fg/40" />
-                auto-save
-              </span>
-            </div>
-
-            {/* Restore button + helper */}
-            {selectedVersion && (
-              <>
-                <button
-                  onClick={handleRestore}
-                  className="mt-3 w-full px-2 py-1.5 rounded bg-accent text-accent-fg text-xs cursor-pointer hover:brightness-110 transition"
-                >
-                  Restore this version
-                </button>
-                <div className="mt-2 text-[0.68rem] text-fg/55 leading-relaxed">
-                  The editor is showing this older version.{" "}
-                  <span className="text-[color:color-mix(in_srgb,#22c55e_75%,transparent)]">Green</span>{" "}
-                  = text that will come back,{" "}
-                  <span className="text-[color:color-mix(in_srgb,#ef4444_75%,transparent)] line-through">red</span>{" "}
-                  = text that will be lost. Drag back to "Now" to resume editing.
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: isSelected ? 600 : 400 }}>
+                    {session.userName || "Anonymous"}
+                  </span>
+                  <span style={{ fontSize: "0.75rem", opacity: 0.45, marginLeft: "0.4rem" }}>
+                    {timeAgo(session.endedAt)}
+                  </span>
                 </div>
-              </>
-            )}
-          </>
-        )}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  {isSelected && (
+                    <span style={{ fontSize: "0.65rem", opacity: 0.55, color: "var(--accent)" }}>preview ↗</span>
+                  )}
+                  <span style={{ fontSize: "0.68rem", opacity: 0.45 }}>
+                    {session.updateCount} edit{session.updateCount !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </button>
+            );
+          } else {
+            const { version } = row;
+            return (
+              <button
+                key={rowId}
+                onClick={() => handleSelect(rowId)}
+                style={{
+                  ...rowStyle,
+                  background: isSelected ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
+                  borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                  paddingLeft: "calc(0.75rem - 2px)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: isSelected ? 600 : 400, color: "var(--fg)" }}>
+                    {timeAgo(version.created_at)}
+                  </span>
+                  {isVersionLoading && <span style={{ fontSize: "0.68rem", opacity: 0.5 }}>loading…</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  {version.creator_name && !version.auto && (
+                    <span style={{ fontSize: "0.7rem", opacity: 0.55, maxWidth: "6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {version.creator_name}
+                    </span>
+                  )}
+                  <span style={badgeStyle(version.auto ? "auto" : "manual")}>
+                    {version.auto ? "auto" : "saved"}
+                  </span>
+                </div>
+              </button>
+            );
+          }
+        })}
       </div>
+
+      {/* Restore footer (only for manual versions) */}
+      {selectedVersion && (
+        <div style={{ padding: "0.75rem", borderTop: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", flexShrink: 0 }}>
+          <button onClick={handleRestore} style={restoreBtnStyle}>
+            Restore this version
+          </button>
+          <p style={{ margin: "0.4rem 0 0", fontSize: "0.68rem", opacity: 0.5, lineHeight: 1.4 }}>
+            Current content will be overwritten. A backup is saved automatically before restoring.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -258,20 +285,20 @@ const panelStyle: React.CSSProperties = {
   top: "var(--nav-h, 3rem)",
   right: 0,
   bottom: 0,
-  width: "min(22rem, 90vw)",
+  width: "min(20rem, 90vw)",
   background: "var(--bg)",
-  borderLeft: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
+  borderLeft: "1.5px solid color-mix(in srgb, var(--fg) 12%, transparent)",
   display: "flex",
   flexDirection: "column",
   zIndex: 50,
-  boxShadow: "var(--shadow-sm)",
+  boxShadow: "-4px 0 16px color-mix(in srgb, var(--fg) 6%, transparent)",
 };
 
 const inlinePanelStyle: React.CSSProperties = {
-  width: "min(22rem, 35vw)",
+  width: "min(20rem, 35vw)",
   flexShrink: 0,
   background: "var(--bg)",
-  borderLeft: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
+  borderLeft: "1.5px solid color-mix(in srgb, var(--fg) 12%, transparent)",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -282,7 +309,23 @@ const headerStyle: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   padding: "0.75rem",
-  borderBottom: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
+  borderBottom: "1.5px solid color-mix(in srgb, var(--fg) 10%, transparent)",
+};
+
+const rowStyle: React.CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0.55rem 0.75rem",
+  border: "none",
+  borderBottom: "1px solid color-mix(in srgb, var(--fg) 5%, transparent)",
+  cursor: "pointer",
+  textAlign: "left",
+  color: "var(--fg)",
+  transition: "background 80ms ease-out",
+  fontFamily: "var(--font-ui)",
+  gap: "0.5rem",
 };
 
 const saveBtnStyle: React.CSSProperties = {
@@ -291,10 +334,40 @@ const saveBtnStyle: React.CSSProperties = {
   padding: "0.4rem 0.5rem",
   background: "color-mix(in srgb, var(--fg) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
-  borderRadius: "4px",
+  borderRadius: "0",
   color: "var(--fg)",
   cursor: "pointer",
-  transition: "background 150ms ease-out",
+  fontFamily: "var(--font-ui)",
 };
 
+const restoreBtnStyle: React.CSSProperties = {
+  fontSize: "0.78rem",
+  width: "100%",
+  padding: "0.4rem 0.5rem",
+  background: "var(--accent)",
+  border: "none",
+  borderRadius: "0",
+  color: "var(--bg)",
+  cursor: "pointer",
+  fontFamily: "var(--font-ui)",
+  fontWeight: 600,
+};
 
+function badgeStyle(type: "auto" | "manual" | "live" | "session"): React.CSSProperties {
+  const colors: Record<string, string> = {
+    auto: "color-mix(in srgb, var(--fg) 12%, transparent)",
+    manual: "color-mix(in srgb, var(--color-sage) 25%, transparent)",
+    live: "color-mix(in srgb, var(--color-blue) 20%, transparent)",
+    session: "color-mix(in srgb, var(--color-orange) 20%, transparent)",
+  };
+  return {
+    fontSize: "0.62rem",
+    padding: "1px 5px",
+    background: colors[type],
+    color: "var(--fg)",
+    borderRadius: "2px",
+    fontFamily: "var(--font-ui)",
+    letterSpacing: "0.02em",
+    flexShrink: 0,
+  };
+}

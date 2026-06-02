@@ -2,6 +2,7 @@ import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { hash, verify } from "@node-rs/argon2";
+import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 
@@ -501,6 +502,135 @@ export async function verifySharePassword(docId: string, password: string): Prom
   return await verify(doc.share_password_hash, password);
 }
 
+// ─── Update sessions (Yjs update log) ────────────────────
+
+export interface UpdateSession {
+  userId: string | null;
+  userName: string | null;
+  startedAt: number;
+  endedAt: number;
+  updateCount: number;
+  snapshotVersionId: string | null;
+  prevSnapshotVersionId: string | null;
+  contentBefore: string; // doc text just before session started
+  contentAfter: string;  // doc text at end of session
+}
+
+function extractYjsText(frag: Y.XmlFragment): string {
+  const extractNode = (node: Y.XmlElement | Y.XmlText): string => {
+    if (node instanceof Y.XmlText) {
+      return (node.toDelta() as Array<{ insert?: string }>)
+        .map((d) => (typeof d.insert === "string" ? d.insert : ""))
+        .join("");
+    }
+    const parts: string[] = [];
+    node.forEach((c) => parts.push(extractNode(c as Y.XmlElement | Y.XmlText)));
+    return parts.join("");
+  };
+  const parts: string[] = [];
+  frag.forEach((child) => parts.push(extractNode(child as Y.XmlElement | Y.XmlText)));
+  return parts.filter(Boolean).join("\n");
+}
+
+export function getDocumentHistory(docId: string): UpdateSession[] {
+  const updates = prep<{
+    user_id: string | null;
+    user_name: string | null;
+    created_at: number;
+    yjs_update: Buffer;
+  }, [string]>(
+    `SELECT user_id, user_name, created_at, yjs_update
+     FROM document_updates
+     WHERE document_id = ?
+     ORDER BY created_at ASC`
+  ).all(docId);
+
+  if (updates.length === 0) return [];
+
+  // Group into sessions: same user, gap < 5 min
+  const SESSION_GAP = 5 * 60;
+  const sessions: UpdateSession[] = [];
+  let current: UpdateSession | null = null;
+
+  for (const u of updates) {
+    if (
+      current &&
+      current.userId === u.user_id &&
+      u.created_at - current.endedAt < SESSION_GAP
+    ) {
+      current.endedAt = u.created_at;
+      current.updateCount++;
+    } else {
+      if (current) sessions.push(current);
+      current = {
+        userId: u.user_id,
+        userName: u.user_name,
+        startedAt: u.created_at,
+        endedAt: u.created_at,
+        updateCount: 1,
+        snapshotVersionId: null,
+        prevSnapshotVersionId: null,
+        contentBefore: "",
+        contentAfter: "",
+      };
+    }
+  }
+  if (current) sessions.push(current);
+
+  // Reconstruct exact doc state at session boundaries using raw Yjs updates.
+  // Apply updates chronologically, snapshotting text before and after each session.
+  try {
+    const ydoc = new Y.Doc();
+    const frag = ydoc.getXmlFragment("prosemirror");
+    let i = 0;
+    for (const session of sessions) {
+      while (i < updates.length && updates[i].created_at < session.startedAt) {
+        Y.applyUpdate(ydoc, updates[i].yjs_update);
+        i++;
+      }
+      session.contentBefore = extractYjsText(frag);
+      while (i < updates.length && updates[i].created_at <= session.endedAt) {
+        Y.applyUpdate(ydoc, updates[i].yjs_update);
+        i++;
+      }
+      session.contentAfter = extractYjsText(frag);
+    }
+  } catch {
+    // Yjs reconstruction failed (e.g. legacy CodeMirror doc) — diff will show nothing
+  }
+
+  // Attach closest version snapshot at or before each session ends
+  const versions = prep<{ id: string; created_at: number }, [string]>(
+    `SELECT id, created_at FROM document_versions
+     WHERE document_id = ?
+     ORDER BY created_at ASC`
+  ).all(docId);
+
+  for (const session of sessions) {
+    let afterId: string | null = null;
+    let beforeId: string | null = null;
+    let nextId: string | null = null;
+    for (const v of versions) {
+      if (v.created_at < session.startedAt) beforeId = v.id;
+      if (v.created_at <= session.endedAt) {
+        afterId = v.id;
+      } else {
+        if (nextId === null) nextId = v.id;
+        break;
+      }
+    }
+    if (afterId !== null) {
+      session.snapshotVersionId = afterId;
+      session.prevSnapshotVersionId = beforeId !== afterId ? beforeId : null;
+    } else if (nextId !== null) {
+      session.snapshotVersionId = nextId;
+      session.prevSnapshotVersionId = null;
+    }
+  }
+
+  return sessions.reverse(); // newest first
+}
+
 // ─── Versions ────────────────────────────────────────────
 
 export type DocumentVersion = {
@@ -512,6 +642,7 @@ export type DocumentVersion = {
   creator_name: string | null;
   auto: number;
   created_at: number;
+  yjs_state?: string | null;
 };
 
 export type DocumentVersionSummary = Omit<DocumentVersion, "content"> & {
@@ -521,13 +652,14 @@ export type DocumentVersionSummary = Omit<DocumentVersion, "content"> & {
 export function createDocumentVersion(
   docId: string,
   userId: string | null,
-  auto: boolean
+  auto: boolean,
+  yjsState?: Buffer | null
 ): string {
   const id = nanoid(16);
   db.prepare(
-    `INSERT INTO document_versions (id, document_id, title, content, created_by, auto)
-     SELECT ?, id, title, content, ?, ? FROM documents WHERE id = ?`
-  ).run(id, userId, auto ? 1 : 0, docId);
+    `INSERT INTO document_versions (id, document_id, title, content, yjs_state, created_by, auto)
+     SELECT ?, id, title, content, ?, ?, ? FROM documents WHERE id = ?`
+  ).run(id, yjsState ?? null, userId, auto ? 1 : 0, docId);
   return id;
 }
 
@@ -544,16 +676,34 @@ export function getDocumentVersions(docId: string): DocumentVersionSummary[] {
 }
 
 export function getDocumentVersion(versionId: string): DocumentVersion | null {
-  return (
-    prep<DocumentVersion, [string]>(
+  const row = prep<Omit<DocumentVersion, 'yjs_state'> & { yjs_state: Buffer | null }, [string]>(
         `SELECT v.id, v.document_id, v.title, v.content, v.created_by, v.auto, v.created_at,
-                u.name as creator_name
+                u.name as creator_name, v.yjs_state
          FROM document_versions v
          LEFT JOIN users u ON u.id = v.created_by
          WHERE v.id = ?`
       )
-      .get(versionId) ?? null
-  );
+      .get(versionId);
+
+  if (!row) return null;
+
+  let content = row.content;
+  // If content was blanked (e.g. legacy HTML cleanup) but yjs_state exists,
+  // extract plain text from the Yjs snapshot on the fly.
+  if (!content && row.yjs_state) {
+    try {
+      const ydoc = new Y.Doc();
+      Y.applyUpdate(ydoc, row.yjs_state);
+      const frag = ydoc.getXmlFragment("prosemirror");
+      if (frag.length > 0) content = extractYjsText(frag);
+    } catch {}
+  }
+
+  return {
+    ...row,
+    content,
+    yjs_state: row.yjs_state ? row.yjs_state.toString('base64') : null,
+  };
 }
 
 /**
@@ -569,8 +719,8 @@ export async function restoreDocumentVersion(
   versionId: string,
   userId: string | null,
 ): Promise<{ backupVersionId: string } | null> {
-  const version = prep<{ title: string; content: string }, [string, string]>(
-      "SELECT title, content FROM document_versions WHERE id = ? AND document_id = ?"
+  const version = prep<{ title: string; content: string; yjs_state: Buffer | null }, [string, string]>(
+      "SELECT title, content, yjs_state FROM document_versions WHERE id = ? AND document_id = ?"
     )
     .get(versionId, docId);
 
@@ -582,8 +732,8 @@ export async function restoreDocumentVersion(
   const backupVersionId = createDocumentVersion(docId, userId, true);
 
   db.prepare(
-    `UPDATE documents SET title = ?, content = ?, yjs_state = NULL, updated_at = unixepoch() WHERE id = ?`
-  ).run(version.title, version.content, docId);
+    `UPDATE documents SET title = ?, content = ?, yjs_state = ?, updated_at = unixepoch() WHERE id = ?`
+  ).run(version.title, version.content, version.yjs_state ?? null, docId);
 
   // Notify ws-server to reset the room — await so the room is destroyed
   // before the client reloads and reconnects
