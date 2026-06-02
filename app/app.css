@@ -1799,7 +1799,8 @@ html {
 .pm-editor-mount .ProseMirror li:has(.pm-comment-highlight)::before {
   content: "";
   position: absolute;
-  left: -20px;
+  right: -20px;
+  left: auto;
   top: 0.3em;
   width: 13px;
   height: 13px;
