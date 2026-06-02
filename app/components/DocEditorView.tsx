@@ -339,6 +339,8 @@ export function DocEditorView(_props: DocumentProps) {
                 focusedId={focusedCommentId}
                 onFocus={focusComment}
                 mountRef={editorMountRef}
+                editorApiRef={ctx.editorApi}
+                currentUserId={user.id}
               />
             )}
           </div>

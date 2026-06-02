@@ -14,7 +14,7 @@ import { LinkModal } from "~/components/LinkModal";
 
 const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
-import { CommentPanel } from "~/components/CommentPanel";
+import { FloatingComments } from "~/components/FloatingComments";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
 import type { ConnectionStatus } from "~/components/DocActionBar";
 import type { ResolvedThread } from "~/components/comment-decorations";
@@ -486,8 +486,8 @@ function EditableView({
   }, []);
 
   const [threads, setThreads] = useState<ResolvedThread[]>([]);
-  const [showComments, setShowComments] = useState(false);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+  const editorMountRef = useRef<HTMLDivElement | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [trackChangesState, setTrackChangesState] = useState<TrackChangesActiveState | null>(null);
@@ -512,16 +512,6 @@ function EditableView({
     focus: () => void;
   } | null>(null);
 
-  // Auto-show/hide sidebar
-  useEffect(() => {
-    const hasItems = threads.some((t) => !t.resolved);
-    if (hasItems && !showComments) setShowComments(true);
-    if (!hasItems && showComments) {
-      setShowComments(false);
-      setFocusedThreadId(null);
-      setFocusedSuggestionId(null);
-    }
-  }, [threads]);
 
   const docType = getDocumentType(document.content || "");
   const ExtensionEditor = useDocTypeExtension(docType)?.EditorView ?? null;
@@ -578,33 +568,44 @@ function EditableView({
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
           />
         ) : USE_PM ? (
-          <ProseMirrorEditor
-            docId={document.id}
-            wsUrl={wsUrl}
-            wsParams={{ token: shareToken }}
-            userInfo={guestIdentity}
-            onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
-            onPresenceChange={onPresenceChange}
-            onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
-            onChange={(val) => { setContent(val); scheduleSave(val); }}
-            onStateChange={setPmActiveState}
-            onTrackChangesStateChange={setTrackChangesState}
-            onThreadsChange={setThreads}
-            onThreadClick={(thread) => {
-              setShowComments(true);
-              setFocusedThreadId(thread.id);
-              setFocusedSuggestionId(null);
-            }}
-            focusedCommentId={focusedThreadId}
-            onSelectionChange={(sel) => {
-              if (sel && sel.to > sel.from) {
-                setSelectionBubble({ top: sel.top, left: sel.left });
-              } else {
-                setSelectionBubble(null);
-              }
-            }}
-            autoFocus
-          />
+          <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <ProseMirrorEditor
+              docId={document.id}
+              wsUrl={wsUrl}
+              wsParams={{ token: shareToken }}
+              userInfo={guestIdentity}
+              mountRefOut={editorMountRef}
+              onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
+              onPresenceChange={onPresenceChange}
+              onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
+              onChange={(val) => { setContent(val); scheduleSave(val); }}
+              onStateChange={setPmActiveState}
+              onTrackChangesStateChange={setTrackChangesState}
+              onThreadsChange={setThreads}
+              onThreadClick={(thread) => { setFocusedThreadId(thread.id); setFocusedSuggestionId(null); }}
+              focusedCommentId={focusedThreadId}
+              onSelectionChange={(sel) => {
+                if (!sel) { setSelectionBubble(null); setFocusedThreadId(null); return; }
+                if (sel.to > sel.from) {
+                  setSelectionBubble({ top: sel.top, left: sel.left });
+                } else {
+                  setSelectionBubble(null);
+                  setFocusedThreadId(null);
+                }
+              }}
+              autoFocus
+            />
+            {threads.some(t => !t.resolved) && (
+              <FloatingComments
+                threads={threads}
+                focusedId={focusedThreadId}
+                onFocus={setFocusedThreadId}
+                mountRef={editorMountRef}
+                editorApiRef={editorApi as any}
+                currentUserId={guestIdentity.name}
+              />
+            )}
+          </div>
         ) : (
           <Editor
             initialValue={document.content}
@@ -614,8 +615,7 @@ function EditableView({
             }}
             onThreadsChange={setThreads}
             onThreadClick={(thread) => {
-              setShowComments(true);
-              setFocusedThreadId(thread.id);
+                            setFocusedThreadId(thread.id);
               setFocusedSuggestionId(null);
             }}
             onSelectionChange={(sel) => {
@@ -653,8 +653,7 @@ function EditableView({
               onMouseDown={(e) => {
                 e.preventDefault();
                 const newId = editorApi.current?.addComment();
-                setShowComments(true);
-                setFocusedThreadId(newId ?? null);
+                                setFocusedThreadId(newId ?? null);
                 setSelectionBubble(null);
               }}
               style={floatingBubbleBtnStyle}
@@ -664,23 +663,6 @@ function EditableView({
           </div>
         )}
 
-        {/* Comment/suggestion sidebar */}
-        {showComments && (
-          <CommentPanel
-            threads={threads}
-            focusedThreadId={focusedThreadId}
-            focusedSuggestionId={focusedSuggestionId}
-            canResolve={false}
-            onClose={() => { setShowComments(false); setFocusedThreadId(null); setFocusedSuggestionId(null); }}
-            onScrollTo={(pos) => editorApi.current?.scrollToPos(pos)}
-            onReply={(threadId, body) => editorApi.current?.addReply(threadId, body)}
-            onEditComment={(commentId, body) => editorApi.current?.updateComment(commentId, body)}
-            onDeleteComment={(commentId) => editorApi.current?.deleteComment(commentId)}
-            onResolveThread={(threadId) => editorApi.current?.resolveThread(threadId)}
-            onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
-            onFinish={() => editorApi.current?.focus()}
-          />
-        )}
       </div>
       <DocActionBar content={content} connectionStatus={localConnectionStatus} showBranding />
       <LinkModal

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useDocument } from "~/lib/DocumentContext";
+import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 
@@ -12,23 +12,24 @@ interface Props {
   focusedId: string | null;
   onFocus: (id: string | null) => void;
   mountRef: React.RefObject<HTMLDivElement | null>;
+  editorApiRef: React.RefObject<EditorApi | null>;
+  currentUserId: string;
 }
 
-export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Props) {
-  const { editorApi } = useDocument();
+export function FloatingComments({ threads, focusedId, onFocus, mountRef, editorApiRef, currentUserId }: Props) {
   const [positions, setPositions] = useState<Map<string, number>>(new Map());
 
   const recalc = useCallback(() => {
     const container = mountRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    const raw = editorApi.current?.getThreadPositions?.() ?? [];
+    const raw = editorApiRef.current?.getThreadPositions?.() ?? [];
     const map = new Map<string, number>();
     for (const { id, top } of raw) {
       map.set(id, top - rect.top + container.scrollTop);
     }
     setPositions(map);
-  }, [editorApi, mountRef]);
+  }, [editorApiRef, mountRef]);
 
   useEffect(() => {
     recalc();
@@ -66,6 +67,8 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Prop
           top={top}
           focused={thread.id === focusedId}
           onFocus={onFocus}
+          editorApiRef={editorApiRef}
+          currentUserId={currentUserId}
         />
       ))}
     </div>
@@ -81,20 +84,22 @@ function timeAgo(ts: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function FloatingCard({ thread, top, focused, onFocus }: {
+function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUserId }: {
   thread: ResolvedThread;
   top: number;
   focused: boolean;
   onFocus: (id: string | null) => void;
+  editorApiRef: React.RefObject<EditorApi | null>;
+  currentUserId: string;
 }) {
-  const { editorApi, user } = useDocument();
+  const editorApi = editorApiRef;
   const [reply, setReply] = useState("");
   const [replyOpen, setReplyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(thread.body);
   const [hovered, setHovered] = useState(false);
   const replyRef = useRef<HTMLTextAreaElement>(null);
-  const isOwn = thread.userId === user.id;
+  const isOwn = thread.userId === currentUserId;
   const color = authorColorFromName(thread.userName || "");
 
   const submitReply = () => {
@@ -158,7 +163,7 @@ function FloatingCard({ thread, top, focused, onFocus }: {
               userName={r.userName || "Unknown"}
               color={authorColorFromName(r.userName || "")}
               createdAt={r.createdAt}
-              isOwn={r.userId === user.id}
+              isOwn={r.userId === currentUserId}
               editing={false}
               showActions={false}
               onDelete={() => editorApi.current?.deleteComment(r.id)}
