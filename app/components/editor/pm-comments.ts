@@ -16,40 +16,50 @@ function makeIndicator(commentId: string): HTMLElement {
   return el;
 }
 
-// Find the widget insertion position for a comment anchor.
-// - Inside a table cell → end of the table row's first cell paragraph (so icon
-//   appears at the right of the row, consistently)
+// Find the widget insertion position and node bounds for the indicator.
+// - Inside a table cell → last cell in the row (so icon sits at table's right edge)
 // - Otherwise → end of the direct parent block (paragraph, heading, etc.)
-// Returns { indicatorPos, nodeFrom, nodeTo } for the node decoration too.
 function findBlockInfo(doc: any, from: number): { indicatorPos: number; nodeFrom: number; nodeTo: number } | null {
   try {
     const $pos = doc.resolve(from);
-    // Walk up looking for a table node first
+
     for (let d = $pos.depth; d >= 1; d--) {
       const node = $pos.node(d);
-      if (node.type.name === "table") {
-        // Put indicator at the end of the first row
-        const tableStart = $pos.before(d);
-        const tableEnd = tableStart + node.nodeSize;
-        // Find first row end to place widget — use $pos.end(d) which is end of table content
-        const rowEnd = $pos.end(d + 1 > $pos.depth ? d : d + 1);
-        return { indicatorPos: $pos.end(d), nodeFrom: tableStart, nodeTo: tableEnd };
+
+      // Inside a table cell — find the last cell in this row
+      if (node.type.name === "table_cell" || node.type.name === "table_header") {
+        const rowDepth = d - 1;
+        const rowNode = $pos.node(rowDepth);
+        const rowStart = $pos.before(rowDepth);
+        // Walk the row to find the last cell
+        let lastCellOffset = 0;
+        let lastCellNode: any = null;
+        rowNode.forEach((child: any, offset: number) => {
+          if (child.type.name === "table_cell" || child.type.name === "table_header") {
+            lastCellOffset = offset;
+            lastCellNode = child;
+          }
+        });
+        if (!lastCellNode) break;
+        const cellStart = rowStart + 1 + lastCellOffset; // +1 for row node start
+        const cellEnd = cellStart + lastCellNode.nodeSize;
+        // Widget at end of last cell's content
+        const indicatorPos = cellEnd - 1;
+        return { indicatorPos, nodeFrom: cellStart, nodeTo: cellEnd };
       }
-    }
-    // Regular block — find innermost block that is a direct child of doc or blockquote
-    for (let d = $pos.depth; d >= 1; d--) {
-      const node = $pos.node(d);
-      if (node.isBlock && (node.type.name === "paragraph" || node.type.name === "heading" || node.type.name === "list_item" || node.type.name === "blockquote")) {
+
+      // Regular block
+      if (node.isBlock && !node.isInline &&
+          ["paragraph", "heading", "list_item", "blockquote", "code_block"].includes(node.type.name)) {
         const nodeFrom = $pos.before(d);
         const nodeTo = nodeFrom + node.nodeSize;
-        const indicatorPos = $pos.end(d);
-        return { indicatorPos, nodeFrom, nodeTo };
+        return { indicatorPos: $pos.end(d), nodeFrom, nodeTo };
       }
     }
-    // Fallback: use depth 1
+
+    // Fallback
     const nodeFrom = $pos.before(1);
-    const nodeTo = nodeFrom + $pos.node(1).nodeSize;
-    return { indicatorPos: $pos.end(1), nodeFrom, nodeTo };
+    return { indicatorPos: $pos.end(1), nodeFrom, nodeTo: nodeFrom + $pos.node(1).nodeSize };
   } catch {
     return null;
   }
