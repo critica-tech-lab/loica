@@ -46,6 +46,8 @@ export interface HistoryPreviewState {
   title: string;
   label: string; // e.g. "3 min ago · auto-save" — shown in the banner
   currentContent: string; // live content, used to compute the diff view
+  yjsState?: string; // base64-encoded Yjs state for PM docs
+  versionId?: string; // version ID for restore action
 }
 
 export interface EditorApi {
@@ -78,9 +80,11 @@ export interface EditorApi {
   toggleTrackChanges?: () => void;
   acceptAllChanges?: () => void;
   rejectAllChanges?: () => void;
-  acceptChangeById?: (id: string) => void;
-  rejectChangeById?: (id: string) => void;
+  acceptChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
+  rejectChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
   setShowMarkup?: (show: boolean) => void;
+  setTextAlign?: (alignment: string | null) => void;
+  addLink?: (url: string) => void;
 }
 
 export interface DocumentContextValue {

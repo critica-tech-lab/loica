@@ -155,7 +155,7 @@ export function DocEditorView(_props: DocumentProps) {
     setLinkModal({
       mode: "add",
       onApply: (url) => {
-        ctx.editorApi.current?.format("[", `](${url})`);
+        ctx.editorApi.current?.addLink?.(url);
       },
     });
   }, [ctx]);

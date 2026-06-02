@@ -1,9 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { Peer } from "~/components/Editor";
 import type { PMActiveState, TrackChangesActiveState, TrackedChangeEntry } from "./editor/types";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
+import { defaultMarkdownParser } from "prosemirror-markdown";
+import { Slice } from "prosemirror-model";
+import {
+  addRowBefore, addRowAfter, deleteRow,
+  addColumnBefore, addColumnAfter, deleteColumn,
+  deleteTable,
+} from "prosemirror-tables";
 
 interface Props {
   docId: string;
@@ -26,6 +33,7 @@ interface Props {
   onThreadsChange?: (threads: ResolvedThread[]) => void;
   onThreadClick?: (thread: ResolvedThread, pos: { x: number; y: number }) => void;
   onSelectionChange?: (sel: { from: number; to: number; top: number; left: number } | null) => void;
+  onEditLink?: (url: string, apply: (newUrl: string) => void) => void;
   focusedCommentId?: string | null;
 }
 
@@ -72,6 +80,7 @@ export function ProseMirrorEditor({
   onThreadsChange,
   onThreadClick: _onThreadClick,
   onSelectionChange,
+  onEditLink,
   focusedCommentId,
   currentUserId,
 }: Props) {
@@ -84,6 +93,8 @@ export function ProseMirrorEditor({
   userInfoRef.current = userInfo;
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; inHeaderRow: boolean } | null>(null);
+  const [linkBubble, setLinkBubble] = useState<{ url: string; x: number; y: number; from: number; to: number } | null>(null);
   // Stable ref to current threads — lets addComment() append without going through the plugin
   const threadsRef = useRef<ResolvedThread[]>([]);
   const onThreadsChangeRef = useRef(onThreadsChange);
@@ -96,6 +107,8 @@ export function ProseMirrorEditor({
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
   const onTrackChangeClickRef = useRef(onTrackChangeClick);
   onTrackChangeClickRef.current = onTrackChangeClick;
+  const onEditLinkRef = useRef(onEditLink);
+  onEditLinkRef.current = onEditLink;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -239,6 +252,7 @@ export function ProseMirrorEditor({
         let inBlockquote = false;
         let inBulletList = false;
         let inOrderedList = false;
+        let textAlign: string | null = null;
         for (let d = $from.depth; d > 0; d--) {
           const node = $from.node(d);
           if (node.type === schema.nodes.heading) heading = node.attrs.level;
@@ -246,6 +260,9 @@ export function ProseMirrorEditor({
           if (node.type === schema.nodes.bullet_list) inBulletList = true;
           if (node.type === schema.nodes.ordered_list) inOrderedList = true;
         }
+        // textAlign lives on the direct block parent (paragraph or heading)
+        const blockNode = $from.node($from.depth);
+        if (blockNode?.attrs?.textAlign) textAlign = blockNode.attrs.textAlign;
         return {
           strong: markActive(schema.marks.strong),
           em: markActive(schema.marks.em),
@@ -256,6 +273,7 @@ export function ProseMirrorEditor({
           inBlockquote,
           inBulletList,
           inOrderedList,
+          textAlign,
         };
       }
 
@@ -378,6 +396,37 @@ export function ProseMirrorEditor({
         nodeViews: {
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
         },
+        handlePaste(_view: any, event: ClipboardEvent) {
+          const html = event.clipboardData?.getData("text/html") ?? "";
+          const text = (event.clipboardData?.getData("text/plain") ?? "").trim();
+          if (!text) return false;
+          // URL paste → insert as link (or wrap selection).
+          // Skip the html check — browsers always include html even for bare URL copies.
+          if (/^https?:\/\/\S+$/.test(text)) {
+            const { from, to, empty } = _view.state.selection;
+            const linkMark = schema.marks.link.create({ href: text, title: null });
+            if (empty) {
+              const textNode = schema.text(text, [linkMark]);
+              _view.dispatch(_view.state.tr.replaceSelectionWith(textNode));
+            } else {
+              _view.dispatch(_view.state.tr.addMark(from, to, linkMark));
+            }
+            return true;
+          }
+          // Markdown paste → parse and insert as rich content
+          if (!html && /^#{1,6} |^[*-] |\*\*\S|\[.+\]\(.+\)|^> |^```/.test(text)) {
+            try {
+              const parsed = defaultMarkdownParser.parse(text);
+              if (!parsed) return false;
+              const adapted = schema.nodeFromJSON(parsed.toJSON());
+              const slice = new Slice(adapted.content, 0, 0);
+              const { from, to } = _view.state.selection;
+              _view.dispatch(_view.state.tr.replace(from, to, slice));
+              return true;
+            } catch { return false; }
+          }
+          return false;
+        },
         handleDOMEvents: {
           click: (_view: any, event: MouseEvent) => {
             const target = event.target as HTMLElement;
@@ -421,6 +470,16 @@ export function ProseMirrorEditor({
                 return false;
               }
             }
+            // Link click → show link bubble
+            const linkEl = target.closest("a[href]") as HTMLAnchorElement | null;
+            if (linkEl) {
+              const rect = linkEl.getBoundingClientRect();
+              const from = _view.posAtDOM(linkEl, 0);
+              const to = _view.posAtDOM(linkEl, linkEl.childNodes.length);
+              setLinkBubble({ url: linkEl.href, x: rect.left, y: rect.bottom + 4, from, to });
+              return false;
+            }
+            setLinkBubble(null);
             return false;
           },
         },
@@ -688,6 +747,31 @@ export function ProseMirrorEditor({
           mountRef.current?.classList.toggle("hide-markup", !show);
         },
 
+        setTextAlign: (alignment: string | null) => {
+          const { from, to } = view.state.selection;
+          const tr = view.state.tr;
+          view.state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+            if (node.isBlock && node.type.spec.attrs?.textAlign !== undefined) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, textAlign: alignment });
+            }
+          });
+          view.dispatch(tr);
+          view.focus();
+        },
+
+        addLink: (url: string) => {
+          const { from, to, empty } = view.state.selection;
+          const linkMark = schema.marks.link.create({ href: url, title: null });
+          const tr = view.state.tr;
+          if (empty) {
+            tr.insertText(url, from).addMark(from, from + url.length, linkMark);
+          } else {
+            tr.addMark(from, to, linkMark);
+          }
+          view.dispatch(tr);
+          view.focus();
+        },
+
         toggleTrackChanges: () => {
           const tcState = trackChangesPluginKey.getState(view.state);
           if (!tcState) return;
@@ -830,26 +914,252 @@ export function ProseMirrorEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId, wsUrl]);
 
+  // Table context menu via native listener (React synthetic events miss contenteditable)
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const cell = (e.target as HTMLElement | null)?.closest("td, th");
+      if (!cell) return;
+      e.preventDefault();
+      const row = cell.closest("tr");
+      const table = row?.closest("table");
+      const inHeaderRow = !!(row && table && (table as HTMLTableElement).rows[0] === row);
+      setTableMenu({ x: e.clientX, y: e.clientY, inHeaderRow });
+    };
+    el.addEventListener("contextmenu", handler);
+    return () => el.removeEventListener("contextmenu", handler);
+  }, []);
+
   // Forward mount ref to parent if requested
   useEffect(() => {
     if (mountRefOut) (mountRefOut as React.MutableRefObject<HTMLDivElement | null>).current = mountRef.current;
   });
 
+  function runTableCmd(cmd: (state: any, dispatch: any) => boolean) {
+    const view = viewRef.current;
+    if (!view) return;
+    cmd(view.state, view.dispatch);
+    view.focus();
+    setTableMenu(null);
+  }
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+      <div
+        ref={mountRef}
+        className="pm-editor-mount"
+        style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}
+        onBlur={(e) => {
+          if (!mountRef.current?.contains(e.relatedTarget as Node)) {
+            onSelectionChangeRef.current?.(null);
+          }
+        }}
+      />
+      {tableMenu && (
+        <TableContextMenu
+          x={tableMenu.x}
+          y={tableMenu.y}
+          onClose={() => setTableMenu(null)}
+          onAddRowBefore={() => runTableCmd(tableMenu?.inHeaderRow ? addRowAfter : addRowBefore)}
+          onAddRowAfter={() => runTableCmd(addRowAfter)}
+          onDeleteRow={() => runTableCmd(deleteRow)}
+          onAddColBefore={() => runTableCmd(addColumnBefore)}
+          onAddColAfter={() => runTableCmd(addColumnAfter)}
+          onDeleteCol={() => runTableCmd(deleteColumn)}
+          onDeleteTable={() => runTableCmd(deleteTable)}
+        />
+      )}
+      {linkBubble && (
+        <LinkBubble
+          url={linkBubble.url}
+          x={linkBubble.x}
+          y={linkBubble.y}
+          onClose={() => setLinkBubble(null)}
+          onEdit={() => {
+            const { from, to } = linkBubble;
+            setLinkBubble(null);
+            onEditLinkRef.current?.(linkBubble.url, (newUrl) => {
+              const view = viewRef.current;
+              if (!view) return;
+              const linkMark = view.state.schema.marks.link.create({ href: newUrl, title: null });
+              const tr = view.state.tr.removeMark(from, to, view.state.schema.marks.link).addMark(from, to, linkMark);
+              view.dispatch(tr);
+              view.focus();
+            });
+          }}
+          onRemove={() => {
+            const { from, to } = linkBubble;
+            setLinkBubble(null);
+            const view = viewRef.current;
+            if (!view) return;
+            view.dispatch(view.state.tr.removeMark(from, to, view.state.schema.marks.link));
+            view.focus();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Table context menu ───────────────────────────────────
+
+interface TableMenuProps {
+  x: number; y: number;
+  onClose: () => void;
+  onAddRowBefore: () => void; onAddRowAfter: () => void; onDeleteRow: () => void;
+  onAddColBefore: () => void; onAddColAfter: () => void; onDeleteCol: () => void;
+  onDeleteTable: () => void;
+}
+
+function TableContextMenu({ x, y, onClose, onAddRowBefore, onAddRowAfter, onDeleteRow, onAddColBefore, onAddColAfter, onDeleteCol, onDeleteTable }: TableMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey  = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  const W = 200, GAP = 8;
+  const left = Math.min(x + 2, window.innerWidth  - W - GAP);
+  const top  = Math.min(y + 2, window.innerHeight - 280 - GAP);
+
   return (
     <div
-      ref={mountRef}
-      className="pm-editor-mount"
+      ref={ref}
       style={{
-        flex: 1,
-        overflow: "auto",
-        display: "flex",
-        flexDirection: "column",
+        position: "fixed", top, left, width: W, zIndex: 500,
+        background: "var(--bg)",
+        border: "1.5px solid var(--fg)",
+        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        fontFamily: "var(--font-ui)",
+        fontSize: "0.8rem",
+        color: "var(--fg)",
+        userSelect: "none",
       }}
-      onBlur={(e) => {
-        if (!mountRef.current?.contains(e.relatedTarget as Node)) {
-          onSelectionChangeRef.current?.(null);
-        }
+    >
+      <Section>
+        <Item label="Insert row above" onClick={onAddRowBefore} />
+        <Item label="Insert row below" onClick={onAddRowAfter} />
+      </Section>
+      <Divider />
+      <Section>
+        <Item label="Insert column left"  onClick={onAddColBefore} />
+        <Item label="Insert column right" onClick={onAddColAfter} />
+      </Section>
+      <Divider />
+      <Section>
+        <Item label="Delete row"    onClick={onDeleteRow} danger />
+        <Item label="Delete column" onClick={onDeleteCol} danger />
+      </Section>
+      <Divider />
+      <Section>
+        <Item label="Delete table" onClick={onDeleteTable} danger />
+      </Section>
+    </div>
+  );
+}
+
+function Item({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      style={{
+        display: "block", width: "100%", textAlign: "left",
+        padding: "0.45rem 0.75rem",
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        color: danger ? "var(--accent)" : "var(--fg)",
+        fontSize: "inherit",
+        fontFamily: "inherit",
+        transition: "background 60ms ease-out",
       }}
-    />
+      onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 7%, transparent)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Section({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: "3px 0" }}>{children}</div>;
+}
+
+function Divider() {
+  return <div style={{ height: "1px", background: "color-mix(in srgb, var(--fg) 12%, transparent)", margin: "0" }} />;
+}
+
+// ─── Link bubble ──────────────────────────────────────────
+
+function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: number; y: number; onClose: () => void; onEdit: () => void; onRemove: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey  = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  const display = url.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 40);
+  const left = Math.min(x, window.innerWidth - 260);
+  const top  = Math.min(y + 4, window.innerHeight - 60);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed", top, left, zIndex: 500,
+        display: "inline-flex", alignItems: "center", gap: "0.5rem",
+        background: "var(--bg)",
+        border: "1.5px solid var(--fg)",
+        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        padding: "0.3rem 0.6rem",
+        fontFamily: "var(--font-ui)",
+        fontSize: "0.75rem",
+        color: "var(--fg)",
+      }}
+    >
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "var(--accent)", textDecoration: "underline", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
+        {display}
+      </a>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", textDecoration: "none", whiteSpace: "nowrap" }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.55"; }}
+      >
+        Open ↗
+      </a>
+      <span style={{ opacity: 0.25, userSelect: "none" }}>|</span>
+      <button
+        onClick={onEdit}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", whiteSpace: "nowrap" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.55"; }}
+      >
+        Edit
+      </button>
+      <button
+        onClick={onRemove}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", whiteSpace: "nowrap" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.55"; }}
+      >
+        Remove
+      </button>
+    </div>
   );
 }

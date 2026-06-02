@@ -280,7 +280,7 @@ export function Editor({
       const loicaTheme = EditorView.theme({
         "&": {
           fontFamily: "var(--font-editor)",
-          fontSize: "1rem",
+          fontSize: "1.0625rem",
           background: "var(--bg)",
           color: "var(--fg)",
           height: "100%",
@@ -292,10 +292,11 @@ export function Editor({
         ".cm-scroller": {
           overflow: "auto",
           fontFamily: "var(--font-editor)",
+          fontSize: "1.0625rem",
           lineHeight: "1.6",
         },
         ".cm-content": {
-          maxWidth: "70ch",
+          maxWidth: "65ch",
           margin: "0 auto",
           padding: "2rem 2rem",
           caretColor: "transparent",

@@ -7,7 +7,7 @@ import { authorTrackColor } from "./types";
 
 // dataTracked is required on all block nodes by @manuscripts/track-changes-plugin
 // when track changes is enabled — it stores pending change metadata.
-const DT = { dataTracked: { default: null } };
+const DT = { dataTracked: { default: null }, textAlign: { default: null } };
 
 function withDT(spec: any): any {
   const origToDOM = spec.toDOM;
@@ -17,13 +17,16 @@ function withDT(spec: any): any {
     toDOM(node: any) {
       const base: any[] = origToDOM ? origToDOM.call(this, node) : ["div", 0];
       const dt = node.attrs?.dataTracked;
-      if (!dt?.id) return base;
+      const ta = node.attrs?.textAlign;
+      if (!dt?.id && !ta) return base;
       const [tag, ...rest] = base;
-      // Merge data-change-id into existing attrs object, or insert one
-      if (rest.length > 0 && rest[0] !== null && typeof rest[0] === "object" && !Array.isArray(rest[0])) {
-        return [tag, { ...rest[0], "data-change-id": dt.id }, ...rest.slice(1)];
-      }
-      return [tag, { "data-change-id": dt.id }, ...rest];
+      const hasAttrs = rest.length > 0 && rest[0] !== null && typeof rest[0] === "object" && !Array.isArray(rest[0]);
+      const existing = hasAttrs ? rest[0] : {};
+      const tail = hasAttrs ? rest.slice(1) : rest;
+      const attrs: Record<string, any> = { ...existing };
+      if (dt?.id) attrs["data-change-id"] = dt.id;
+      if (ta) attrs["style"] = `text-align: ${ta}${existing.style ? "; " + existing.style : ""}`;
+      return [tag, attrs, ...tail];
     },
   };
 }

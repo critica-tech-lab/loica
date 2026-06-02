@@ -8,6 +8,7 @@ export interface PMActiveState {
   inBlockquote: boolean;
   inBulletList: boolean;
   inOrderedList: boolean;
+  textAlign: string | null;
 }
 
 export interface TrackedChangeEntry {

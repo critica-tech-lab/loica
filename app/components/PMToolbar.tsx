@@ -151,11 +151,24 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
 
       <Sep />
 
+      {/* Text alignment */}
+      <Btn title="Align left"    active={!active?.textAlign || active.textAlign === "left"}    onActivate={run(() => api?.setTextAlign?.(null))}         icon={<AlignLeftIcon />} />
+      <Btn title="Align center"  active={active?.textAlign === "center"}                        onActivate={run(() => api?.setTextAlign?.("center"))}     icon={<AlignCenterIcon />} />
+      <Btn title="Align right"   active={active?.textAlign === "right"}                         onActivate={run(() => api?.setTextAlign?.("right"))}      icon={<AlignRightIcon />} />
+      <Btn title="Justify"       active={active?.textAlign === "justify"}                       onActivate={run(() => api?.setTextAlign?.("justify"))}    icon={<AlignJustifyIcon />} />
+
+      <Sep />
+
       {/* Editing mode dropdown — Google Docs style */}
       <ModeDropdown mode={editingMode} onModeChange={onModeChange} onOpenChangesPanel={onOpenChangesPanel} />
     </div>
   );
 }
+
+const AlignLeftIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="18" y2="18" /></svg>;
+const AlignCenterIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="6" y1="12" x2="18" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>;
+const AlignRightIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="9" y1="12" x2="21" y2="12" /><line x1="6" y1="18" x2="21" y2="18" /></svg>;
+const AlignJustifyIcon= () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>;
 
 function Sep() {
   return (
