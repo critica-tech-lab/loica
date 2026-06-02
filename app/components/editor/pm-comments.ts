@@ -69,6 +69,12 @@ export function pmCommentPlugin(
       const to: number   = typeof entry.anchorTo   === "number" ? entry.anchorTo   : 0;
       if (from > 0 && to > from && to <= docSize) {
         try {
+          // Validate anchor text — if content was replaced the positions point to wrong text
+          if (entry.anchorText) {
+            const currentText = doc.textBetween(from, to, " ");
+            if (currentText !== entry.anchorText) return;
+          }
+
           // Inline highlight
           decos.push(Decoration.inline(from, to, {
             class: "pm-comment-highlight",

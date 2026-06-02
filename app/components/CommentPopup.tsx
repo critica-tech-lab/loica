@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
+import { timeAgo } from "~/lib/ui-utils";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -35,14 +36,6 @@ interface Props {
   onDismiss: () => void;
 }
 
-function timeAgo(ts: number): string {
-  if (!ts) return "";
-  const diff = Math.floor(Date.now() / 1000 - ts);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorRef, onDismiss }: Props) {
   const ref = useRef<HTMLDivElement>(null);

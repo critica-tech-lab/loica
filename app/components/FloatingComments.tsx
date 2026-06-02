@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
+import { timeAgo } from "~/lib/ui-utils";
 
 const CARD_MIN_H = 80;
 const CARD_GAP = 8;
@@ -75,14 +76,6 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef, editor
   );
 }
 
-function timeAgo(ts: number): string {
-  if (!ts) return "";
-  const diff = Math.floor((Date.now() / 1000) - ts);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
 
 function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUserId }: {
   thread: ResolvedThread;
