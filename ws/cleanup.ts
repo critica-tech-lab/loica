@@ -19,6 +19,16 @@ export function initializeCleanupStatements(db: Database.Database) {
     ),
     deleteDoc: db.prepare(`DELETE FROM documents WHERE id = ?`),
     allContent: db.prepare(`SELECT content FROM documents`),
+    pruneUpdates: db.prepare(
+      `DELETE FROM document_updates
+       WHERE document_id = @docId
+       AND id NOT IN (
+         SELECT id FROM document_updates
+         WHERE document_id = @docId
+         ORDER BY created_at DESC
+         LIMIT 500
+       )`
+    ),
   };
 }
 

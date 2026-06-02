@@ -32,6 +32,7 @@ import {
   maybeAutoVersion,
   saveCommentsFromYjs,
   getDocContent,
+  saveDocumentUpdate,
   type PersistenceStatements,
 } from "./ws/persistence.ts";
 import {
@@ -61,6 +62,11 @@ try {
 } catch {
   /* exists */
 }
+try {
+  db.exec("ALTER TABLE document_versions ADD COLUMN yjs_state BLOB");
+} catch {
+  /* exists */
+}
 db.exec(`CREATE TABLE IF NOT EXISTS comments (
   id          TEXT PRIMARY KEY,
   document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -74,11 +80,58 @@ db.exec(`CREATE TABLE IF NOT EXISTS comments (
   created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
 )`);
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS document_updates (
+    id          TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    user_id     TEXT,
+    user_name   TEXT,
+    yjs_update  BLOB NOT NULL,
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+  )`);
+} catch {
+  /* exists */
+}
+try {
+  db.exec("CREATE INDEX IF NOT EXISTS idx_doc_updates ON document_updates(document_id, created_at DESC)");
+} catch {
+  /* exists */
+}
 
 // ─── Initialize persistence and cleanup statements ───────────────────────────
 
 const persistenceStmts: PersistenceStatements = initializePersistenceStatements(db);
 const cleanupStmts: CleanupStatements = initializeCleanupStatements(db);
+
+// ─── Per-room pending updates with throttling ─────────────────────────────────
+
+interface PendingUpdate {
+  update: Uint8Array;
+  userId: string | null;
+  userName: string | null;
+  docId: string;
+  createdAt: number;
+}
+
+// Per-room pending updates: key = `${docId}:${userId}`, value = merged update
+const pendingUpdates = new Map<string, PendingUpdate>();
+const updateFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function flushPendingUpdate(key: string) {
+  const pending = pendingUpdates.get(key);
+  if (!pending) return;
+  pendingUpdates.delete(key);
+  updateFlushTimers.delete(key);
+  try {
+    saveDocumentUpdate(db, pending.docId, pending.userId, pending.userName, pending.update, pending.createdAt);
+    // Prune occasionally (1% of flushes)
+    if (Math.random() < 0.01) {
+      cleanupStmts.pruneUpdates?.run({ docId: pending.docId });
+    }
+  } catch (err) {
+    console.error("[ws] Failed to save update:", err);
+  }
+}
 
 // ─── In-memory doc rooms ──────────────────────────────────────────────────────
 
@@ -118,6 +171,38 @@ function getOrCreateRoom(docId: string): Room {
     scheduleSave(docId, room);
   });
 
+  // Log each Yjs update with user attribution for document history
+  doc.on("update", (update: Uint8Array, origin: unknown) => {
+    if (!room.wsUserMap.has(origin as WebSocket)) return; // skip DB/local origins
+    const ws = origin as WebSocket;
+    const userId = room.wsUserMap.get(ws) ?? null;
+    if (!userId) return;
+    // Get user name from DB
+    let userName: string | null = null;
+    try {
+      const u = db.prepare<[string], { name: string }>("SELECT name FROM users WHERE id = ?").get(userId);
+      userName = u?.name ?? null;
+    } catch {}
+    const key = `${docId}:${userId}`;
+    const now = Math.floor(Date.now() / 1000);
+    const existing = pendingUpdates.get(key);
+    let merged: Uint8Array;
+    try {
+      merged = existing ? Y.mergeUpdates([existing.update, update]) : update;
+    } catch {
+      merged = update;
+    }
+    pendingUpdates.set(key, {
+      update: merged,
+      userId,
+      userName,
+      docId,
+      createdAt: existing?.createdAt ?? now,
+    });
+    clearTimeout(updateFlushTimers.get(key));
+    updateFlushTimers.set(key, setTimeout(() => flushPendingUpdate(key), 1000));
+  });
+
   rooms.set(docId, room);
   return room;
 }
@@ -128,7 +213,7 @@ function scheduleSave(docId: string, room: Room) {
     const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
     const content = getDocContent(room.doc);
     if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
-      room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, content, room.lastVersionAt);
+      room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor);
     }
     // Persist comments from Yjs map to DB
     try {
@@ -282,7 +367,7 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
           if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
             // Force an auto-version on room teardown, regardless of interval —
             // this captures the final edits of a short session.
-            room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, content, room.lastVersionAt, true);
+            room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor, true);
           }
           // Persist comments
           try {
@@ -290,6 +375,13 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
             saveCommentsFromYjs(db, docId, commentsMap);
           } catch (e) {
             console.error("[ws] error persisting comments on room close:", e);
+          }
+          // Flush pending updates for this room
+          const keysToFlush = Array.from(pendingUpdates.keys()).filter(k => k.startsWith(`${docId}:`));
+          for (const key of keysToFlush) {
+            const timer = updateFlushTimers.get(key);
+            if (timer) clearTimeout(timer);
+            flushPendingUpdate(key);
           }
           rooms.delete(docId);
         }
@@ -532,7 +624,7 @@ setTimeout(() => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-const WS_HOST = process.env.WS_HOST ?? (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
+const WS_HOST = process.env.WS_HOST ?? "0.0.0.0";
 server.listen(PORT, WS_HOST, () => {
   console.log(`[ws-server] Yjs WebSocket server listening on ws://${WS_HOST}:${PORT}`);
 });

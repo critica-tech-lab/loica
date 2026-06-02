@@ -37,7 +37,7 @@ export const MESSAGE_AWARENESS = 1;
 
 // ─── Cleanup ───────────────────────────────────────────────────────────────────
 
-export const AUTO_VERSION_INTERVAL = 60 * 1000; // 1 minute
+export const AUTO_VERSION_INTERVAL = 5 * 1000; // 5s — TESTING MODE, revert to 60*1000
 export const RING_BUFFER_SIZE = 15; // always keep the last N auto-versions per doc
 export const SHARED_ACCESS_TTL = 5 * 60 * 1000; // 5 minutes
 export const CLEANUP_INTERVAL = 60 * 60 * 1000; // every hour
