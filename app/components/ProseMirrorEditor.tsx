@@ -24,7 +24,7 @@ interface Props {
   onTrackChangesStateChange?: (state: TrackChangesActiveState) => void;
   onTrackChangeClick?: (changeId: string, pos: { x: number; y: number }) => void;
   onThreadsChange?: (threads: ResolvedThread[]) => void;
-  onThreadClick?: (thread: ResolvedThread) => void;
+  onThreadClick?: (thread: ResolvedThread, pos: { x: number; y: number }) => void;
   onSelectionChange?: (sel: { from: number; to: number; top: number; left: number } | null) => void;
   focusedCommentId?: string | null;
 }
@@ -285,9 +285,10 @@ export function ProseMirrorEditor({
             if (!commentId) return false;
             const thread = threadsRef.current.find(t => t.id === commentId);
             if (thread) {
+              const rect = el.getBoundingClientRect();
               pendingClickId = commentId;
               Promise.resolve().then(() => { pendingClickId = null; });
-              onThreadClickRef.current?.(thread);
+              onThreadClickRef.current?.(thread, { x: rect.left, y: rect.bottom });
             }
             return false;
           },

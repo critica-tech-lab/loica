@@ -2,7 +2,7 @@ import { AppShell } from "~/components/AppShell";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
 import { TrackChangePopup } from "~/components/TrackChangePopup";
-import { FloatingComments } from "~/components/FloatingComments";
+import { CommentPopup } from "~/components/CommentPopup";
 import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
@@ -78,6 +78,7 @@ export function DocEditorView(_props: DocumentProps) {
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [editingMode, setEditingMode] = useState<EditingMode>("editing");
   const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
+  const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
   const editorMountRef = useRef<HTMLDivElement | null>(null);
   const focusComment = useCallback((id: string | null) => {
     setFocusedCommentId(id);
@@ -310,9 +311,10 @@ export function DocEditorView(_props: DocumentProps) {
               onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
               focusedCommentId={focusedCommentId}
               onThreadsChange={setComments}
-              onThreadClick={(thread) => {
+              onThreadClick={(thread, pos) => {
                 focusComment(thread.id);
                 setFocusedSuggestionId(null);
+                setCommentPopup({ threadId: thread.id, pos });
               }}
               onSelectionChange={(sel) => {
                 if (!sel) {
@@ -330,19 +332,22 @@ export function DocEditorView(_props: DocumentProps) {
                 } else {
                   setSelectionBubble(null);
                   focusComment(null);
+                  setCommentPopup(null);
                 }
               }}
             />
-            {USE_PM && comments.some(t => !t.resolved) && (
-              <FloatingComments
-                threads={comments}
-                focusedId={focusedCommentId}
-                onFocus={focusComment}
-                mountRef={editorMountRef}
-                editorApiRef={ctx.editorApi}
-                currentUserId={user.id}
-              />
-            )}
+            {USE_PM && commentPopup && (() => {
+              const thread = comments.find(t => t.id === commentPopup.threadId);
+              return thread ? (
+                <CommentPopup
+                  thread={thread}
+                  pos={commentPopup.pos}
+                  currentUserId={user.id}
+                  editorApiRef={ctx.editorApi}
+                  onDismiss={() => { setCommentPopup(null); focusComment(null); }}
+                />
+              ) : null;
+            })()}
           </div>
         ) : (
           <Editor
