@@ -1783,41 +1783,31 @@ html {
 }
 
 /* ─── PM comment highlights (Google Docs style) ─────────── */
-/* Comment presence indicator — small icon in left margin */
-.pm-editor-mount .ProseMirror p:has(.pm-comment-highlight),
-.pm-editor-mount .ProseMirror h1:has(.pm-comment-highlight),
-.pm-editor-mount .ProseMirror h2:has(.pm-comment-highlight),
-.pm-editor-mount .ProseMirror h3:has(.pm-comment-highlight),
-.pm-editor-mount .ProseMirror li:has(.pm-comment-highlight) {
-  position: relative;
-}
-
-.pm-editor-mount .ProseMirror p:has(.pm-comment-highlight)::before,
-.pm-editor-mount .ProseMirror h1:has(.pm-comment-highlight)::before,
-.pm-editor-mount .ProseMirror h2:has(.pm-comment-highlight)::before,
-.pm-editor-mount .ProseMirror h3:has(.pm-comment-highlight)::before,
-.pm-editor-mount .ProseMirror li:has(.pm-comment-highlight)::before {
-  content: "";
+/* Comment indicator widget — real DOM element, clickable */
+.pm-comment-indicator {
   position: absolute;
-  right: -28px;
-  left: auto;
-  top: 0.25em;
+  right: -26px;
+  top: 0.1em;
   width: 16px;
   height: 16px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E");
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.25;
-  pointer-events: none;
-  transition: opacity 150ms;
+  color: #888;
+  opacity: 0.28;
+  cursor: pointer;
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms, color 150ms;
+  user-select: none;
+  z-index: 5;
 }
-
-.pm-editor-mount .ProseMirror p:has(.pm-comment-highlight):hover::before,
-.pm-editor-mount .ProseMirror h1:has(.pm-comment-highlight):hover::before,
-.pm-editor-mount .ProseMirror h2:has(.pm-comment-highlight):hover::before,
-.pm-editor-mount .ProseMirror h3:has(.pm-comment-highlight):hover::before,
-.pm-editor-mount .ProseMirror li:has(.pm-comment-highlight):hover::before {
-  opacity: 0.55;
+.pm-comment-indicator:hover {
+  opacity: 0.75;
+  color: #f59e0b;
+}
+/* Block containing a comment indicator needs relative positioning */
+.pm-editor-mount .ProseMirror .has-comment-indicator {
+  position: relative;
 }
 
 .pm-comment-highlight {

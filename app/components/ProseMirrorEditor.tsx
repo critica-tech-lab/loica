@@ -278,7 +278,22 @@ export function ProseMirrorEditor({
                 return false;
               }
             }
-            // Comment click
+            // Comment indicator icon click (the bubble in the margin)
+            const indicatorEl = target.closest(".pm-comment-indicator") as HTMLElement | null;
+            if (indicatorEl) {
+              const commentId = indicatorEl.getAttribute("data-comment-id");
+              if (commentId) {
+                const thread = threadsRef.current.find(t => t.id === commentId);
+                if (thread) {
+                  const rect = indicatorEl.getBoundingClientRect();
+                  pendingClickId = commentId;
+                  Promise.resolve().then(() => { pendingClickId = null; });
+                  onThreadClickRef.current?.(thread, { x: rect.right + 8, y: rect.top });
+                }
+              }
+              return false;
+            }
+            // Comment highlight click
             const el = target.closest("[data-comment-id]") as HTMLElement | null;
             if (!el) return false;
             const commentId = el.getAttribute("data-comment-id");
@@ -288,7 +303,6 @@ export function ProseMirrorEditor({
               const rect = el.getBoundingClientRect();
               pendingClickId = commentId;
               Promise.resolve().then(() => { pendingClickId = null; });
-              // Pass right edge + top so popup can appear to the right of the text
               onThreadClickRef.current?.(thread, { x: rect.right, y: rect.top });
             }
             return false;
