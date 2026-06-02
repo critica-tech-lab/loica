@@ -3,9 +3,9 @@ import { useDocument } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 
-const CARD_MIN_H = 72;
+const CARD_MIN_H = 80;
 const CARD_GAP = 8;
-const CARD_W = 252;
+const CARD_W = 264;
 
 interface Props {
   threads: ResolvedThread[];
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Props) {
-  const { editorApi, user } = useDocument();
+  const { editorApi } = useDocument();
   const [positions, setPositions] = useState<Map<string, number>>(new Map());
 
   const recalc = useCallback(() => {
@@ -30,7 +30,6 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Prop
     setPositions(map);
   }, [editorApi, mountRef]);
 
-  // Recalculate on scroll, resize, and thread changes
   useEffect(() => {
     recalc();
     const el = mountRef.current;
@@ -48,7 +47,6 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Prop
       .map(t => ({ thread: t, ideal: positions.get(t.id)! }))
       .sort((a, b) => a.ideal - b.ideal);
 
-    // Collision avoidance — shift down if overlapping
     let floor = -Infinity;
     return withPos.map(item => {
       const top = Math.max(item.ideal, floor + CARD_GAP);
@@ -67,7 +65,6 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Prop
           thread={thread}
           top={top}
           focused={thread.id === focusedId}
-          currentUserId={user.id}
           onFocus={onFocus}
         />
       ))}
@@ -75,168 +72,150 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef }: Prop
   );
 }
 
-function FloatingCard({ thread, top, focused, currentUserId, onFocus }: {
+function timeAgo(ts: number): string {
+  if (!ts) return "";
+  const diff = Math.floor((Date.now() / 1000) - ts);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function FloatingCard({ thread, top, focused, onFocus }: {
   thread: ResolvedThread;
   top: number;
   focused: boolean;
-  currentUserId: string;
   onFocus: (id: string | null) => void;
 }) {
-  const { editorApi } = useDocument();
+  const { editorApi, user } = useDocument();
   const [reply, setReply] = useState("");
+  const [replyOpen, setReplyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(thread.body);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
+  const [hovered, setHovered] = useState(false);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
+  const isOwn = thread.userId === user.id;
   const color = authorColorFromName(thread.userName || "");
-  const isOwn = thread.userId === currentUserId;
-
-  useEffect(() => {
-    if (focused && reply === "" && textareaRef.current) {
-      // Don't auto-focus — let user click reply explicitly
-    }
-  }, [focused]);
 
   const submitReply = () => {
     if (!reply.trim()) return;
     editorApi.current?.addReply(thread.id, reply.trim());
     setReply("");
+    setReplyOpen(false);
   };
 
-  const resolve = () => {
-    editorApi.current?.resolveThread(thread.id);
-    onFocus(null);
-  };
-
-  const deleteComment = () => {
-    editorApi.current?.deleteComment(thread.id);
-    onFocus(null);
-  };
+  useEffect(() => {
+    if (replyOpen && replyRef.current) replyRef.current.focus();
+  }, [replyOpen]);
 
   return (
     <div
       onClick={() => onFocus(thread.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: "absolute",
         top,
-        right: 8,
-        width: CARD_W - 16,
-        background: "var(--bg)",
-        borderRadius: "8px",
+        right: 10,
+        width: CARD_W - 20,
+        background: "#fff",
+        borderRadius: "4px",
         boxShadow: focused
-          ? "0 2px 12px rgba(0,0,0,0.15), 0 0 0 1.5px rgba(249,171,0,0.5)"
-          : "0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent)",
+          ? "0 1px 8px rgba(0,0,0,0.20), 0 2px 4px rgba(0,0,0,0.12)"
+          : "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
+        border: focused ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
         pointerEvents: "all",
         cursor: focused ? "default" : "pointer",
-        transition: "box-shadow 150ms",
-        overflow: "hidden",
+        transition: "box-shadow 120ms, border-color 120ms",
         fontFamily: "var(--font-ui)",
+        overflow: "hidden",
       }}
     >
-      {/* Thread root */}
-      <div style={{ padding: "0.55rem 0.65rem 0.45rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.3rem" }}>
-          <span style={{
-            width: 22, height: 22, borderRadius: "50%", background: color, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: "0.65rem", fontWeight: 700,
-          }}>
-            {(thread.userName || "?").slice(0, 1).toUpperCase()}
-          </span>
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {thread.userName || "Unknown"}
-          </span>
-          {isOwn && focused && (
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteComment(); }}
-              title="Delete comment"
-              style={iconBtn}
-            >×</button>
-          )}
-          {focused && (
-            <button
-              onClick={(e) => { e.stopPropagation(); resolve(); }}
-              title="Resolve"
-              style={{ ...iconBtn, color: "#16a34a", fontSize: "0.8rem" }}
-            >✓</button>
-          )}
-        </div>
+      {/* Root comment */}
+      <CommentEntry
+        body={editing ? editBody : thread.body}
+        userName={thread.userName || "Unknown"}
+        color={color}
+        createdAt={thread.createdAt}
+        isOwn={isOwn}
+        editing={editing}
+        showActions={focused && (hovered || editing)}
+        onEditStart={() => { setEditBody(thread.body); setEditing(true); }}
+        onEditChange={setEditBody}
+        onEditSave={() => { editorApi.current?.updateComment(thread.id, editBody); setEditing(false); }}
+        onEditCancel={() => setEditing(false)}
+        onDelete={() => { editorApi.current?.deleteComment(thread.id); onFocus(null); }}
+        onClick={(e) => e.stopPropagation()}
+      />
 
-        {editing ? (
-          <div>
-            <textarea
-              value={editBody}
-              onChange={e => setEditBody(e.target.value)}
-              style={textareaStyle}
-              rows={2}
-              autoFocus
-            />
-            <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.3rem" }}>
-              <button onClick={() => { editorApi.current?.updateComment(thread.id, editBody); setEditing(false); }} style={actionBtnStyle("#2563eb")}>Save</button>
-              <button onClick={() => setEditing(false)} style={actionBtnStyle("color-mix(in srgb, var(--fg) 50%, transparent)")}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          <p
-            onDoubleClick={() => { if (isOwn) { setEditBody(thread.body); setEditing(true); } }}
-            style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.45, color: "var(--fg)", wordBreak: "break-word" }}
-          >
-            {thread.body || <em style={{ opacity: 0.5 }}>Empty comment</em>}
-          </p>
-        )}
-      </div>
-
-      {/* Quoted anchor text */}
-      {thread.anchorText && (
-        <div style={{
-          margin: "0 0.65rem 0.35rem",
-          padding: "0.2rem 0.45rem",
-          borderLeft: "3px solid rgba(249,171,0,0.6)",
-          background: "rgba(249,171,0,0.08)",
-          borderRadius: "0 3px 3px 0",
-          fontSize: "0.72rem",
-          color: "color-mix(in srgb, var(--fg) 60%, transparent)",
-          fontStyle: "italic",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>
-          {thread.anchorText}
-        </div>
-      )}
-
-      {/* Replies — only when focused */}
-      {focused && thread.replies.length > 0 && (
-        <div style={{ borderTop: "1px solid color-mix(in srgb, var(--fg) 7%, transparent)" }}>
+      {/* Replies */}
+      {thread.replies.length > 0 && (
+        <div style={{ borderTop: "1px solid #e0e0e0" }}>
           {thread.replies.map(r => (
-            <div key={r.id} style={{ padding: "0.45rem 0.65rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 5%, transparent)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.2rem" }}>
-                <span style={{ width: 16, height: 16, borderRadius: "50%", background: authorColorFromName(r.userName || ""), display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "0.55rem", fontWeight: 700, flexShrink: 0 }}>
-                  {(r.userName || "?").slice(0, 1).toUpperCase()}
-                </span>
-                <span style={{ fontSize: "0.71rem", fontWeight: 600 }}>{r.userName || "Unknown"}</span>
-              </div>
-              <p style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.4, color: "var(--fg)" }}>{r.body}</p>
-            </div>
+            <CommentEntry
+              key={r.id}
+              body={r.body}
+              userName={r.userName || "Unknown"}
+              color={authorColorFromName(r.userName || "")}
+              createdAt={r.createdAt}
+              isOwn={r.userId === user.id}
+              editing={false}
+              showActions={false}
+              onDelete={() => editorApi.current?.deleteComment(r.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
           ))}
         </div>
       )}
 
-      {/* Reply input — only when focused */}
+      {/* Footer actions */}
       {focused && (
         <div
           onClick={e => e.stopPropagation()}
-          style={{ padding: "0.4rem 0.65rem 0.5rem", borderTop: "1px solid color-mix(in srgb, var(--fg) 7%, transparent)" }}
+          style={{ borderTop: "1px solid #e0e0e0", padding: "6px 12px 8px" }}
         >
-          <textarea
-            ref={textareaRef}
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitReply(); }}
-            placeholder="Reply…"
-            rows={1}
-            style={textareaStyle}
-          />
-          {reply.trim() && (
-            <button onClick={submitReply} style={{ ...actionBtnStyle("#2563eb"), marginTop: "0.3rem" }}>Reply</button>
+          {replyOpen ? (
+            <>
+              <textarea
+                ref={replyRef}
+                value={reply}
+                onChange={e => setReply(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitReply(); if (e.key === "Escape") { setReplyOpen(false); setReply(""); } }}
+                placeholder="Reply…"
+                rows={2}
+                style={{
+                  width: "100%", resize: "none", border: "none", outline: "none",
+                  borderBottom: "2px solid #1a73e8", padding: "2px 0",
+                  fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+                  background: "transparent", color: "#202124", lineHeight: 1.5,
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px", marginTop: "6px" }}>
+                <GButton variant="text" onClick={() => { setReplyOpen(false); setReply(""); }}>Cancel</GButton>
+                <GButton variant="filled" onClick={submitReply} disabled={!reply.trim()}>Reply</GButton>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                onClick={() => setReplyOpen(true)}
+                style={{
+                  flex: 1, textAlign: "left", background: "none", border: "none",
+                  color: "#80868b", fontSize: "0.78rem", cursor: "text",
+                  fontFamily: "var(--font-ui)", padding: "2px 0",
+                }}
+              >
+                Reply…
+              </button>
+              <GButton
+                variant="text"
+                onClick={() => { editorApi.current?.resolveThread(thread.id); onFocus(null); }}
+                style={{ color: "#137333", fontWeight: 600 }}
+              >
+                Resolve
+              </GButton>
+            </div>
           )}
         </div>
       )}
@@ -244,22 +223,135 @@ function FloatingCard({ thread, top, focused, currentUserId, onFocus }: {
   );
 }
 
-const iconBtn: React.CSSProperties = {
-  background: "none", border: "none", cursor: "pointer", padding: "0 2px",
-  color: "color-mix(in srgb, var(--fg) 40%, transparent)", fontSize: "1rem", lineHeight: 1,
-  fontFamily: "var(--font-ui)",
-};
+function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showActions, onEditStart, onEditChange, onEditSave, onEditCancel, onDelete, onClick }: {
+  body: string;
+  userName: string;
+  color: string;
+  createdAt: number;
+  isOwn: boolean;
+  editing: boolean;
+  showActions: boolean;
+  onEditStart?: () => void;
+  onEditChange?: (v: string) => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
+  onDelete?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div onClick={onClick} style={{ padding: "10px 12px 8px", position: "relative" }}>
+      {/* Author row */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: "50%", background: color, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontSize: "0.7rem", fontWeight: 700, userSelect: "none",
+        }}>
+          {userName.slice(0, 1).toUpperCase()}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {userName}
+          </div>
+          {createdAt > 0 && (
+            <div style={{ fontSize: "0.68rem", color: "#80868b", lineHeight: 1.2 }}>
+              {timeAgo(createdAt)}
+            </div>
+          )}
+        </div>
+        {/* Edit/Delete — show on hover when actions are visible */}
+        {showActions && isOwn && !editing && (
+          <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
+            {onEditStart && (
+              <IconBtn title="Edit" onClick={(e) => { e.stopPropagation(); onEditStart(); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </IconBtn>
+            )}
+            {onDelete && (
+              <IconBtn title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </IconBtn>
+            )}
+          </div>
+        )}
+      </div>
 
-const textareaStyle: React.CSSProperties = {
-  width: "100%", resize: "none", border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
-  borderRadius: "5px", padding: "0.3rem 0.4rem", fontSize: "0.78rem", fontFamily: "var(--font-ui)",
-  background: "var(--bg)", color: "var(--fg)", outline: "none", lineHeight: 1.4, boxSizing: "border-box",
-};
+      {/* Body */}
+      {editing ? (
+        <>
+          <textarea
+            value={body}
+            onChange={e => onEditChange?.(e.target.value)}
+            autoFocus
+            rows={2}
+            style={{
+              width: "100%", resize: "none", border: "none", outline: "none",
+              borderBottom: "2px solid #1a73e8", padding: "2px 0",
+              fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+              background: "transparent", color: "#202124", lineHeight: 1.5,
+              boxSizing: "border-box",
+            }}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px", marginTop: "6px" }}>
+            <GButton variant="text" onClick={onEditCancel}>Cancel</GButton>
+            <GButton variant="filled" onClick={onEditSave}>Save</GButton>
+          </div>
+        </>
+      ) : (
+        <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
+          {body || <em style={{ color: "#80868b" }}>Empty comment</em>}
+        </p>
+      )}
+    </div>
+  );
+}
 
-function actionBtnStyle(color: string): React.CSSProperties {
-  return {
-    padding: "0.18rem 0.6rem", border: `1px solid ${color}40`, borderRadius: "4px",
-    background: `color-mix(in srgb, ${color} 8%, transparent)`,
-    color, fontSize: "0.72rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-ui)",
-  };
+function GButton({ variant, children, onClick, disabled, style }: {
+  variant: "text" | "filled";
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "5px 12px",
+        border: "none",
+        borderRadius: "4px",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+        cursor: disabled ? "default" : "pointer",
+        fontFamily: "var(--font-ui)",
+        transition: "background 100ms",
+        ...(variant === "filled"
+          ? { background: disabled ? "#e8eaed" : "#1a73e8", color: disabled ? "#80868b" : "#fff" }
+          : { background: "transparent", color: "#1a73e8" }),
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconBtn({ title, onClick, children }: { title: string; onClick: (e: React.MouseEvent) => void; children: React.ReactNode }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      style={{
+        width: 26, height: 26, border: "none", borderRadius: "50%",
+        background: "transparent", cursor: "pointer", color: "#5f6368",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "background 100ms",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = "#f1f3f4"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+    >
+      {children}
+    </button>
+  );
 }
