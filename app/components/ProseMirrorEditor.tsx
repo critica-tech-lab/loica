@@ -288,7 +288,8 @@ export function ProseMirrorEditor({
               const rect = el.getBoundingClientRect();
               pendingClickId = commentId;
               Promise.resolve().then(() => { pendingClickId = null; });
-              onThreadClickRef.current?.(thread, { x: rect.left, y: rect.bottom });
+              // Pass right edge + top so popup can appear to the right of the text
+              onThreadClickRef.current?.(thread, { x: rect.right, y: rect.top });
             }
             return false;
           },

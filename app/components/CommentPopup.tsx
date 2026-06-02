@@ -32,10 +32,14 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, onDismi
   const isOwn = thread.userId === currentUserId;
   const color = authorColorFromName(thread.userName || "");
 
-  // Position: below anchor by default, flip above if too close to bottom
-  const left = Math.min(Math.max(pos.x, GAP), window.innerWidth - POPUP_W - GAP);
-  const spaceBelow = window.innerHeight - pos.y - GAP;
-  const top = spaceBelow > 180 ? pos.y + GAP : pos.y - GAP - Math.min(POPUP_MAX_H, 300);
+  // Position: to the right of the anchor text, vertically aligned with it.
+  // Falls back left if there's no room on the right.
+  const spaceRight = window.innerWidth - pos.x - GAP;
+  const left = spaceRight >= POPUP_W + GAP
+    ? pos.x + GAP
+    : Math.max(GAP, pos.x - POPUP_W - GAP);
+  // Vertically: align top with click Y, clamp to viewport
+  const top = Math.min(Math.max(pos.y - 20, GAP), window.innerHeight - 200 - GAP);
 
   // Dismiss on outside click or Escape
   useEffect(() => {
