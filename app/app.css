@@ -1809,6 +1809,10 @@ html {
 .pm-editor-mount .ProseMirror .has-comment-indicator {
   position: relative;
 }
+/* Allow table indicator to escape the table's overflow:hidden */
+.pm-editor-mount .ProseMirror table .has-comment-indicator {
+  overflow: visible;
+}
 
 .pm-comment-highlight {
   background-color: rgba(255, 217, 102, 0.35);
@@ -1822,31 +1826,28 @@ html {
   background-color: rgba(255, 217, 102, 0.85);
 }
 
-/* Track changes — Word-like: author color via --track-color CSS var */
+/* Track changes — color only, no underline/border, visually distinct from comments */
 ins.tracked-insert {
-  text-decoration: underline;
-  text-decoration-color: var(--track-color, #2563eb);
-  text-underline-offset: 2px;
-  text-decoration-thickness: 2px;
-  color: var(--track-color, #2563eb);
+  text-decoration: none;
+  color: #15803d;
   background: none;
   cursor: pointer;
+  font-style: normal;
 }
 ins.tracked-insert:hover {
-  background-color: color-mix(in srgb, var(--track-color, #2563eb) 12%, transparent);
+  background-color: rgba(21,128,61,0.08);
   border-radius: 2px;
 }
 
 del.tracked-delete {
   text-decoration: line-through;
-  text-decoration-color: var(--track-color, #dc2626);
-  text-decoration-thickness: 2px;
-  color: var(--track-color, #dc2626);
+  text-decoration-color: currentColor;
+  color: #b91c1c;
   background: none;
   cursor: pointer;
 }
 del.tracked-delete:hover {
-  background-color: color-mix(in srgb, var(--track-color, #dc2626) 12%, transparent);
+  background-color: rgba(185,28,28,0.08);
   border-radius: 2px;
 }
 
@@ -1868,7 +1869,7 @@ del.tracked-delete:hover {
   margin-left: 0 !important;
 }
 
-/* Change bar in left margin for paragraphs containing tracked changes */
+/* Subtle left bar for tracked-change paragraphs — thinner, neutral */
 .pm-editor-mount .ProseMirror p:has(ins.tracked-insert),
 .pm-editor-mount .ProseMirror p:has(del.tracked-delete),
 .pm-editor-mount .ProseMirror h1:has(ins.tracked-insert),
@@ -1877,7 +1878,7 @@ del.tracked-delete:hover {
 .pm-editor-mount .ProseMirror h1:has(del.tracked-delete),
 .pm-editor-mount .ProseMirror h2:has(del.tracked-delete),
 .pm-editor-mount .ProseMirror h3:has(del.tracked-delete) {
-  border-left: 3px solid color-mix(in srgb, var(--track-color, #2563eb) 60%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--fg) 20%, transparent);
   padding-left: 0.4rem;
   margin-left: -0.65rem;
 }
