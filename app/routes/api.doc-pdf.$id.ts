@@ -40,44 +40,16 @@ async function convertImage(srcPath: string, pngPath: string): Promise<boolean> 
   return false;
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+async function generatePdf(rawContent: string, title: string, landscape = false): Promise<Response> {
   mkdirSync(loicaTmpDir, { recursive: true });
 
-  const doc = getDocument(params.id);
-  if (!doc) throw new Response("Not found", { status: 404 });
-
-  const isPublic = !!(doc.public_token || doc.edit_token);
-
-  if (!isPublic) {
-    const user = getSessionUser(request);
-    if (!user) throw new Response("Not found", { status: 404 });
-    const role = getMembership(doc.workspace_id, user.id, user.is_admin);
-    const shared = doc.folder_id ? hasSharedAccess(doc.folder_id, user.id) : false;
-    if (!role && !shared) throw new Response("Not found", { status: 404 });
-  }
-
-  const title = doc.title || "Untitled";
-  const frontmatter = parseFrontmatter(doc.content || "");
-
-  // Extension-provided exporters take precedence over core markdown→PDF.
-  const ext = getServerExtensionForDocType(frontmatter?.type);
-  if (ext?.exporters?.pdf) {
-    return ext.exporters.pdf(doc, frontmatter);
-  }
-
-  // Core fallback — markdown via pandoc/tectonic. Requires `pandoc` and
-  // `tectonic` on PATH. If absent the catch returns 500 with a clear error.
   const uploadsDir = join(process.cwd(), "uploads");
-
   const id = nanoid(8);
   const tmpImgDir = join(loicaTmpDir, `loica-img-${id}`);
   const tmpFiles: string[] = [];
-
-  // Formats natively supported by Tectonic's XeTeX engine
   const nativeFormats = new Set([".png", ".jpg", ".jpeg", ".pdf"]);
 
-  // Renumber footnotes for display, then rewrite image paths
-  const rawContent = renumberFootnotesForDisplay(doc.content || "");
+  // Rewrite /api/uploads/* image paths to absolute filesystem paths for pandoc
   const imgRegex = /!\[([^\]]*)\]\(\/api\/uploads\/([^)]+)\)/g;
   const replacements = await Promise.all(
     Array.from(rawContent.matchAll(imgRegex)).map(async (m) => {
@@ -90,7 +62,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         return { match, replacement: `![${alt}](${srcPath})` };
       }
 
-      // Convert non-native formats (webp, svg, gif, bmp, tiff, etc.) to png
       mkdirSync(tmpImgDir, { recursive: true });
       const pngName = file.replace(/\.[^.]+$/, ".png");
       const pngPath = join(tmpImgDir, pngName);
@@ -111,11 +82,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const pdfPath = join(loicaTmpDir, `loica-${id}.pdf`);
   let wideTableHeaderPath: string | null = null;
   let landscapeHeaderPath: string | null = null;
-  const landscape = frontmatter?.orientation === "landscape";
 
   try {
-    // Ensure blank lines before pipe tables so GFM recognises them as blocks,
-    // and convert <br> in table cells to spaces for LaTeX compatibility.
     const prepared = fixListIndentation(content)
       .replace(/<br\s*\/?>/gi, " ")
       .replace(/^(\|.+\|)\s*$/gm, (match, _row, offset, str) => {
@@ -127,14 +95,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         return match;
       });
 
-    // Detect wide tables: count max columns in any pipe table.
-    // Stay in portrait and shrink the table font instead of switching layout.
     const maxTableCols = prepared
       .split("\n")
       .filter((l) => l.trimStart().startsWith("|") && l.trimEnd().endsWith("|"))
       .reduce((max, line) => Math.max(max, line.split("|").length - 2), 0);
 
-    // In landscape, tables have ~2x the horizontal room — skip the shrink.
     let tableSizeOverride = "";
     if (!landscape) {
       if (maxTableCols >= 8) {
@@ -155,7 +120,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     writeFileSync(mdPath, prepared, "utf-8");
 
-    // Set OSFONTDIR so Tectonic/XeTeX finds bundled fonts on any system
     const env = { ...process.env, OSFONTDIR: fontsDir, TMPDIR: loicaTmpDir };
 
     const pandocArgs = [
@@ -176,12 +140,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       "--metadata", `title=${title}`,
       "-H", preamblePath,
     ];
-    if (wideTableHeaderPath) {
-      pandocArgs.push("-H", wideTableHeaderPath);
-    }
-    if (landscapeHeaderPath) {
-      pandocArgs.push("-H", landscapeHeaderPath);
-    }
+    if (wideTableHeaderPath) pandocArgs.push("-H", wideTableHeaderPath);
+    if (landscapeHeaderPath) pandocArgs.push("-H", landscapeHeaderPath);
 
     execFileSync("pandoc", pandocArgs, { timeout: 120000, stdio: "pipe", env });
 
@@ -205,4 +165,41 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     for (const f of tmpFiles) { try { unlinkSync(f); } catch {} }
     try { rmSync(tmpImgDir, { recursive: true }); } catch {}
   }
+}
+
+async function authorizeDoc(request: Request, params: { id?: string }) {
+  const doc = getDocument(params.id!);
+  if (!doc) throw new Response("Not found", { status: 404 });
+
+  const isPublic = !!(doc.public_token || doc.edit_token);
+  if (!isPublic) {
+    const user = getSessionUser(request);
+    if (!user) throw new Response("Not found", { status: 404 });
+    const role = getMembership(doc.workspace_id, user.id, user.is_admin);
+    const shared = doc.folder_id ? hasSharedAccess(doc.folder_id, user.id) : false;
+    if (!role && !shared) throw new Response("Not found", { status: 404 });
+  }
+
+  return doc;
+}
+
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const doc = await authorizeDoc(request, params);
+  const title = doc.title || "Untitled";
+  const frontmatter = parseFrontmatter(doc.content || "");
+
+  const ext = getServerExtensionForDocType(frontmatter?.type);
+  if (ext?.exporters?.pdf) {
+    return ext.exporters.pdf(doc, frontmatter);
+  }
+
+  const content = renumberFootnotesForDisplay(doc.content || "");
+  return generatePdf(content, title, frontmatter?.orientation === "landscape");
+}
+
+// POST: accepts { content: string } — used by PM editor to send serialized markdown
+export async function action({ request, params }: Route.ActionArgs) {
+  const doc = await authorizeDoc(request, params);
+  const { content = "" } = await request.json() as { content?: string };
+  return generatePdf(content, doc.title || "Untitled");
 }

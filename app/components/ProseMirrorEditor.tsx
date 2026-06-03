@@ -5,6 +5,7 @@ import type { PMActiveState, TrackChangesActiveState, TrackedChangeEntry } from 
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
 import { defaultMarkdownParser } from "prosemirror-markdown";
+import { loicaMarkdownSerializer } from "~/components/editor/pm-markdown";
 import { Slice } from "prosemirror-model";
 import {
   addRowBefore, addRowAfter, deleteRow,
@@ -864,21 +865,27 @@ export function ProseMirrorEditor({
 
         replaceContent: () => {},
 
+        getMarkdown: () => loicaMarkdownSerializer.serialize(view.state.doc),
+
         exportDocx: async (filename = "document.docx") => {
-          const { defaultDocxSerializer, writeDocx } = await import("prosemirror-docx");
-          const doc = defaultDocxSerializer.serialize(view.state.doc, {
-            getImageBuffer: (src: string) => new Uint8Array(0),
-          });
-          const buffer = await writeDocx(doc);
-          const blob = new Blob([new Uint8Array(buffer as any)], {
-            type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(url);
+          try {
+            const { defaultDocxSerializer } = await import("prosemirror-docx");
+            const { Packer } = await import("docx");
+            const doc = defaultDocxSerializer.serialize(view.state.doc, {
+              getImageBuffer: (_src: string) => new Uint8Array(0),
+            });
+            // Packer.toBlob is the browser-compatible path; toBuffer uses
+            // JSZip "nodebuffer" which is Node.js-only and returns null in browsers.
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            console.error("[exportDocx]", err);
+          }
         },
       };
 

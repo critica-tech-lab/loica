@@ -23,7 +23,6 @@ import type { DocumentProps } from "~/lib/DocumentContext";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { diffWords } from "diff";
 
-const TOOLBAR_OPEN_KEY = "loica.docToolbar.open";
 const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
 export type { DocumentProps as DocEditorViewProps };
 
@@ -74,7 +73,6 @@ export function DocEditorView(_props: DocumentProps) {
 
   // Default visible — users who want it hidden dismiss with ×, preference sticks.
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
-  const [toolbarOpen, setToolbarOpen] = useState(true);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
   const [editingMode, setEditingMode] = useState<EditingMode>(() => {
     if (typeof window === "undefined") return "editing";
@@ -166,56 +164,11 @@ export function DocEditorView(_props: DocumentProps) {
       onApply: apply,
     });
   }, []);
-  // Hydrate toolbar visibility on mount.
-  // Freshly-created docs (< 60s old) always show the toolbar regardless of the
-  // stored preference — first impression matters more than power-user muscle
-  // memory, and the user can still dismiss it afterwards.
-  useEffect(() => {
-    const createdAtMs = document.created_at ? new Date(document.created_at).getTime() : 0;
-    const isFreshDoc = createdAtMs && Date.now() - createdAtMs < 60_000;
-    if (isFreshDoc) {
-      setToolbarOpen(true);
-      return;
-    }
-    try {
-      const saved = localStorage.getItem(TOOLBAR_OPEN_KEY);
-      if (saved === "0") setToolbarOpen(false);
-      else if (saved === "1") setToolbarOpen(true);
-    } catch { /* localStorage unavailable — stay on default */ }
-  }, [document.created_at]);
-  const toggleToolbar = useCallback(() => {
-    setToolbarOpen((v) => {
-      const next = !v;
-      try { localStorage.setItem(TOOLBAR_OPEN_KEY, next ? "1" : "0"); } catch {}
-      return next;
-    });
-  }, []);
-  const closeToolbar = useCallback(() => {
-    setToolbarOpen(false);
-    try { localStorage.setItem(TOOLBAR_OPEN_KEY, "0"); } catch {}
-  }, []);
-  // ⌘/ toggles the formatting toolbar. Esc closes it when open.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && !e.shiftKey && e.key === "/") {
-        e.preventDefault();
-        toggleToolbar();
-      } else if (e.key === "Escape" && toolbarOpen) {
-        const activeTag = (e.target as HTMLElement | null)?.tagName;
-        if (activeTag !== "INPUT" || (e.target as HTMLInputElement).type !== "search") {
-          closeToolbar();
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggleToolbar, closeToolbar, toolbarOpen]);
 
   return (
     <AppShell
       navLeft={<DocNavLeft />}
-      navActions={<DocNavActions toolbarOpen={toolbarOpen} onToggleToolbar={toggleToolbar} />}
+      navActions={<DocNavActions />}
       footerLeft={<DocFooterLeft />}
       footerCenter={hasCustomEditor ? null : <DocFooterCenter />}
       sidebar={null}
@@ -299,7 +252,7 @@ export function DocEditorView(_props: DocumentProps) {
                   }
                 }}
               />
-            : toolbarOpen && <Toolbar variant="pill" onLink={openLinkModal} />
+            : null
         )}
         {(() => {
           const Banner = docTypeExtension?.EditorBanner;
@@ -997,13 +950,7 @@ function DocNavLeft() {
 }
 
 
-function DocNavActions({
-  toolbarOpen,
-  onToggleToolbar,
-}: {
-  toolbarOpen: boolean;
-  onToggleToolbar: () => void;
-}) {
+function DocNavActions() {
   const {
     user,
     isShared,
@@ -1031,9 +978,38 @@ function DocNavActions({
   const hasComments = comments.length > 0;
 
   const { editorApi, title } = useDocument();
-  const download = (kind: "md" | "pdf" | "docx") => {
+  const download = async (kind: "md" | "pdf" | "docx") => {
+    const slug = (title || "document").replace(/[^a-zA-Z0-9_\-. ]/g, "_");
     if (USE_PM && kind === "docx") {
-      editorApi.current?.exportDocx?.(`${title || "document"}.docx`);
+      editorApi.current?.exportDocx?.(`${slug}.docx`);
+      return;
+    }
+    if (USE_PM && (kind === "md" || kind === "pdf")) {
+      const md = editorApi.current?.getMarkdown?.() ?? "";
+      if (kind === "md") {
+        const blob = new Blob([md], { type: "text/markdown; charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+        a.href = url; a.download = `${slug}.md`; a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      // PDF: POST markdown to server, receive PDF blob
+      try {
+        const resp = await fetch(`/api/doc-pdf/${document.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: md }),
+        });
+        if (!resp.ok) throw new Error("PDF failed");
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+        a.href = url; a.download = `${slug}.pdf`; a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        window.open(`/api/doc-pdf/${document.id}`, "_blank");
+      }
       return;
     }
     const path =
@@ -1074,12 +1050,6 @@ function DocNavActions({
           { kind: "separator" } as DocMenuItem,
         ]
       : []),
-    {
-      label: "Formatting",
-      title: "⌘/",
-      icon: <FormatIcon />,
-      onClick: onToggleToolbar,
-    },
     {
       label: "History",
       icon: <ClockIcon className="w-[14px] h-[14px]" />,
@@ -1176,23 +1146,6 @@ function TopbarIconBtn({
   );
 }
 
-/** Typography "Aa" glyph for the formatting-toolbar menu item. */
-function FormatIcon() {
-  return (
-    <span
-      aria-hidden
-      style={{
-        display: "inline-flex",
-        alignItems: "baseline",
-        fontFamily: "var(--font-ui)",
-        lineHeight: 1,
-      }}
-    >
-      <span style={{ fontSize: "13px", fontWeight: 600 }}>A</span>
-      <span style={{ fontSize: "9px", fontWeight: 500, marginLeft: "0.5px" }}>a</span>
-    </span>
-  );
-}
 
 function TopbarBadge({ count }: { count: number }) {
   return (

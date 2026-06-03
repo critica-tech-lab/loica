@@ -85,6 +85,7 @@ export interface EditorApi {
   setShowMarkup?: (show: boolean) => void;
   setTextAlign?: (alignment: string | null) => void;
   addLink?: (url: string) => void;
+  getMarkdown?: () => string;
 }
 
 export interface DocumentContextValue {
