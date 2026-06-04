@@ -23,15 +23,16 @@ function findBlockInfo(doc: any, from: number): { indicatorPos: number; nodeFrom
   try {
     const $pos = doc.resolve(from);
 
+    // Check all ancestors first — paragraph inside table_cell would be found before table_cell otherwise
     for (let d = $pos.depth; d >= 1; d--) {
       const node = $pos.node(d);
-
-      // Inside a table cell — skip indicator (table layout clips it; highlight alone is sufficient)
       if (node.type.name === "table_cell" || node.type.name === "table_header") {
         return null;
       }
+    }
 
-      // Regular block
+    for (let d = $pos.depth; d >= 1; d--) {
+      const node = $pos.node(d);
       if (node.isBlock && !node.isInline &&
           ["paragraph", "heading", "list_item", "blockquote", "code_block"].includes(node.type.name)) {
         const nodeFrom = $pos.before(d);
