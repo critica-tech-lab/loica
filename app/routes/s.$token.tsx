@@ -12,7 +12,9 @@ import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import type { PMActiveState, TrackChangesActiveState } from "~/components/editor/types";
 import { LinkModal } from "~/components/LinkModal";
 
-const USE_PM = import.meta.env.VITE_PM_EDITOR === "1";
+// ProseMirror is the default editor on this branch. Set VITE_PM_EDITOR=0 to
+// fall back to the legacy CodeMirror editor.
+const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
 import { CommentPopup } from "~/components/CommentPopup";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
