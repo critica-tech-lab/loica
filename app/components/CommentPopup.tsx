@@ -45,6 +45,19 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
   const isOwn = thread.userId === currentUserId;
   const color = authorColorFromName(thread.userName || "");
 
+  // A freshly-created comment has no body and no replies yet → show a focused
+  // compose field for its first comment instead of an "Empty comment" stub.
+  const isDraft = !thread.body && thread.replies.length === 0 && isOwn;
+  const [draftText, setDraftText] = useState("");
+  const submittedRef = useRef(false);
+  // Dismissing an unfilled draft removes the placeholder thread so we don't
+  // leave empty comments behind.
+  const handleDismissRef = useRef<() => void>(() => {});
+  handleDismissRef.current = () => {
+    if (isDraft && !submittedRef.current) editorApiRef.current?.deleteComment(thread.id);
+    onDismiss();
+  };
+
   const [layout, setLayout] = useState<Layout>(() => computeLayout(pos, editorRef));
 
   useEffect(() => {
@@ -55,21 +68,28 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onDismiss();
+      if (ref.current && !ref.current.contains(e.target as Node)) handleDismissRef.current();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onDismiss(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleDismissRef.current(); };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [onDismiss]);
+  }, []);
 
   const submitReply = () => {
     if (!reply.trim()) return;
     editorApiRef.current?.addReply(thread.id, reply.trim());
     setReply("");
+  };
+
+  const submitDraft = () => {
+    const b = draftText.trim();
+    if (!b) return;
+    submittedRef.current = true;
+    editorApiRef.current?.updateComment(thread.id, b);
   };
 
   const resolve = () => {
@@ -93,6 +113,34 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         color: "var(--fg)",
       }}
     >
+      {/* New-comment compose */}
+      {isDraft && (
+        <div style={{ paddingTop: "3px" }}>
+          {thread.anchorText && (
+            <div style={{
+              margin: "10px 12px 0", padding: "3px 8px",
+              borderLeft: "2px solid var(--accent)", fontSize: "0.71rem",
+              color: "color-mix(in srgb, var(--fg) 55%, transparent)", fontStyle: "italic",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {thread.anchorText}
+            </div>
+          )}
+          <CommentInput
+            avatarName={currentUserId}
+            value={draftText}
+            onChange={setDraftText}
+            onSubmit={submitDraft}
+            onCancel={() => handleDismissRef.current()}
+            placeholder="Add a comment…"
+            submitLabel="Comment"
+            autoFocus
+            showCancel
+          />
+        </div>
+      )}
+
+      {!isDraft && (<>
       {/* Root comment */}
       <div style={{ padding: "12px 12px 10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -172,26 +220,65 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
       )}
 
       {/* Reply input */}
-      <div style={{ borderTop: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)", padding: "9px 12px 11px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
-        <Avatar name={currentUserId} color={authorColorFromName(currentUserId)} size={20} style={{ marginTop: 2, flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <textarea
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitReply();
-              if (e.key === "Escape") { e.stopPropagation(); onDismiss(); }
-            }}
-            placeholder="Reply…"
-            rows={1}
-            style={inlineTextarea}
-          />
-          {reply.trim() && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "5px" }}>
-              <SmallBtn primary onClick={submitReply}>Reply</SmallBtn>
-            </div>
-          )}
-        </div>
+      <CommentInput
+        avatarName={currentUserId}
+        value={reply}
+        onChange={setReply}
+        onSubmit={submitReply}
+        onCancel={() => handleDismissRef.current()}
+        placeholder="Reply…"
+        submitLabel="Reply"
+        bordered
+      />
+      </>)}
+    </div>
+  );
+}
+
+// Shared composer for both the first comment and replies — same avatar +
+// underlined-textarea layout so they align. Enter submits; Shift+Enter newlines;
+// Escape cancels. The submit row only appears once there's text.
+function CommentInput({
+  avatarName, value, onChange, onSubmit, onCancel,
+  placeholder, submitLabel, autoFocus = false, showCancel = false, bordered = false,
+}: {
+  avatarName: string;
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel?: () => void;
+  placeholder: string;
+  submitLabel: string;
+  autoFocus?: boolean;
+  showCancel?: boolean;
+  bordered?: boolean;
+}) {
+  return (
+    <div style={{
+      borderTop: bordered ? "1px solid color-mix(in srgb, var(--fg) 12%, transparent)" : undefined,
+      padding: "9px 12px 11px",
+      display: "flex", gap: "8px", alignItems: "flex-start",
+    }}>
+      <Avatar name={avatarName} color={authorColorFromName(avatarName)} size={20} style={{ marginTop: 2, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
+            if (e.key === "Escape") { e.stopPropagation(); onCancel?.(); }
+          }}
+          autoFocus={autoFocus}
+          placeholder={placeholder}
+          rows={1}
+          style={inlineTextarea}
+        />
+        {value.trim() && (
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px", marginTop: "5px" }}>
+            {showCancel && onCancel && <SmallBtn onClick={onCancel}>Cancel</SmallBtn>}
+            <SmallBtn primary onClick={onSubmit}>{submitLabel}</SmallBtn>
+          </div>
+        )}
       </div>
     </div>
   );
