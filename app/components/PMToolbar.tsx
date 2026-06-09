@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useOptionalDocument } from "~/lib/DocumentContext";
+import type { EditorApi } from "~/lib/DocumentContext";
 import type { PMActiveState, TrackChangesActiveState, EditingMode } from "./editor/types";
 
 interface Props {
@@ -10,12 +11,16 @@ interface Props {
   onImageUpload?: (file: File) => void;
   onOpenChangesPanel?: () => void;
   onModeChange?: (mode: EditingMode) => void;
+  // Overrides for hosts without a DocumentProvider (e.g. the public share
+  // edit view), which otherwise resolve canEdit=false and hide the toolbar.
+  canEdit?: boolean;
+  editorApiRef?: React.RefObject<EditorApi | null>;
 }
 
-export function PMToolbar({ activeState, trackChangesState, editingMode = "editing", onLink, onImageUpload, onOpenChangesPanel, onModeChange }: Props) {
+export function PMToolbar({ activeState, trackChangesState, editingMode = "editing", onLink, onImageUpload, onOpenChangesPanel, onModeChange, canEdit: canEditProp, editorApiRef }: Props) {
   const ctx = useOptionalDocument();
-  const api = ctx?.editorApi.current;
-  const canEdit = ctx?.canEdit ?? false;
+  const api = editorApiRef?.current ?? ctx?.editorApi.current;
+  const canEdit = canEditProp ?? ctx?.canEdit ?? false;
 
   if (!canEdit) return null;
 

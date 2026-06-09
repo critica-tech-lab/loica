@@ -523,7 +523,7 @@ function EditableView({
     <>
       {!ExtensionEditor && (
         USE_PM
-          ? <PMToolbar activeState={pmActiveState} trackChangesState={trackChangesState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
+          ? <PMToolbar canEdit editorApiRef={editorApi as any} activeState={pmActiveState} trackChangesState={trackChangesState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
           : <Toolbar
               onFormat={(b, a) => editorApi.current?.format(b, a)}
               onFormatLine={(p) => editorApi.current?.formatLine(p)}
