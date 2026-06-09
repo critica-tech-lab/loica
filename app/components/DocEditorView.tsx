@@ -59,6 +59,7 @@ export function DocEditorView(_props: DocumentProps) {
 
     scheduleSave,
     handleContentChange,
+    maybeAdoptTitle,
     registerEditorApi,
     historyPreview,
   } = ctx;
@@ -294,6 +295,7 @@ export function DocEditorView(_props: DocumentProps) {
               onPresenceChange={setPeers}
               onConnectionStatus={setConnectionStatus}
               onChange={handleContentChange}
+              onTitle={(headingText, fullText) => maybeAdoptTitle(headingText, fullText)}
               onStateChange={setPmActiveState}
               onTrackChangesStateChange={setTrackChangesState}
               onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}

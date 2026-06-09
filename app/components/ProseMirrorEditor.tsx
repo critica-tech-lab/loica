@@ -28,6 +28,9 @@ interface Props {
     status: "connected" | "connecting" | "disconnected"
   ) => void;
   onChange?: (content: string) => void;
+  // Fires on doc change with the first block's heading text (empty if the first
+  // block isn't a heading) — lets the host auto-adopt the H1 as the doc title.
+  onTitle?: (headingText: string, fullText: string) => void;
   onStateChange?: (state: PMActiveState) => void;
   onTrackChangesStateChange?: (state: TrackChangesActiveState) => void;
   onTrackChangeClick?: (changeId: string, pos: { x: number; y: number }) => void;
@@ -75,6 +78,7 @@ export function ProseMirrorEditor({
   onPresenceChange,
   onConnectionStatus,
   onChange,
+  onTitle,
   onStateChange,
   onTrackChangesStateChange,
   onTrackChangeClick,
@@ -110,6 +114,8 @@ export function ProseMirrorEditor({
   onTrackChangeClickRef.current = onTrackChangeClick;
   const onEditLinkRef = useRef(onEditLink);
   onEditLinkRef.current = onEditLink;
+  const onTitleRef = useRef(onTitle);
+  onTitleRef.current = onTitle;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -593,7 +599,12 @@ export function ProseMirrorEditor({
           const newState = view.state.apply(tr);
           view.updateState(newState);
           if (tr.docChanged) {
-            onChange?.(view.state.doc.textContent);
+            const fullText = view.state.doc.textContent;
+            onChange?.(fullText);
+            const first = view.state.doc.firstChild;
+            const headingText =
+              first && first.type === schema.nodes.heading ? first.textContent.trim() : "";
+            onTitleRef.current?.(headingText, fullText);
           }
           onStateChange?.(computeActiveState(view.state));
           // Emit track-changes state

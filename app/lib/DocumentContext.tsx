@@ -163,6 +163,7 @@ export interface DocumentContextValue {
   togglePanel: (panel: PanelId) => void;
   toggleStar: () => void;
   handleContentChange: (val: string) => void;
+  maybeAdoptTitle: (candidate: string | null, contentForSave?: string) => boolean;
   registerEditorApi: (api: EditorApi) => void;
   sendMention: (body: string) => void;
   restoreVersion: (versionId: string) => void;
@@ -414,22 +415,21 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   }, [content, canEdit]);
 
   // ─── Content change handler (with auto-title) ─────────────
-  const handleContentChange = useCallback(
-    (val: string) => {
-      setContent(val);
-      // Auto-adopt the body's first H1 as the document title, but only for
-      // freshly-created docs the user is actively editing. Guards:
-      //   · recency — only kicks in within 1 hour of creation, so opening an
-      //     old doc that still happens to carry a placeholder title doesn't
-      //     trigger surprise renames.
-      //   · placeholder — starts only while the title is a system default
-      //     (empty / "Untitled" / the `xxx-xxx-xxx` slug from randomDocName()).
-      //   · sticky — once we've adopted once (`titleAutoAdopted`), we keep
-      //     syncing keystroke-by-keystroke until the user manually edits the
-      //     title (which flips `titleSetByUser` and locks it in).
-      //
-      // `handleContentChange` is only wired to the Editor's onChange, so this
-      // never fires outside an active edit session.
+  // Auto-adopt `candidate` as the document title, but only for freshly-created
+  // docs the user is actively editing. Returns true if it adopted (and saved).
+  // Guards:
+  //   · recency — only within 1 hour of creation, so opening an old doc that
+  //     still carries a placeholder title doesn't trigger a surprise rename.
+  //   · placeholder — only while the title is a system default
+  //     (empty / "Untitled" / the `xxx-xxx-xxx` slug from randomDocName()).
+  //   · sticky — once adopted (`titleAutoAdopted`), keep syncing keystroke-by-
+  //     keystroke until the user manually edits the title (flips
+  //     `titleSetByUser`, locking it in).
+  // Used by both the markdown editor (via extractFirstH1) and the ProseMirror
+  // editor (which passes the first heading node's text directly).
+  const maybeAdoptTitle = useCallback(
+    (candidate: string | null, contentForSave?: string): boolean => {
+      if (!candidate) return false;
       const createdRaw = document.created_at ? Number(document.created_at) : 0;
       const createdMs =
         createdRaw && createdRaw < 1e12 ? createdRaw * 1000 : createdRaw;
@@ -443,19 +443,27 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
         !titleSetByUser.current &&
         isRecentDoc &&
         (titleAutoAdopted.current || isPlaceholderTitle);
-      if (canAutoAdopt) {
-        const h1 = extractFirstH1(val);
-        if (h1) {
-          titleAutoAdopted.current = true;
-          setTitle(h1);
-          originalTitle.current = h1;
-          scheduleSave(h1, val);
-          return;
-        }
-      }
+      if (!canAutoAdopt) return false;
+      titleAutoAdopted.current = true;
+      setTitle(candidate);
+      originalTitle.current = candidate;
+      scheduleSave(candidate, contentForSave ?? content);
+      return true;
+    },
+    [document.created_at, title, scheduleSave, content]
+  );
+
+  const handleContentChange = useCallback(
+    (val: string) => {
+      setContent(val);
+      // `handleContentChange` is only wired to the Editor's onChange, so the
+      // title auto-adopt never fires outside an active edit session. The PM
+      // editor sources its H1 candidate via the onTitle callback instead (its
+      // textContent has no `#` markers for extractFirstH1 to match).
+      if (maybeAdoptTitle(extractFirstH1(val), val)) return;
       scheduleSave(title, val);
     },
-    [document.created_at, title, scheduleSave]
+    [maybeAdoptTitle, title, scheduleSave]
   );
 
   // ─── Insert footnote ─────────────────────────────────────
@@ -609,6 +617,7 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     togglePanel,
     toggleStar,
     handleContentChange,
+    maybeAdoptTitle,
     registerEditorApi,
     sendMention,
     restoreVersion,
