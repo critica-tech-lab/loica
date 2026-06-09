@@ -20,6 +20,9 @@ const newcssDir = resolve(process.cwd(), "assets/pdf-newcss");
 const newcssTemplate = join(newcssDir, "template.html");
 const newcssStyle = join(newcssDir, "new.min.css");
 const newcssPrint = join(newcssDir, "print.css");
+// Applies a resized image's `{width=Npx}` marker (emitted by the markdown
+// serializer) as a real width attribute, for both HTML and LaTeX output.
+const imageWidthFilter = resolve(process.cwd(), "assets/image-width.lua");
 
 // Snap-confined tectonic can only access non-hidden dirs under $HOME.
 // Using $HOME/loica-tmp instead of /tmp or a dot-prefixed project dir.
@@ -131,6 +134,7 @@ async function generatePdf(
       const args = [
         mdPath, "-f", "gfm+footnotes", "-o", pdfPath,
         "--pdf-engine=tectonic", "--metadata", `title=${title}`,
+        "--lua-filter", imageWidthFilter,
       ];
       if (pdfStyle.extraPandocArgs) args.push(...pdfStyle.extraPandocArgs);
       for (const filter of pdfStyle.luaFilters ?? []) args.push("--lua-filter", filter);
@@ -161,6 +165,7 @@ async function generatePdf(
       execFileSync("pandoc", [
         mdPath, "-f", "gfm+footnotes", "-t", "html5", "-s",
         "--template", newcssTemplate, "--metadata", `title=${title}`,
+        "--lua-filter", imageWidthFilter,
         "-o", htmlPath,
       ], { timeout: 120000, stdio: "pipe", env });
 
@@ -176,6 +181,7 @@ async function generatePdf(
       const args = [
         mdPath, "-f", "gfm+footnotes", "-o", pdfPath,
         "--pdf-engine=tectonic", "--metadata", `title=${title}`,
+        "--lua-filter", imageWidthFilter,
       ];
       if (landscape) args.push("-V", "geometry:landscape");
       execFileSync("pandoc", args, { timeout: 120000, stdio: "pipe", env });

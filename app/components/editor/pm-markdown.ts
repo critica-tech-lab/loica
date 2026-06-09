@@ -9,6 +9,20 @@ export const loicaMarkdownSerializer = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
 
+    // Preserve a resized image's width on export. Emits the default
+    // `![alt](src "title")` plus a `{width=Npx}` marker that the PDF route's
+    // image-width Lua filter turns into a real width attribute (pandoc gfm
+    // can't parse link attributes natively). No marker when width is unset.
+    image(state, node) {
+      const { src, alt, title, width } = node.attrs;
+      state.write(
+        "![" + state.esc(alt || "") + "](" + src.replace(/[()]/g, "\\$&") +
+        (title ? ' "' + title.replace(/"/g, '\\"') + '"' : "") + ")"
+      );
+      const w = parseInt(width, 10);
+      if (Number.isFinite(w) && w > 0) state.write(`{width=${w}px}`);
+    },
+
     table(state, node) {
       const rows: string[][] = [];
       node.forEach((row) => {
