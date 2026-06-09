@@ -390,6 +390,92 @@ export function ProseMirrorEditor({
       // so we can suppress the null-selection emission for that same click.
       let pendingClickId: string | null = null;
 
+      // ── Image upload helpers (shared by paste, drop, toolbar) ───────────
+      const MAX_IMAGE_DIM = 1200;
+      const IMAGE_QUALITY = 0.72;
+
+      // Downscale + webp-compress large rasters before upload. Skip SVG (vector)
+      // and GIF (animated) so we don't strip animation / rasterize vectors.
+      function resizeImage(file: File): Promise<File> {
+        if (file.type === "image/svg+xml" || file.type === "image/gif") {
+          return Promise.resolve(file);
+        }
+        return new Promise((resolve) => {
+          const img = new Image();
+          const url = URL.createObjectURL(file);
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            const { width, height } = img;
+            const scale = Math.min(MAX_IMAGE_DIM / width, MAX_IMAGE_DIM / height, 1);
+            const w = Math.round(width * scale);
+            const h = Math.round(height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d")!;
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob(
+              (blob) => {
+                resolve(blob
+                  ? new File([blob], file.name.replace(/\.\w+$/, ".webp"), { type: "image/webp" })
+                  : file);
+              },
+              "image/webp",
+              IMAGE_QUALITY,
+            );
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+          img.src = url;
+        });
+      }
+
+      // Insert a placeholder image node at `pos`, upload, then swap in the real
+      // src. Removes the placeholder on failure. Returns once done.
+      async function uploadImageFile(v: any, file: File, pos: number) {
+        const s = v.state.schema;
+        const placeholder = s.nodes.image.create({ src: "", alt: "Uploading…" });
+        v.dispatch(v.state.tr.insert(pos, placeholder));
+        try {
+          const resized = await resizeImage(file);
+          const formData = new FormData();
+          formData.append("file", resized);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (!res.ok) throw new Error(await res.text());
+          const { url } = await res.json();
+          // Re-locate the placeholder (positions may have shifted) and swap src.
+          let found = false;
+          v.state.doc.descendants((node: any, p: number) => {
+            if (found) return false;
+            if (node.type === s.nodes.image && node.attrs.alt === "Uploading…" && node.attrs.src === "") {
+              v.dispatch(v.state.tr.setNodeMarkup(p, undefined, { src: url, alt: "" }));
+              found = true;
+              return false;
+            }
+          });
+        } catch (err) {
+          console.error("[ProseMirrorEditor] image upload failed:", err);
+          let found = false;
+          v.state.doc.descendants((node: any, p: number) => {
+            if (found) return false;
+            if (node.type === s.nodes.image && node.attrs.alt === "Uploading…" && node.attrs.src === "") {
+              v.dispatch(v.state.tr.delete(p, p + node.nodeSize));
+              found = true;
+              return false;
+            }
+          });
+        }
+      }
+
+      // Pull image files out of a clipboard/drag DataTransfer.
+      function imageFilesFrom(dt: DataTransfer | null | undefined): File[] {
+        if (!dt) return [];
+        const out: File[] = [];
+        for (const item of Array.from(dt.files)) {
+          if (item.type.startsWith("image/")) out.push(item);
+        }
+        return out;
+      }
+
       let view: any = null;
       view = new EditorView(mountRef.current, {
         state,
@@ -398,6 +484,14 @@ export function ProseMirrorEditor({
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
         },
         handlePaste(_view: any, event: ClipboardEvent) {
+          // Image paste (screenshot, copied image) → upload at cursor.
+          const imgs = imageFilesFrom(event.clipboardData);
+          if (imgs.length) {
+            event.preventDefault();
+            const at = _view.state.selection.from;
+            imgs.forEach((f) => uploadImageFile(_view, f, at));
+            return true;
+          }
           const html = event.clipboardData?.getData("text/html") ?? "";
           const text = (event.clipboardData?.getData("text/plain") ?? "").trim();
           if (!text) return false;
@@ -427,6 +521,16 @@ export function ProseMirrorEditor({
             } catch { return false; }
           }
           return false;
+        },
+        handleDrop(_view: any, event: DragEvent) {
+          const imgs = imageFilesFrom(event.dataTransfer);
+          if (!imgs.length) return false;
+          event.preventDefault();
+          // Insert at the drop point, falling back to the cursor.
+          const coords = { left: event.clientX, top: event.clientY };
+          const dropPos = _view.posAtCoords(coords)?.pos ?? _view.state.selection.from;
+          imgs.forEach((f) => uploadImageFile(_view, f, dropPos));
+          return true;
         },
         handleDOMEvents: {
           click: (_view: any, event: MouseEvent) => {
@@ -830,33 +934,7 @@ export function ProseMirrorEditor({
         },
 
         uploadImage: async (file: File) => {
-          const { schema: s } = view.state;
-          // Insert placeholder
-          const placeholderNode = s.nodes.image.create({ src: "", alt: "Uploading…" });
-          const { from } = view.state.selection;
-          view.dispatch(view.state.tr.insert(from, placeholderNode));
-          const placeholderPos = from;
-
-          try {
-            const formData = new FormData();
-            formData.append("file", file);
-            const res = await fetch("/api/upload", { method: "POST", body: formData });
-            if (!res.ok) throw new Error(await res.text());
-            const { url } = await res.json();
-            // Replace placeholder with real image
-            const doc = view.state.doc;
-            doc.nodesBetween(placeholderPos, placeholderPos + 1, (node: any, pos: number) => {
-              if (node.type === s.nodes.image && node.attrs.alt === "Uploading…") {
-                view.dispatch(
-                  view.state.tr.setNodeMarkup(pos, undefined, { src: url, alt: "" })
-                );
-                return false;
-              }
-            });
-          } catch {
-            // Remove placeholder on error
-            view.dispatch(view.state.tr.delete(placeholderPos, placeholderPos + 1));
-          }
+          await uploadImageFile(view, file, view.state.selection.from);
         },
 
         insertAt: (pos: number, text: string) => {
