@@ -21,7 +21,7 @@ import {
 } from "~/lib/admin.server";
 import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds } from "~/lib/db.server";
 import { extensions } from "~/extensions";
-import { getEnabledExtensionIdSet } from "~/extensions/index.server";
+import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions } from "~/extensions/index.server";
 import { deleteTeamspace, renameTeamspace } from "~/lib/teamspace.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
@@ -130,10 +130,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   `).all();
   const serverErrorCount = (db.prepare("SELECT COUNT(*) as count FROM server_errors").get() as { count: number }).count;
 
+  // Include runtime-discovered drop-in plugins (server-only, absent from the
+  // client `extensions` registry) so admins can toggle them too.
+  await ensurePluginsLoaded();
   const enabledExtensionSet = getEnabledExtensionIdSet();
-  const extensionInfo = extensions.map((e) => ({
-    id: e.id,
-    description: e.description ?? "",
+  const extById = new Map<string, { id: string; description: string }>();
+  for (const e of extensions) extById.set(e.id, { id: e.id, description: e.description ?? "" });
+  for (const e of serverExtensions) {
+    if (!extById.has(e.id)) extById.set(e.id, { id: e.id, description: e.description ?? "" });
+  }
+  const extensionInfo = Array.from(extById.values()).map((e) => ({
+    ...e,
     enabled: enabledExtensionSet.has(e.id),
   }));
   return { users: listAllUsers(), registrationOpen: isRegistrationOpen(), loginEnabled: isLocalLoginEnabled(), stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo };
