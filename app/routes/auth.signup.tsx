@@ -9,7 +9,7 @@ import { isRegistrationOpen, isLocalLoginEnabled } from "~/lib/db.server";
 import { getActiveAuthProviders } from "~/extensions/index.server";
 import { checkRateLimit, getClientIp } from "~/lib/rate-limit.server";
 
-const WELCOME_CONTENT = `# Welcome to Loica! 🐔
+const WELCOME_CONTENT = `# Welcome to Loica!
 
 Thanks for creating an account. Here's a quick tour of what ships in the box.
 

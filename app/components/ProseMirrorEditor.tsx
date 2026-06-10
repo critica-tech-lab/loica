@@ -1041,7 +1041,7 @@ export function ProseMirrorEditor({
   }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", position: "relative" }}>
       <div
         ref={mountRef}
         className="pm-editor-mount"

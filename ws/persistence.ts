@@ -5,6 +5,8 @@
 import * as Y from "yjs";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
+import { defaultMarkdownParser } from "prosemirror-markdown";
+import { prosemirrorToYXmlFragment } from "y-prosemirror";
 import { migrateDocumentComments } from "../app/lib/comment-migration.server.ts";
 import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
@@ -80,8 +82,14 @@ export function loadDocumentState(
         doc.getText("content").insert(0, row.content);
       }
     } else if (row.content) {
-      // First-time collab: seed from plain-text content
+      // First-time collab: seed from plain-text content.
       doc.getText("content").insert(0, row.content);
+      // Also seed the ProseMirror fragment from the markdown so the PM editor
+      // (the default) renders immediately instead of a blank doc. Spreadsheets
+      // have no PM representation — they're seeded via ss-* maps below.
+      if (!isSpreadsheetContent(row.content)) {
+        seedPmFragmentFromMarkdown(doc, row.content);
+      }
     }
   }
 
@@ -107,6 +115,28 @@ export function loadDocumentState(
 
   // Seed comments from DB into Yjs map
   seedCommentsMap(db, doc, docId);
+}
+
+/**
+ * Seed Y.XmlFragment("prosemirror") from a markdown string so a freshly
+ * created (or pre-PM) doc renders in the ProseMirror editor instead of blank.
+ * Mirrors the editor's markdown-paste path. The default markdown schema's node
+ * type names (paragraph, heading, bullet_list, list_item, …) match the app
+ * schema, so the client reads the fragment back fine and fills attr defaults.
+ * (We don't import the app schema here — it uses extensionless imports that the
+ * ws server's node ESM loader can't resolve.) No-op if the fragment already has
+ * content. Failures are logged and swallowed (the Y.Text seed still applies).
+ */
+function seedPmFragmentFromMarkdown(doc: Y.Doc, markdown: string): void {
+  const frag = doc.getXmlFragment("prosemirror");
+  if (frag.length > 0) return;
+  try {
+    const parsed = defaultMarkdownParser.parse(markdown);
+    if (!parsed) return;
+    prosemirrorToYXmlFragment(parsed, frag);
+  } catch (err) {
+    console.error("[ws-server] Failed to seed PM fragment from markdown:", err);
+  }
 }
 
 /**
