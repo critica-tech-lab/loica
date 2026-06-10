@@ -294,6 +294,7 @@ export function DocEditorView(_props: DocumentProps) {
               autoFocus={canEdit}
               mountRefOut={editorMountRef}
               onReady={(api) => registerEditorApi(api)}
+              onEditLink={openEditLinkModal}
               onPresenceChange={setPeers}
               onConnectionStatus={setConnectionStatus}
               onChange={handleContentChange}
