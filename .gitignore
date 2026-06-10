@@ -2,3 +2,27 @@
 # opinionated install (e.g. Critica) drops packages into plugins/<name>/.
 /plugins/*
 !/plugins/README.md
+
+node_modules/
+build/
+.react-router/
+*.db
+*.db-shm
+*.db-wal
+.env
+.DS_Store
+.aider*
+app/**/*.js
+*.config.js
+ws-server.js
+uploads/
+backups/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+nohup.out
+ws/*.js
+.claude/
+CLAUDE.md
+.claudeignore
+server.log
+package-lock.json
