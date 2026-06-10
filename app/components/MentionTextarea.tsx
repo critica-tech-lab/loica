@@ -12,17 +12,40 @@ interface MentionTextareaProps {
   placeholder?: string;
   style?: React.CSSProperties;
   rows?: number;
+  autoFocus?: boolean;
 }
 
 const mentionPattern = /@\[(.+?)\]\(user:.+?\)/g;
 
+/** True when the text contains at least one mention markup token. */
+export function hasMentions(text: string): boolean {
+  return /@\[.+?\]\(user:.+?\)/.test(text);
+}
+
+/** Render mention markup as bold @name spans, leaving other text intact. */
+export function renderMentions(body: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  const re = /@\[(.+?)\]\(user:(.+?)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(body)) !== null) {
+    if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
+    parts.push(
+      <span key={match.index} style={{ fontWeight: 700, color: "#D0A215" }}>@{match[1]}</span>
+    );
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < body.length) parts.push(body.slice(lastIndex));
+  return parts.length > 0 ? parts : body;
+}
+
 /** Replace mention markup with just @name for display */
-function toDisplay(text: string): string {
+export function toDisplay(text: string): string {
   return text.replace(mentionPattern, "@$1");
 }
 
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaProps>(
-  function MentionTextarea({ value, onChange, onKeyDown, onBlur, onSubmit, submitLabel = "Press Enter to comment", placeholder, style, rows }, ref) {
+  function MentionTextarea({ value, onChange, onKeyDown, onBlur, onSubmit, submitLabel = "Press Enter to comment", placeholder, style, rows, autoFocus }, ref) {
     const innerRef = useRef<HTMLTextAreaElement>(null);
     useImperativeHandle(ref, () => innerRef.current!);
 
@@ -263,13 +286,17 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           setActiveIdx((i) => Math.max(i - 1, 0));
           return;
         }
-        if (e.key === "Enter" && activeIdx >= 0) {
+        if (e.key === "Enter") {
+          // Dropdown open → Enter picks the highlighted result (or the first),
+          // never falls through to submit a half-typed mention.
           e.preventDefault();
-          selectUser(results[activeIdx]);
+          e.stopPropagation();
+          selectUser(results[activeIdx >= 0 ? activeIdx : 0]);
           return;
         }
         if (e.key === "Escape") {
           e.preventDefault();
+          e.stopPropagation(); // close only the dropdown, not a host popup
           setOpen(false);
           return;
         }
@@ -288,6 +315,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
           placeholder={placeholder}
           style={style}
           rows={rows}
+          autoFocus={autoFocus}
         />
         {onSubmit && value.trim() && (
           <button
@@ -311,6 +339,11 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault(); // prevent blur
+                  // Stop the event reaching host outside-click handlers (e.g.
+                  // CommentPopup): selecting synchronously unmounts this button,
+                  // so a document-level mousedown would see a detached target
+                  // and wrongly treat the pick as an outside click.
+                  e.stopPropagation();
                   selectUser(user);
                 }}
                 onMouseEnter={() => setActiveIdx(i)}

@@ -3,6 +3,7 @@ import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
+import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -34,10 +35,13 @@ interface Props {
   editorApiRef: React.RefObject<EditorApi | null>;
   editorRef?: React.RefObject<HTMLDivElement | null>;
   onDismiss: () => void;
+  /** Fired with the raw comment body when it contains @mentions, so the host
+   *  can send mention-notification emails. Absent on anonymous share views. */
+  onMention?: (body: string) => void;
 }
 
 
-export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorRef, onDismiss }: Props) {
+export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorRef, onDismiss, onMention }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [reply, setReply] = useState("");
   const [editing, setEditing] = useState(false);
@@ -68,7 +72,13 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) handleDismissRef.current();
+      const target = e.target as Node;
+      // A picked mention-dropdown item unmounts synchronously during this same
+      // mousedown (React flushes discrete events), detaching the target before
+      // this listener runs. A detached node was inside our tree → not an
+      // outside click; ignore it so the popup doesn't dismiss on selection.
+      if (!document.contains(target)) return;
+      if (ref.current && !ref.current.contains(target)) handleDismissRef.current();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleDismissRef.current(); };
     document.addEventListener("mousedown", onDown);
@@ -80,8 +90,10 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
   }, []);
 
   const submitReply = () => {
-    if (!reply.trim()) return;
-    editorApiRef.current?.addReply(thread.id, reply.trim());
+    const body = reply.trim();
+    if (!body) return;
+    editorApiRef.current?.addReply(thread.id, body);
+    if (hasMentions(body)) onMention?.(body);
     setReply("");
   };
 
@@ -90,6 +102,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
     if (!b) return;
     submittedRef.current = true;
     editorApiRef.current?.updateComment(thread.id, b);
+    if (hasMentions(b)) onMention?.(b);
   };
 
   const resolve = () => {
@@ -181,7 +194,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
 
         {editing ? (
           <>
-            <textarea
+            <MentionTextarea
               value={editBody}
               onChange={e => setEditBody(e.target.value)}
               autoFocus
@@ -190,7 +203,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
             />
             <div style={{ display: "flex", gap: "6px", marginTop: "6px", justifyContent: "flex-end" }}>
               <SmallBtn onClick={() => setEditing(false)}>Cancel</SmallBtn>
-              <SmallBtn primary onClick={() => { editorApiRef.current?.updateComment(thread.id, editBody); setEditing(false); }}>Save</SmallBtn>
+              <SmallBtn primary onClick={() => { editorApiRef.current?.updateComment(thread.id, editBody); if (hasMentions(editBody)) onMention?.(editBody); setEditing(false); }}>Save</SmallBtn>
             </div>
           </>
         ) : (
@@ -198,7 +211,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
             onDoubleClick={() => { if (isOwn) { setEditBody(thread.body); setEditing(true); } }}
             style={{ margin: 0, lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}
           >
-            {thread.body || <em style={{ color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>Empty comment</em>}
+            {thread.body ? renderMentions(thread.body) : <em style={{ color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>Empty comment</em>}
           </p>
         )}
       </div>
@@ -213,7 +226,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
                 <span style={{ fontWeight: 700, fontSize: "0.74rem", color: "var(--fg)" }}>{r.userName || "Unknown"}</span>
                 <span style={{ fontSize: "0.64rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{timeAgo(r.createdAt)}</span>
               </div>
-              <p style={{ margin: 0, lineHeight: 1.5, color: "var(--fg)", fontSize: "0.79rem" }}>{r.body}</p>
+              <p style={{ margin: 0, lineHeight: 1.5, color: "var(--fg)", fontSize: "0.79rem" }}>{renderMentions(r.body)}</p>
             </div>
           ))}
         </div>
@@ -261,7 +274,7 @@ function CommentInput({
     }}>
       <Avatar name={avatarName} color={authorColorFromName(avatarName)} size={20} style={{ marginTop: 2, flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <textarea
+        <MentionTextarea
           value={value}
           onChange={e => onChange(e.target.value)}
           onKeyDown={e => {

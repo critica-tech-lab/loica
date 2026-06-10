@@ -341,6 +341,7 @@ export function DocEditorView(_props: DocumentProps) {
                   editorApiRef={ctx.editorApi}
                   editorRef={editorMountRef}
                   onDismiss={() => { setCommentPopup(null); focusComment(null); }}
+                  onMention={ctx.sendMention}
                 />
               ) : null;
             })()}
