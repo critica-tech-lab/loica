@@ -6,9 +6,11 @@ import * as Y from "yjs";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
 import { defaultMarkdownParser } from "prosemirror-markdown";
-import { prosemirrorToYXmlFragment } from "y-prosemirror";
+import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "y-prosemirror";
 import { migrateDocumentComments } from "../app/lib/comment-migration.server.ts";
 import { sendCommentNotification } from "../app/lib/email.server.ts";
+import { schema as pmSchema } from "../app/components/editor/schema.ts";
+import { loicaMarkdownSerializer } from "../app/components/editor/pm-markdown.ts";
 import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
 
 /**
@@ -451,7 +453,19 @@ export function getDocContent(doc: Y.Doc): string {
   // have stale Y.Text("content") in their yjs_state from before the PM migration,
   // causing getDocContent to return HTML-contaminated text if Y.Text is checked first.
   const pmFrag = doc.getXmlFragment("prosemirror");
-  if (pmFrag.length > 0) return extractTextFromXmlFragment(pmFrag);
+  if (pmFrag.length > 0) {
+    // Project the PM tree to real markdown so the stored `content` column (and
+    // every server-side export that reads it: .md download, workspace/user zip,
+    // docx, pdf) preserves formatting. Falls back to plaintext extraction if
+    // serialization ever throws, so a save is never lost.
+    try {
+      const pmDoc = yXmlFragmentToProseMirrorRootNode(pmFrag, pmSchema);
+      return loicaMarkdownSerializer.serialize(pmDoc);
+    } catch (err) {
+      console.error("[ws-server] PM→markdown serialize failed, using plaintext:", err);
+      return extractTextFromXmlFragment(pmFrag);
+    }
+  }
 
   // Legacy markdown docs use Y.Text("content")
   const markdownText = doc.getText("content").toString();

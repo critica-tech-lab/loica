@@ -3,7 +3,7 @@ import OrderedMap from "orderedmap";
 import { nodes as basicNodes, marks as basicMarks } from "prosemirror-schema-basic";
 import { addListNodes } from "prosemirror-schema-list";
 import { tableNodes } from "prosemirror-tables";
-import { authorTrackColor } from "./types";
+import { authorTrackColor } from "./types.ts";
 
 // dataTracked is required on all block nodes by @manuscripts/track-changes-plugin
 // when track changes is enabled — it stores pending change metadata.
