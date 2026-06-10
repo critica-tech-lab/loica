@@ -1,7 +1,7 @@
 import { CommentIcon, ClockIcon, ShareIcon, DocIcon } from "./icons";
 import { useDocument } from "~/lib/DocumentContext";
 
-export type PanelId = "comments" | "history" | "share" | "info";
+export type PanelId = "comments" | "history" | "share" | "info" | "changes";
 
 const items: { id: PanelId; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; label: string }[] = [
   { id: "comments", icon: CommentIcon, label: "Comments" },
@@ -11,8 +11,8 @@ const items: { id: PanelId; icon: React.ComponentType<React.SVGProps<SVGSVGEleme
 ];
 
 export function ActivityBar() {
-  const { activePanel, togglePanel: onToggle, comments, suggestions } = useDocument();
-  const commentCount = comments.filter((c) => !c.resolved).length + suggestions.length;
+  const { activePanel, togglePanel: onToggle, comments } = useDocument();
+  const commentCount = comments.filter((c) => !c.resolved).length;
   return (
     <div className="activity-bar">
       {items.map((item) => {

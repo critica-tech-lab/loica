@@ -1,0 +1,20 @@
+/* Print tuning for new.css PDF output via WeasyPrint.
+   new.css targets the screen (narrow centred column); widen it to fill the
+   page within sensible margins, and avoid awkward breaks. */
+@page {
+  size: A4;
+  margin: 2.2cm 2cm;
+}
+
+body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+/* Keep block elements from splitting across pages where it hurts. */
+pre, table, blockquote, figure { page-break-inside: avoid; }
+h1, h2, h3, h4 { page-break-after: avoid; }
+img { max-width: 100%; }

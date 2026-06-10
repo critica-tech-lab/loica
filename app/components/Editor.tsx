@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import type { EditorView as EditorViewType } from "@codemirror/view";
-import type { SuggestionEntry } from "./criticmarkup";
 import type { ResolvedThread } from "./comment-decorations";
 import {
   createImageDecorations,
@@ -50,10 +49,6 @@ interface EditorProps {
   onThreadsChange?: (threads: ResolvedThread[]) => void;
   /** Called when user clicks a comment highlight in the editor */
   onThreadClick?: (thread: ResolvedThread) => void;
-  /** Called when CriticMarkup suggestions change */
-  onSuggestionsChange?: (suggestions: SuggestionEntry[]) => void;
-  /** Called when user clicks on a suggestion decoration in the editor */
-  onSuggestionClick?: (entry: SuggestionEntry) => void;
   /** Called once the editor is mounted */
   onReady?: (api: {
     getContent: () => string;
@@ -68,10 +63,6 @@ interface EditorProps {
     unresolveThread: (threadId: string) => void;
     scrollToPos: (pos: number) => void;
     focus: () => void;
-    addSuggestion: (type: "addition" | "deletion" | "substitution") => void;
-    acceptSuggestion: (entry: SuggestionEntry) => void;
-    rejectSuggestion: (entry: SuggestionEntry) => void;
-    getSuggestions: () => SuggestionEntry[];
     uploadImage: (file: File) => void;
     insertAt: (pos: number, text: string) => void;
     replaceContent: (newContent: string, cursorPos?: number) => void;
@@ -108,7 +99,6 @@ const cmDepsPromise =
         import("@codemirror/commands"),
         import("@codemirror/language"),
         import("@lezer/highlight"),
-        import("./criticmarkup"),
         import("./comment-decorations"),
         import("nanoid"),
         import("turndown"),
@@ -139,12 +129,9 @@ export function Editor({
   currentUserId,
   onThreadsChange,
   onThreadClick,
-  onSuggestionsChange,
-  onSuggestionClick,
   onSelectionChange,
   onReady,
   onPresenceChange,
-  suggestionMode = false,
   userName,
   spellLang = "en",
   onConnectionStatus,
@@ -157,14 +144,10 @@ export function Editor({
   onChangeRef.current = onChange;
   const onThreadsRef = useRef(onThreadsChange);
   onThreadsRef.current = onThreadsChange;
-  const onSuggestionsRef = useRef(onSuggestionsChange);
-  onSuggestionsRef.current = onSuggestionsChange;
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
   const onThreadClickRef = useRef(onThreadClick);
   onThreadClickRef.current = onThreadClick;
-  const onSuggestionClickRef = useRef(onSuggestionClick);
-  onSuggestionClickRef.current = onSuggestionClick;
   const onSelectionRef = useRef(onSelectionChange);
   onSelectionRef.current = onSelectionChange;
   const onPresenceRef = useRef(onPresenceChange);
@@ -175,8 +158,6 @@ export function Editor({
   userInfoRef.current = userInfo;
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
-  const suggestionModeRef = useRef(suggestionMode);
-  suggestionModeRef.current = suggestionMode;
   const userNameRef = useRef(userName);
   userNameRef.current = userName;
   const spellLangRef = useRef(spellLang);
@@ -200,7 +181,6 @@ export function Editor({
         { defaultKeymap, history, historyKeymap, indentWithTab },
         { syntaxHighlighting, HighlightStyle, syntaxTree },
         { tags },
-        { criticMarkupExtension, parseSuggestionsFromDoc, mergeSuggestions },
         { commentDecoExtension, dispatchThreads },
         { nanoid },
       ] = await cmDepsPromise!;
@@ -300,7 +280,7 @@ export function Editor({
       const loicaTheme = EditorView.theme({
         "&": {
           fontFamily: "var(--font-editor)",
-          fontSize: "1rem",
+          fontSize: "1.0625rem",
           background: "var(--bg)",
           color: "var(--fg)",
           height: "100%",
@@ -312,10 +292,11 @@ export function Editor({
         ".cm-scroller": {
           overflow: "auto",
           fontFamily: "var(--font-editor)",
+          fontSize: "1.0625rem",
           lineHeight: "1.6",
         },
         ".cm-content": {
-          maxWidth: "70ch",
+          maxWidth: "65ch",
           margin: "0 auto",
           padding: "2rem 2rem",
           caretColor: "transparent",
@@ -872,8 +853,6 @@ export function Editor({
         }
       }
 
-      let prevSuggestionJson = "";
-
       const baseExtensions = [
         drawSelection({ cursorBlinkRate: 900 }),
         formattingKeymap,
@@ -1053,153 +1032,12 @@ export function Editor({
           },
         }),
         loicaTheme,
-        criticMarkupExtension(
-          undefined,
-          (entry) => onSuggestionClickRef.current?.(entry),
-        ),
         commentDecoExtension(
           (thread) => onThreadClickRef.current?.(thread),
         ),
-        // ── Track-changes transactionFilter ─────────────────
-        EditorState.transactionFilter.of((tr) => {
-          // Skip if suggestion mode is off
-          if (!suggestionModeRef.current) return tr;
-          // Skip if no doc changes
-          if (!tr.docChanged) return tr;
-          // Skip if already processed by us
-          if (tr.annotation(suggestionAnnotation)) return tr;
-          // Skip if not a user event (remote Yjs syncs have no userEvent)
-          if (!tr.isUserEvent("input") && !tr.isUserEvent("delete")) return tr;
-
-          const docText = tr.startState.doc.toString();
-
-          // Parse existing CriticMarkup suggestion blocks
-          // to detect if we're editing inside one
-          const existingSuggestions = parseSuggestionsFromDoc(docText);
-
-          function isInsideCriticBlock(from: number, to: number): boolean {
-            for (const block of existingSuggestions) {
-              if (from >= block.fullFrom && to < block.fullTo) return true;
-            }
-            return false;
-          }
-
-          /** Find an addition block whose closing marker would be hit by this change */
-          function findBlockForMarkerBackspace(from: number, to: number): SuggestionEntry | null {
-            for (const block of existingSuggestions) {
-              if (block.kind !== "addition") continue;
-              if (block.author !== authorName) continue;
-              const markerStart = block.fullTo - 3;
-              if (from >= markerStart && to <= block.fullTo && from >= block.fullFrom) return block;
-            }
-            return null;
-          }
-
-          // Find an adjacent addition block by the same author that
-          // ends right at `pos` (cursor is at the closing ++})
-          const authorName = userNameRef.current || userInfoRef.current?.name || "Guest";
-          const prefix = `@${authorName}:`;
-
-          function findAdjacentAddition(pos: number): SuggestionEntry | null {
-            for (const block of existingSuggestions) {
-              if (block.kind !== "addition") continue;
-              if (block.fullTo !== pos) continue;
-              if (block.author !== authorName) continue;
-              return block;
-            }
-            return null;
-          }
-
-          // First pass: check if ALL changes are inside existing blocks
-          let allInside = true;
-          tr.changes.iterChanges((fromA, toA) => {
-            if (!isInsideCriticBlock(fromA, toA)) allInside = false;
-          });
-
-          // If all changes are inside existing blocks, pass through unchanged
-          if (allInside) return tr;
-
-          // Build wrapped changes
-          const specs: { from: number; to: number; insert: string }[] = [];
-          let cursorPos = 0;
-
-          tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-            const insertedText = inserted.toString();
-            const deletedText = docText.slice(fromA, toA);
-            const isInsert = toA === fromA && insertedText.length > 0;
-            const isDelete = toA > fromA && insertedText.length === 0;
-            const isReplace = toA > fromA && insertedText.length > 0;
-
-            if (isInsideCriticBlock(fromA, toA)) {
-              // Passthrough — change is inside an existing block
-              specs.push({ from: fromA, to: toA, insert: insertedText });
-              cursorPos = fromA + insertedText.length;
-            } else if (isDelete && findBlockForMarkerBackspace(fromA, toA)) {
-              // Backspace from after a block tries to delete the closing marker.
-              // Redirect to delete the last content character instead.
-              const block = findBlockForMarkerBackspace(fromA, toA)!;
-              const prefixLen = block.author ? block.author.length + 2 : 0;
-              const contentStart = block.fullFrom + 3 + prefixLen;
-              const contentEnd = block.fullTo - 3;
-              if (contentEnd > contentStart) {
-                // Delete last content char
-                specs.push({ from: contentEnd - 1, to: contentEnd, insert: "" });
-                cursorPos = contentEnd - 1;
-              } else {
-                // Content is empty — remove the entire block
-                specs.push({ from: block.fullFrom, to: block.fullTo, insert: "" });
-                cursorPos = block.fullFrom;
-              }
-            } else if (isInsert) {
-              // Check if we can extend an adjacent addition block
-              // by the same author instead of creating a new one.
-              // This merges consecutive keystrokes into one suggestion.
-              const adj = findAdjacentAddition(fromA);
-              if (adj) {
-                // Insert text just before the closing ++}
-                const insertPos = adj.fullTo - 3; // before ++}
-                specs.push({ from: insertPos, to: insertPos, insert: insertedText });
-                cursorPos = insertPos + insertedText.length;
-              } else {
-                const wrapped = `{++${prefix}${insertedText}++}`;
-                specs.push({ from: fromA, to: fromA, insert: wrapped });
-                // Cursor inside before ++}
-                cursorPos = fromA + wrapped.length - 3;
-              }
-            } else if (isDelete) {
-              const wrapped = `{--${prefix}${deletedText}--}`;
-              specs.push({ from: fromA, to: toA, insert: wrapped });
-              cursorPos = fromA + wrapped.length;
-            } else if (isReplace) {
-              const wrapped = `{~~${prefix}${deletedText}~>${insertedText}~~}`;
-              specs.push({ from: fromA, to: toA, insert: wrapped });
-              cursorPos = fromA + wrapped.length;
-            } else {
-              specs.push({ from: fromA, to: toA, insert: insertedText });
-              cursorPos = fromA + insertedText.length;
-            }
-          });
-
-          return [{
-            changes: specs,
-            selection: EditorSelection.cursor(cursorPos),
-            annotations: suggestionAnnotation.of(true),
-          }];
-        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && onChangeRef.current) {
             onChangeRef.current(update.state.doc.toString());
-          }
-          if (update.docChanged) {
-            const docText = update.state.doc.toString();
-            if (onSuggestionsRef.current) {
-              const suggestions = mergeSuggestions(parseSuggestionsFromDoc(docText, update.view));
-              const json = suggestions.map((s) => `${s.id}:${s.kind}`).join("|");
-              if (json !== prevSuggestionJson) {
-                prevSuggestionJson = json;
-                onSuggestionsRef.current(suggestions);
-              }
-            }
           }
           // Emit selection changes for floating comment button
           if (onSelectionRef.current && (update.selectionSet || update.docChanged)) {
@@ -1665,59 +1503,6 @@ export function Editor({
         },
         focus: () => {
           viewRef.current?.focus();
-        },
-        addSuggestion: (type) => {
-          const v = viewRef.current;
-          if (!v) return;
-          if (type === "addition") addAdditionCommand(v);
-          else if (type === "deletion") addDeletionCommand(v);
-          else addSubstitutionCommand(v);
-        },
-        acceptSuggestion: (entry) => {
-          const v = viewRef.current;
-          if (!v) return;
-          const fresh = mergeSuggestions(parseSuggestionsFromDoc(v.state.doc.toString()));
-          const current = fresh.find((s) => s.id === entry.id);
-          if (!current) return;
-          let insert = "";
-          if (current.kind === "addition") {
-            insert = current.addedText ?? "";
-          } else if (current.kind === "deletion") {
-            insert = ""; // accepting deletion = remove the text
-          } else {
-            insert = current.newText ?? ""; // accepting substitution = keep new text
-          }
-          v.dispatch({
-            changes: { from: current.fullFrom, to: current.fullTo, insert },
-            userEvent: "input",
-            annotations: suggestionAnnotation.of(true),
-          });
-          v.focus();
-        },
-        rejectSuggestion: (entry) => {
-          const v = viewRef.current;
-          if (!v) return;
-          const fresh = mergeSuggestions(parseSuggestionsFromDoc(v.state.doc.toString()));
-          const current = fresh.find((s) => s.id === entry.id);
-          if (!current) return;
-          let insert = "";
-          if (current.kind === "addition") {
-            insert = ""; // rejecting addition = discard
-          } else if (current.kind === "deletion") {
-            insert = current.deletedText ?? ""; // rejecting deletion = keep original
-          } else {
-            insert = current.oldText ?? ""; // rejecting substitution = keep original
-          }
-          v.dispatch({
-            changes: { from: current.fullFrom, to: current.fullTo, insert },
-            userEvent: "input",
-            annotations: suggestionAnnotation.of(true),
-          });
-          v.focus();
-        },
-        getSuggestions: () => {
-          const v = viewRef.current;
-          return v ? mergeSuggestions(parseSuggestionsFromDoc(v.state.doc.toString(), v)) : [];
         },
         uploadImage: (file: File) => {
           const v = viewRef.current;

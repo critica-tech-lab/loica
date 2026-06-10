@@ -1,4 +1,9 @@
 import { AppShell } from "~/components/AppShell";
+import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
+import { PMToolbar } from "~/components/PMToolbar";
+import { CommentPopup } from "~/components/CommentPopup";
+import { TrackChangePopup } from "~/components/TrackChangePopup";
+import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
 import type { DocMenuItem } from "~/components/DocMenu";
@@ -15,10 +20,12 @@ import { SidePanel } from "~/components/SidePanel";
 import { CommentIcon, ShareIcon, StarIcon, ClockIcon, DocIcon, TrashIcon } from "~/components/icons";
 import { useDocument, userColor } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { diffWords } from "diff";
 
-const TOOLBAR_OPEN_KEY = "loica.docToolbar.open";
+// ProseMirror is the default editor on this branch. Set VITE_PM_EDITOR=0 to
+// fall back to the legacy CodeMirror editor.
+const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 export type { DocumentProps as DocEditorViewProps };
 
 export function DocEditorView(_props: DocumentProps) {
@@ -36,13 +43,16 @@ export function DocEditorView(_props: DocumentProps) {
     editorReady,
     mounted,
 
+    comments,
     setComments,
-    setSuggestions,
+    trackChangesState,
+    setTrackChangesState,
     activePanel,
     setActivePanel,
+    togglePanel,
+    focusedCommentId,
     setFocusedCommentId,
     setFocusedSuggestionId,
-    suggestionMode,
     setSelectionBubble,
     setConnectionStatus,
 
@@ -51,6 +61,7 @@ export function DocEditorView(_props: DocumentProps) {
 
     scheduleSave,
     handleContentChange,
+    maybeAdoptTitle,
     registerEditorApi,
     historyPreview,
   } = ctx;
@@ -65,7 +76,37 @@ export function DocEditorView(_props: DocumentProps) {
 
   // Default visible — users who want it hidden dismiss with ×, preference sticks.
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
-  const [toolbarOpen, setToolbarOpen] = useState(true);
+  const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [editingMode, setEditingMode] = useState<EditingMode>(() => {
+    if (typeof window === "undefined") return "editing";
+    const stored = localStorage.getItem(`loica.editingMode.${document.id}`);
+    return (stored as EditingMode) ?? "editing";
+  });
+  const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
+  const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
+
+  // Re-apply mode when editor becomes ready (restores suggesting mode after reload)
+  useEffect(() => {
+    if (!editorReady) return;
+    const api = ctx.editorApi.current;
+    if (editingMode === "suggesting" && !trackChangesState?.enabled) {
+      api?.toggleTrackChanges?.();
+    } else if (editingMode === "viewing") {
+      api?.setViewOnly?.(true);
+    }
+  }, [editorReady]);
+
+  useEffect(() => {
+    if (!trackPopup) return;
+    const els = window.document.querySelectorAll<HTMLElement>(`[data-change-id="${trackPopup.changeId}"]`);
+    els.forEach(el => el.classList.add("tc-focused"));
+    return () => { els.forEach(el => el.classList.remove("tc-focused")); };
+  }, [trackPopup]);
+
+  const editorMountRef = useRef<HTMLDivElement | null>(null);
+  const focusComment = useCallback((id: string | null) => {
+    setFocusedCommentId(id);
+  }, [setFocusedCommentId]);
 
   // ── Undo-create toast ─────────────────────────────────
   // If this doc was just created (flash arming happens at the caller before
@@ -115,7 +156,7 @@ export function DocEditorView(_props: DocumentProps) {
     setLinkModal({
       mode: "add",
       onApply: (url) => {
-        ctx.editorApi.current?.format("[", `](${url})`);
+        ctx.editorApi.current?.addLink?.(url);
       },
     });
   }, [ctx]);
@@ -126,56 +167,11 @@ export function DocEditorView(_props: DocumentProps) {
       onApply: apply,
     });
   }, []);
-  // Hydrate toolbar visibility on mount.
-  // Freshly-created docs (< 60s old) always show the toolbar regardless of the
-  // stored preference — first impression matters more than power-user muscle
-  // memory, and the user can still dismiss it afterwards.
-  useEffect(() => {
-    const createdAtMs = document.created_at ? new Date(document.created_at).getTime() : 0;
-    const isFreshDoc = createdAtMs && Date.now() - createdAtMs < 60_000;
-    if (isFreshDoc) {
-      setToolbarOpen(true);
-      return;
-    }
-    try {
-      const saved = localStorage.getItem(TOOLBAR_OPEN_KEY);
-      if (saved === "0") setToolbarOpen(false);
-      else if (saved === "1") setToolbarOpen(true);
-    } catch { /* localStorage unavailable — stay on default */ }
-  }, [document.created_at]);
-  const toggleToolbar = useCallback(() => {
-    setToolbarOpen((v) => {
-      const next = !v;
-      try { localStorage.setItem(TOOLBAR_OPEN_KEY, next ? "1" : "0"); } catch {}
-      return next;
-    });
-  }, []);
-  const closeToolbar = useCallback(() => {
-    setToolbarOpen(false);
-    try { localStorage.setItem(TOOLBAR_OPEN_KEY, "0"); } catch {}
-  }, []);
-  // ⌘/ toggles the formatting toolbar. Esc closes it when open.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && !e.shiftKey && e.key === "/") {
-        e.preventDefault();
-        toggleToolbar();
-      } else if (e.key === "Escape" && toolbarOpen) {
-        const activeTag = (e.target as HTMLElement | null)?.tagName;
-        if (activeTag !== "INPUT" || (e.target as HTMLInputElement).type !== "search") {
-          closeToolbar();
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggleToolbar, closeToolbar, toolbarOpen]);
 
   return (
     <AppShell
       navLeft={<DocNavLeft />}
-      navActions={<DocNavActions toolbarOpen={toolbarOpen} onToggleToolbar={toggleToolbar} />}
+      navActions={<DocNavActions />}
       footerLeft={<DocFooterLeft />}
       footerCenter={hasCustomEditor ? null : <DocFooterCenter />}
       sidebar={null}
@@ -196,16 +192,70 @@ export function DocEditorView(_props: DocumentProps) {
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity 150ms ease-out", position: "relative" }}>
-        {historyPreview && (
-          <HistoryPreviewPane
-            content={historyPreview.content}
-            title={historyPreview.title}
-            label={historyPreview.label}
-            currentContent={historyPreview.currentContent}
-          />
+        {/* Suggesting mode banner */}
+        {editingMode === "suggesting" && (
+          <div style={{
+            padding: "0.3rem 1rem",
+            background: "color-mix(in srgb, #16a34a 10%, transparent)",
+            borderBottom: "1px solid color-mix(in srgb, #16a34a 25%, transparent)",
+            fontSize: "0.75rem",
+            color: "#15803d",
+            fontFamily: "var(--font-ui)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            flexShrink: 0,
+          }}>
+            <span>💬</span>
+            <span><strong>You&apos;re suggesting.</strong> Your edits will be tracked and can be accepted or rejected.</span>
+          </div>
         )}
-        {!hasCustomEditor && toolbarOpen && (
-          <Toolbar variant="pill" onLink={openLinkModal} />
+
+        {historyPreview && (
+          USE_PM && historyPreview.yjsState ? (
+            <PMHistoryPreviewPane
+              yjsState={historyPreview.yjsState}
+              label={historyPreview.label}
+              onDismiss={() => ctx.setHistoryPreview(null)}
+              onRestore={historyPreview.versionId ? () => ctx.restoreVersion(historyPreview.versionId!) : undefined}
+            />
+          ) : (
+            <HistoryPreviewPane
+              content={historyPreview.content}
+              title={historyPreview.title}
+              label={historyPreview.label}
+              currentContent={historyPreview.currentContent}
+              onDismiss={() => ctx.setHistoryPreview(null)}
+              onRestore={historyPreview.versionId ? () => ctx.restoreVersion(historyPreview.versionId!) : undefined}
+            />
+          )
+        )}
+        {!hasCustomEditor && (
+          USE_PM
+            ? <PMToolbar
+                activeState={pmActiveState}
+                trackChangesState={trackChangesState}
+                editingMode={editingMode}
+                onLink={openLinkModal}
+                onOpenChangesPanel={() => setActivePanel(activePanel === "changes" ? null : "changes")}
+                onModeChange={(mode) => {
+                  const prev = editingMode;
+                  setEditingMode(mode);
+                  try { localStorage.setItem(`loica.editingMode.${document.id}`, mode); } catch {}
+                  const api = ctx.editorApi.current;
+                  if (mode === "suggesting" && prev !== "suggesting") {
+                    if (!trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(false);
+                  } else if (mode === "editing") {
+                    if (trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(false);
+                  } else if (mode === "viewing") {
+                    if (trackChangesState?.enabled) api?.toggleTrackChanges?.();
+                    api?.setViewOnly?.(true);
+                  }
+                }}
+              />
+            : null
         )}
         {(() => {
           const Banner = docTypeExtension?.EditorBanner;
@@ -232,22 +282,91 @@ export function DocEditorView(_props: DocumentProps) {
             onConnectionStatus={setConnectionStatus}
             onPresenceChange={setPeers}
           />
+        ) : USE_PM ? (
+          <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <ProseMirrorEditor
+              key={editorKey}
+              docId={document.id}
+              wsUrl={wsUrl}
+              userInfo={{ name: user.name, color: userColor(user.id) }}
+              currentUserId={user.id}
+              readOnly={!canEdit}
+              autoFocus={canEdit}
+              mountRefOut={editorMountRef}
+              onReady={(api) => registerEditorApi(api)}
+              onPresenceChange={setPeers}
+              onConnectionStatus={setConnectionStatus}
+              onChange={handleContentChange}
+              onTitle={(headingText, fullText) => maybeAdoptTitle(headingText, fullText)}
+              onStateChange={setPmActiveState}
+              onTrackChangesStateChange={setTrackChangesState}
+              onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
+              focusedCommentId={focusedCommentId}
+              onThreadsChange={setComments}
+              onThreadClick={(thread, pos) => {
+                focusComment(thread.id);
+                setFocusedSuggestionId(null);
+                setCommentPopup({ threadId: thread.id, pos });
+              }}
+              onSelectionChange={(sel) => {
+                if (!sel) {
+                  setSelectionBubble(null);
+                  focusComment(null);
+                  return;
+                }
+                if (sel.to > sel.from) {
+                  setSelectionBubble({ top: sel.top, left: sel.left });
+                  const hit = comments.find(
+                    t => !t.resolved && t.from > 0 && t.to > t.from
+                      && sel.from < t.to && sel.to > t.from
+                  );
+                  focusComment(hit?.id ?? null);
+                } else {
+                  setSelectionBubble(null);
+                  focusComment(null);
+                  // Do NOT close commentPopup here — Y.js awareness transactions
+                  // fire cursor-position selection changes after every click, which
+                  // would close the popup before the user can interact with it.
+                }
+              }}
+            />
+            {USE_PM && commentPopup && (() => {
+              const thread = comments.find(t => t.id === commentPopup.threadId);
+              return thread ? (
+                <CommentPopup
+                  thread={thread}
+                  pos={commentPopup.pos}
+                  currentUserId={user.id}
+                  editorApiRef={ctx.editorApi}
+                  editorRef={editorMountRef}
+                  onDismiss={() => { setCommentPopup(null); focusComment(null); }}
+                />
+              ) : null;
+            })()}
+            {USE_PM && trackPopup && (() => {
+              const change = trackChangesState?.changes.find(c => c.ids.includes(trackPopup.changeId));
+              return change ? (
+                <TrackChangePopup
+                  change={change}
+                  pos={trackPopup.pos}
+                  editorRef={editorMountRef}
+                  onAccept={(id) => { ctx.editorApi.current?.acceptChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
+                  onReject={(id) => { ctx.editorApi.current?.rejectChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
+                  onDismiss={() => setTrackPopup(null)}
+                />
+              ) : null;
+            })()}
+          </div>
         ) : (
           <Editor
             key={editorKey}
             initialValue={document.content}
             onChange={handleContentChange}
             onThreadsChange={setComments}
-            onSuggestionsChange={setSuggestions}
             onThreadClick={(thread) => {
               setActivePanel("comments");
               setFocusedCommentId(thread.id);
               setFocusedSuggestionId(null);
-            }}
-            onSuggestionClick={(entry) => {
-              setActivePanel("comments");
-              setFocusedSuggestionId(entry.id);
-              setFocusedCommentId(null);
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
@@ -265,7 +384,6 @@ export function DocEditorView(_props: DocumentProps) {
             wsUrl={wsUrl}
             currentUserId={user.id}
             userInfo={{ name: user.name, color: userColor(user.id) }}
-            suggestionMode={suggestionMode}
             userName={user.name}
             spellLang={spellLang}
             onConnectionStatus={setConnectionStatus}
@@ -273,7 +391,8 @@ export function DocEditorView(_props: DocumentProps) {
         )}
         </div>
 
-        <SelectionBubble onLink={openLinkModal} />
+        <SelectionBubble onLink={openLinkModal} onCommentAdded={(id, pos) => setCommentPopup({ threadId: id, pos })} />
+
 
         {/* Side panel */}
         {activePanel && <SidePanel />}
@@ -293,23 +412,66 @@ export function DocEditorView(_props: DocumentProps) {
   );
 }
 
-function HistoryPreviewPane({
-  content,
-  title,
+function PMHistoryPreviewPane({
+  yjsState,
   label,
-  currentContent,
+  onDismiss,
+  onRestore,
 }: {
-  content: string;
-  title: string;
+  yjsState: string;
   label: string;
-  currentContent: string;
+  onDismiss: () => void;
+  onRestore?: () => void;
 }) {
-  // Merged diff view: walk through each part from diffWords and render it with
-  // styling that reflects what happens if the user restores this version.
-  // - part.removed (in version, not in current) → will be RECOVERED → green
-  // - part.added   (in current, not in version) → will be LOST → red strikethrough
-  // - unchanged                                 → normal
-  const parts = useMemo(() => diffWords(content, currentContent), [content, currentContent]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let destroyed = false;
+    let view: any = null;
+
+    async function init() {
+      const [
+        { EditorState },
+        { EditorView },
+        Y,
+        { ySyncPlugin, ySyncPluginKey },
+        { schema },
+        { buildPlugins },
+      ] = await Promise.all([
+        import("prosemirror-state"),
+        import("prosemirror-view"),
+        import("yjs"),
+        import("y-prosemirror"),
+        import("~/components/editor/schema"),
+        import("~/components/editor/plugins"),
+      ]);
+
+      if (destroyed || !containerRef.current) return;
+
+      const ydoc = new Y.Doc();
+      const stateBytes = Uint8Array.from(atob(yjsState), (c) => c.charCodeAt(0));
+      Y.applyUpdate(ydoc, stateBytes);
+
+      const yXmlFragment = ydoc.getXmlFragment("prosemirror");
+
+      const plugins = [
+        ...buildPlugins(schema, true), // readOnly=true
+        ySyncPlugin(yXmlFragment),
+      ];
+
+      const state = EditorState.create({ schema, plugins });
+      view = new EditorView(containerRef.current, {
+        state,
+        editable: () => false,
+      });
+    }
+
+    init();
+    return () => {
+      destroyed = true;
+      view?.destroy();
+    };
+  }, [yjsState]);
 
   return (
     <div
@@ -332,12 +494,168 @@ function HistoryPreviewPane({
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
+          justifyContent: "space-between",
+          gap: "1rem",
           flexShrink: 0,
         }}
       >
-        <span style={{ color: "var(--accent)", fontWeight: 600 }}>Viewing version:</span>
-        <span>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={{ fontWeight: 600 }}>Viewing version:</span>
+          <span style={{ opacity: 0.7 }}>{label}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+          {onRestore && (
+            <button
+              onClick={() => {
+                if (confirm("Restore this version? Current content will be overwritten.")) {
+                  onRestore();
+                }
+              }}
+              title="Restore this version"
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.3rem 0.6rem",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+                transition: "opacity 120ms ease-out",
+                opacity: 0.9,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.9"; }}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            title="Close preview"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 4px",
+              color: "var(--fg)",
+              opacity: 0.6,
+              fontSize: "1rem",
+              lineHeight: 1,
+              transition: "opacity 120ms ease-out",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        className="pm-editor"
+        style={{ flex: 1, overflow: "auto", padding: "1rem 2rem" }}
+      />
+    </div>
+  );
+}
+
+function HistoryPreviewPane({
+  content,
+  title,
+  label,
+  currentContent,
+  onDismiss,
+  onRestore,
+}: {
+  content: string;
+  title: string;
+  label: string;
+  currentContent: string;
+  onDismiss: () => void;
+  onRestore?: () => void;
+}) {
+  // diffWords(content, currentContent):
+  // - part.removed = in content but not currentContent = added in this snapshot → green
+  // - part.added   = in currentContent but not content = removed in this snapshot → red strikethrough
+  const parts = useMemo(() => diffWords(content, currentContent), [content, currentContent]);
+  const hasChanges = parts.some(p => p.added || p.removed);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 5,
+        background: "var(--bg)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "0.5rem 1rem",
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+          borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+          fontSize: "0.75rem",
+          color: "var(--fg)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>Viewing version:</span>
+          <span style={{ opacity: 0.8 }}>{label}</span>
+          {hasChanges && (
+            <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
+              <span style={{ background: "color-mix(in srgb, #22c55e 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+              {" "}
+              <span style={{ background: "color-mix(in srgb, #ef4444 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+          {onRestore && (
+            <button
+              onClick={() => { if (confirm("Restore this version? Current content will be overwritten.")) onRestore(); }}
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.25rem 0.6rem",
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+              }}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            onClick={onDismiss}
+            title="Close preview"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 4px",
+              color: "var(--fg)",
+              opacity: 0.6,
+              fontSize: "1rem",
+              lineHeight: 1,
+              transition: "opacity 120ms ease-out",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+          >
+            ×
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "2rem 1rem" }}>
         <div
@@ -352,12 +670,22 @@ function HistoryPreviewPane({
             wordBreak: "break-word",
           }}
         >
-          {title && (
+          {title && hasChanges && (
             <h1 style={{ marginTop: 0, fontSize: "1.5rem" }}>
               {title}
             </h1>
           )}
-          {parts.map((p, i) => {
+          {!content && (
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+              Content unavailable — this version predates rich history storage.
+            </p>
+          )}
+          {!hasChanges && content && (
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+              No changes compared to previous snapshot.
+            </p>
+          )}
+          {hasChanges && parts.map((p, i) => {
             if (p.removed) {
               return (
                 <span
@@ -393,7 +721,7 @@ function HistoryPreviewPane({
   );
 }
 
-function SelectionBubble({ onLink }: { onLink: () => void }) {
+function SelectionBubble({ onLink, onCommentAdded }: { onLink: () => void; onCommentAdded?: (id: string, pos: { x: number; y: number }) => void }) {
   const { selectionBubble, setSelectionBubble, editorApi, setActivePanel, setFocusedCommentId, canEdit } = useDocument();
   if (!selectionBubble) return null;
 
@@ -449,9 +777,12 @@ function SelectionBubble({ onLink }: { onLink: () => void }) {
         label="Comment"
         title="Add comment"
         onActivate={() => {
-          editorApi.current?.addComment();
+          const id = editorApi.current?.addComment() ?? null;
           setActivePanel("comments");
-          setFocusedCommentId(null);
+          setFocusedCommentId(id);
+          if (id && onCommentAdded) {
+            onCommentAdded(id, { x: selectionBubble.left, y: selectionBubble.top });
+          }
           dismiss();
         }}
       />
@@ -623,13 +954,7 @@ function DocNavLeft() {
 }
 
 
-function DocNavActions({
-  toolbarOpen,
-  onToggleToolbar,
-}: {
-  toolbarOpen: boolean;
-  onToggleToolbar: () => void;
-}) {
+function DocNavActions() {
   const {
     user,
     isShared,
@@ -637,7 +962,6 @@ function DocNavActions({
     document,
     togglePanel,
     comments,
-    suggestions,
     isStarred,
     toggleStar,
     canEdit,
@@ -651,13 +975,47 @@ function DocNavActions({
     if (!window.confirm("Move this document to trash? You can restore it later from the Trash page.")) return;
     trashFetcher.submit({ intent: "trash-doc" }, { method: "post" });
   };
-  const unreadComments = comments.filter((c) => !c.resolved).length + suggestions.length;
+  const unreadComments = comments.filter((c) => !c.resolved).length;
   // Only surface the Comments button when there's something to read — adds UI
   // pressure only for docs that actually have a conversation on them.
   // First comment is created via the selection bubble (+ Comment).
-  const hasComments = comments.length + suggestions.length > 0;
+  const hasComments = comments.length > 0;
 
-  const download = (kind: "md" | "pdf" | "docx") => {
+  const { editorApi, title } = useDocument();
+  const download = async (kind: "md" | "pdf" | "docx") => {
+    const slug = (title || "document").replace(/[^a-zA-Z0-9_\-. ]/g, "_");
+    if (USE_PM && kind === "docx") {
+      editorApi.current?.exportDocx?.(`${slug}.docx`);
+      return;
+    }
+    if (USE_PM && (kind === "md" || kind === "pdf")) {
+      const md = editorApi.current?.getMarkdown?.() ?? "";
+      if (kind === "md") {
+        const blob = new Blob([md], { type: "text/markdown; charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+        a.href = url; a.download = `${slug}.md`; a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      // PDF: POST markdown to server, receive PDF blob
+      try {
+        const resp = await fetch(`/api/doc-pdf/${document.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: md }),
+        });
+        if (!resp.ok) throw new Error("PDF failed");
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement("a");
+        a.href = url; a.download = `${slug}.pdf`; a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        window.open(`/api/doc-pdf/${document.id}`, "_blank");
+      }
+      return;
+    }
     const path =
       kind === "md" ? `/api/doc-download/${document.id}` :
       kind === "pdf" ? `/api/doc-pdf/${document.id}` :
@@ -697,12 +1055,6 @@ function DocNavActions({
         ]
       : []),
     {
-      label: "Formatting",
-      title: "⌘/",
-      icon: <FormatIcon />,
-      onClick: onToggleToolbar,
-    },
-    {
       label: "History",
       icon: <ClockIcon className="w-[14px] h-[14px]" />,
       onClick: () => togglePanel("history"),
@@ -737,15 +1089,6 @@ function DocNavActions({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
       <PresenceIndicator />
-      {hasComments && (
-        <TopbarIconBtn
-          title={unreadComments > 0 ? `Comments · ${unreadComments} unread` : "Comments"}
-          onClick={() => togglePanel("comments")}
-        >
-          <CommentIcon className="h-4 w-4" />
-          {unreadComments > 0 && <TopbarBadge count={unreadComments} />}
-        </TopbarIconBtn>
-      )}
       <TopbarIconBtn title="Share this doc" onClick={() => togglePanel("share")}>
         <ShareIcon className="h-4 w-4" />
       </TopbarIconBtn>
@@ -807,23 +1150,6 @@ function TopbarIconBtn({
   );
 }
 
-/** Typography "Aa" glyph for the formatting-toolbar menu item. */
-function FormatIcon() {
-  return (
-    <span
-      aria-hidden
-      style={{
-        display: "inline-flex",
-        alignItems: "baseline",
-        fontFamily: "var(--font-ui)",
-        lineHeight: 1,
-      }}
-    >
-      <span style={{ fontSize: "13px", fontWeight: 600 }}>A</span>
-      <span style={{ fontSize: "9px", fontWeight: 500, marginLeft: "0.5px" }}>a</span>
-    </span>
-  );
-}
 
 function TopbarBadge({ count }: { count: number }) {
   return (

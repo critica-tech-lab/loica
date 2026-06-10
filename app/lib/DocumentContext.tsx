@@ -4,7 +4,6 @@ import type { BreadcrumbSegment } from "~/lib/folder.server";
 import type { Peer } from "~/components/Editor";
 import type { ConnectionStatus } from "~/components/DocActionBar";
 import type { PanelId } from "~/components/ActivityBar";
-import type { SuggestionEntry } from "~/components/criticmarkup";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { detectLanguage } from "~/components/DocActionBar";
 import { getDocumentType } from "~/lib/templates";
@@ -47,6 +46,8 @@ export interface HistoryPreviewState {
   title: string;
   label: string; // e.g. "3 min ago · auto-save" — shown in the banner
   currentContent: string; // live content, used to compute the diff view
+  yjsState?: string; // base64-encoded Yjs state for PM docs
+  versionId?: string; // version ID for restore action
 }
 
 export interface EditorApi {
@@ -62,13 +63,29 @@ export interface EditorApi {
   unresolveThread: (threadId: string) => void;
   scrollToPos: (pos: number) => void;
   focus: () => void;
-  addSuggestion: (type: "addition" | "deletion" | "substitution") => void;
-  acceptSuggestion: (entry: SuggestionEntry) => void;
-  rejectSuggestion: (entry: SuggestionEntry) => void;
-  getSuggestions: () => SuggestionEntry[];
+  getThreadPositions?: () => Array<{ id: string; top: number }>;
   uploadImage: (file: File) => void;
   insertAt: (pos: number, text: string) => void;
   replaceContent: (newContent: string, cursorPos?: number) => void;
+  // ProseMirror-only (optional — undefined in CodeMirror editor)
+  exportDocx?: (filename?: string) => Promise<void>;
+  setHeading?: (level: number) => void;
+  clearFormatting?: () => void;
+  toggleBlockquote?: () => void;
+  toggleBulletList?: () => void;
+  toggleOrderedList?: () => void;
+  insertTable?: () => void;
+  insertHr?: () => void;
+  setViewOnly?: (on: boolean) => void;
+  toggleTrackChanges?: () => void;
+  acceptAllChanges?: () => void;
+  rejectAllChanges?: () => void;
+  acceptChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
+  rejectChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
+  setShowMarkup?: (show: boolean) => void;
+  setTextAlign?: (alignment: string | null) => void;
+  addLink?: (url: string) => void;
+  getMarkdown?: () => string;
 }
 
 export interface DocumentContextValue {
@@ -98,21 +115,17 @@ export interface DocumentContextValue {
   setEditorReady: (ready: boolean) => void;
   mounted: boolean;
 
-  // Comments & suggestions
+  // Comments
   comments: ResolvedThread[];
   setComments: (threads: ResolvedThread[]) => void;
-  suggestions: SuggestionEntry[];
-  setSuggestions: (entries: SuggestionEntry[]) => void;
+  trackChangesState: import("~/components/editor/types").TrackChangesActiveState | null;
+  setTrackChangesState: (s: import("~/components/editor/types").TrackChangesActiveState | null) => void;
   activePanel: PanelId | null;
   setActivePanel: (panel: PanelId | null) => void;
   focusedCommentId: string | null;
   setFocusedCommentId: (id: string | null) => void;
   focusedSuggestionId: string | null;
   setFocusedSuggestionId: (id: string | null) => void;
-
-  // Modes
-  suggestionMode: boolean;
-  setSuggestionMode: React.Dispatch<React.SetStateAction<boolean>>;
 
   // History preview (scrubbing through versions)
   historyPreview: HistoryPreviewState | null;
@@ -150,6 +163,7 @@ export interface DocumentContextValue {
   togglePanel: (panel: PanelId) => void;
   toggleStar: () => void;
   handleContentChange: (val: string) => void;
+  maybeAdoptTitle: (candidate: string | null, contentForSave?: string) => boolean;
   registerEditorApi: (api: EditorApi) => void;
   sendMention: (body: string) => void;
   restoreVersion: (versionId: string) => void;
@@ -263,11 +277,10 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const [editorKey, setEditorKey] = useState(0);
   const [editorReady, setEditorReady] = useState(false);
   const [comments, setComments] = useState<ResolvedThread[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
+  const [trackChangesState, setTrackChangesState] = useState<import("~/components/editor/types").TrackChangesActiveState | null>(null);
   const [activePanel, setActivePanel] = useState<PanelId | null>(null);
   const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
-  const [suggestionMode, setSuggestionMode] = useState(false);
   const [historyPreview, setHistoryPreview] = useState<HistoryPreviewState | null>(null);
   const [selectionBubble, setSelectionBubble] = useState<{ top: number; left: number } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
@@ -282,15 +295,8 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const hasCustomEditor = docTypeExtension?.EditorView != null;
   const spellLang = useMemo(() => detectLanguage(content), [content]);
   const docStats = useMemo(() => {
-    const plain = content
-      .replace(/\{==([\s\S]*?)==\}\{>>[\s\S]*?<<\}/g, "$1")
-      .replace(/\{>>[\s\S]*?<<\}/g, "")
-      .replace(/\{==([\s\S]*?)==\}/g, "$1")
-      .replace(/\{\+\+(?:@[^:]+:)?([\s\S]*?)\+\+\}/g, "$1")
-      .replace(/\{--(?:@[^:]+:)?[\s\S]*?--\}/g, "")
-      .replace(/\{~~(?:@[^:]+:)?[\s\S]*?~>([\s\S]*?)~~\}/g, "$1");
-    const chars = plain.length;
-    const words = plain.split(/\s+/).filter((w) => w.length > 0).length;
+    const chars = content.length;
+    const words = content.split(/\s+/).filter((w) => w.length > 0).length;
     return { chars, words };
   }, [content]);
 
@@ -351,14 +357,14 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
   // ─── Auto-show/hide comments panel ────────────────────────
   useEffect(() => {
-    const hasItems = comments.some((c) => !c.resolved) || suggestions.length > 0;
+    const hasItems = comments.some((c) => !c.resolved);
     if (hasItems && activePanel !== "comments") setActivePanel("comments");
     if (!hasItems && activePanel === "comments") {
       setActivePanel(null);
       setFocusedCommentId(null);
       setFocusedSuggestionId(null);
     }
-  }, [comments.length, suggestions.length]);
+  }, [comments.length]);
 
   // ─── Restore: update state + remount Editor + undo toast ─
   // We only want to react to each restore once, so we track the backup id
@@ -409,22 +415,21 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   }, [content, canEdit]);
 
   // ─── Content change handler (with auto-title) ─────────────
-  const handleContentChange = useCallback(
-    (val: string) => {
-      setContent(val);
-      // Auto-adopt the body's first H1 as the document title, but only for
-      // freshly-created docs the user is actively editing. Guards:
-      //   · recency — only kicks in within 1 hour of creation, so opening an
-      //     old doc that still happens to carry a placeholder title doesn't
-      //     trigger surprise renames.
-      //   · placeholder — starts only while the title is a system default
-      //     (empty / "Untitled" / the `xxx-xxx-xxx` slug from randomDocName()).
-      //   · sticky — once we've adopted once (`titleAutoAdopted`), we keep
-      //     syncing keystroke-by-keystroke until the user manually edits the
-      //     title (which flips `titleSetByUser` and locks it in).
-      //
-      // `handleContentChange` is only wired to the Editor's onChange, so this
-      // never fires outside an active edit session.
+  // Auto-adopt `candidate` as the document title, but only for freshly-created
+  // docs the user is actively editing. Returns true if it adopted (and saved).
+  // Guards:
+  //   · recency — only within 1 hour of creation, so opening an old doc that
+  //     still carries a placeholder title doesn't trigger a surprise rename.
+  //   · placeholder — only while the title is a system default
+  //     (empty / "Untitled" / the `xxx-xxx-xxx` slug from randomDocName()).
+  //   · sticky — once adopted (`titleAutoAdopted`), keep syncing keystroke-by-
+  //     keystroke until the user manually edits the title (flips
+  //     `titleSetByUser`, locking it in).
+  // Used by both the markdown editor (via extractFirstH1) and the ProseMirror
+  // editor (which passes the first heading node's text directly).
+  const maybeAdoptTitle = useCallback(
+    (candidate: string | null, contentForSave?: string): boolean => {
+      if (!candidate) return false;
       const createdRaw = document.created_at ? Number(document.created_at) : 0;
       const createdMs =
         createdRaw && createdRaw < 1e12 ? createdRaw * 1000 : createdRaw;
@@ -438,19 +443,27 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
         !titleSetByUser.current &&
         isRecentDoc &&
         (titleAutoAdopted.current || isPlaceholderTitle);
-      if (canAutoAdopt) {
-        const h1 = extractFirstH1(val);
-        if (h1) {
-          titleAutoAdopted.current = true;
-          setTitle(h1);
-          originalTitle.current = h1;
-          scheduleSave(h1, val);
-          return;
-        }
-      }
+      if (!canAutoAdopt) return false;
+      titleAutoAdopted.current = true;
+      setTitle(candidate);
+      originalTitle.current = candidate;
+      scheduleSave(candidate, contentForSave ?? content);
+      return true;
+    },
+    [document.created_at, title, scheduleSave, content]
+  );
+
+  const handleContentChange = useCallback(
+    (val: string) => {
+      setContent(val);
+      // `handleContentChange` is only wired to the Editor's onChange, so the
+      // title auto-adopt never fires outside an active edit session. The PM
+      // editor sources its H1 candidate via the onTitle callback instead (its
+      // textContent has no `#` markers for extractFirstH1 to match).
+      if (maybeAdoptTitle(extractFirstH1(val), val)) return;
       scheduleSave(title, val);
     },
-    [document.created_at, title, scheduleSave]
+    [maybeAdoptTitle, title, scheduleSave]
   );
 
   // ─── Insert footnote ─────────────────────────────────────
@@ -571,17 +584,14 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
     comments,
     setComments,
-    suggestions,
-    setSuggestions,
+    trackChangesState,
+    setTrackChangesState,
     activePanel,
     setActivePanel,
     focusedCommentId,
     setFocusedCommentId,
     focusedSuggestionId,
     setFocusedSuggestionId,
-
-    suggestionMode,
-    setSuggestionMode,
 
     historyPreview,
     setHistoryPreview,
@@ -607,6 +617,7 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     togglePanel,
     toggleStar,
     handleContentChange,
+    maybeAdoptTitle,
     registerEditorApi,
     sendMention,
     restoreVersion,

@@ -56,6 +56,24 @@ export interface ExtensionExporter {
 }
 
 /**
+ * Install-wide PDF styling contributed by an extension. Unlike `exporters.pdf`
+ * (which replaces the whole pipeline for one doc type), a `pdfStyle` layers
+ * onto the core pandoc/tectonic pipeline for ALL docs — preamble, Lua filters,
+ * fonts, and extra pandoc args. The core resolves the first enabled extension
+ * that declares one; when none do, PDFs render as bare default LaTeX.
+ */
+export interface PdfStyle {
+  /** Absolute path to a LaTeX preamble, included via pandoc `-H`. */
+  preamblePath?: string;
+  /** Absolute paths to pandoc Lua filters (`--lua-filter`). */
+  luaFilters?: string[];
+  /** Font directory exposed to XeTeX/tectonic via `OSFONTDIR`. */
+  fontsDir?: string;
+  /** Extra raw pandoc args, e.g. `["-V", "mainfont=IBM Plex Sans"]`. */
+  extraPandocArgs?: string[];
+}
+
+/**
  * Props passed to an extension's `EditorView` when it owns the editing
  * surface for its doc type (Spreadsheets is the canonical example). The
  * shape is stable: removing or renaming a field is breaking and bumps
@@ -133,6 +151,14 @@ export interface LoicaExtension {
   description?: string;
 
   /**
+   * Whether the extension is on when the admin hasn't configured an explicit
+   * enabled list yet (the day-one state). Defaults to `true`. Opinionated
+   * drop-in plugins (e.g. critica-pdf) set this to `false` so a fresh install
+   * stays bare until an admin turns them on.
+   */
+  defaultEnabled?: boolean;
+
+  /**
    * The `LOICA_EXTENSION_API_VERSION` the extension was written against.
    * When set and it doesn't match the current API version, the registry
    * emits a console warning at startup so the maintainer notices the
@@ -188,6 +214,13 @@ export interface LoicaExtension {
     pdf?: ExtensionExporter;
     docx?: ExtensionExporter;
   };
+
+  /**
+   * Install-wide PDF styling layered onto the core pandoc pipeline for all
+   * docs. See `PdfStyle`. The core uses the first enabled extension that
+   * declares one; none → bare default LaTeX.
+   */
+  pdfStyle?: PdfStyle;
 
   /**
    * Server hook that returns the HTML preview body for `api/doc-preview/:id`

@@ -35,6 +35,7 @@ export default [
   route("api/doc-download/:id", "routes/api.doc-download.$id.ts"),
   route("api/doc-preview/:id", "routes/api.doc-preview.$id.ts"),
   route("api/doc-versions/:id", "routes/api.doc-versions.$id.ts"),
+  route("api/doc-history/:id", "routes/api.doc-history.$id.ts"),
   route("api/doc-shares/:docId", "routes/api.doc-shares.$docId.ts"),
   route("api/folder-shares/:folderId", "routes/api.folder-shares.$folderId.ts"),
   route("api/workspace-export/:id", "routes/api.workspace-export.$id.ts"),

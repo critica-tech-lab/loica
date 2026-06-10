@@ -7,12 +7,18 @@ import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
 import { useDocTypeExtension } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
+import { PMToolbar } from "~/components/PMToolbar";
+import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
+import type { PMActiveState, TrackChangesActiveState } from "~/components/editor/types";
 import { LinkModal } from "~/components/LinkModal";
+
+// ProseMirror is the default editor on this branch. Set VITE_PM_EDITOR=0 to
+// fall back to the legacy CodeMirror editor.
+const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
-import { CommentPanel } from "~/components/CommentPanel";
+import { CommentPopup } from "~/components/CommentPopup";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
 import type { ConnectionStatus } from "~/components/DocActionBar";
-import type { SuggestionEntry } from "~/components/criticmarkup";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { LogoIcon } from "~/components/icons";
 import { getDocumentType } from "~/lib/templates";
@@ -249,7 +255,6 @@ export default function SharePage() {
   // All hooks must be called unconditionally (rules of hooks)
   const [peers, setPeers] = useState<Peer[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
-  const [suggestionMode, setSuggestionMode] = useState(trackChanges);
   const [saving, setSaving] = useState(false);
   const randomIdentity = useMemo(() => randomGuestIdentity(), []);
   const guestIdentity = useMemo(() => {
@@ -332,8 +337,6 @@ export default function SharePage() {
           guestIdentity={guestIdentity}
           onPresenceChange={setPeers}
           onConnectionStatus={setConnectionStatus}
-          suggestionMode={suggestionMode}
-          onToggleSuggestionMode={() => setSuggestionMode((s) => !s)}
           onSavingChange={setSaving}
         />
       ) : (
@@ -375,7 +378,7 @@ function LiveReadOnlyView({
   return (
     <>
     <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0, position: "relative", cursor: "default" }}>
-      {!editorReady && document.content && !ExtensionEditor && (
+      {!USE_PM && !editorReady && document.content && !ExtensionEditor && (
         <pre
           style={{
             position: "absolute",
@@ -409,6 +412,17 @@ function LiveReadOnlyView({
           onPresenceChange={onPresenceChange}
           onConnectionStatus={onConnectionStatus}
         />
+      ) : USE_PM ? (
+        <ProseMirrorEditor
+          readOnly
+          docId={document.id}
+          wsUrl={wsUrl}
+          wsParams={{ token: shareToken }}
+          userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
+          onPresenceChange={onPresenceChange}
+          onConnectionStatus={onConnectionStatus}
+          onReady={() => { setEditorReady(true); }}
+        />
       ) : (
         <Editor
           initialValue={document.content}
@@ -437,8 +451,6 @@ function EditableView({
   guestIdentity,
   onPresenceChange,
   onConnectionStatus,
-  suggestionMode,
-  onToggleSuggestionMode,
   onSavingChange,
 }: {
   document: { id: string; content: string };
@@ -447,8 +459,6 @@ function EditableView({
   guestIdentity: { name: string; color: string };
   onPresenceChange: (peers: Peer[]) => void;
   onConnectionStatus: (status: ConnectionStatus) => void;
-  suggestionMode: boolean;
-  onToggleSuggestionMode: () => void;
   onSavingChange: (saving: boolean) => void;
 }) {
   const fetcher = useFetcher();
@@ -478,10 +488,12 @@ function EditableView({
   }, []);
 
   const [threads, setThreads] = useState<ResolvedThread[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionEntry[]>([]);
-  const [showComments, setShowComments] = useState(false);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+  const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
+  const editorMountRef = useRef<HTMLDivElement | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
+  const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
+  const [trackChangesState, setTrackChangesState] = useState<TrackChangesActiveState | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [selectionBubble, setSelectionBubble] = useState<{ top: number; left: number } | null>(null);
   const [linkModal, setLinkModal] = useState<
@@ -501,22 +513,8 @@ function EditableView({
     unresolveThread: (threadId: string) => void;
     scrollToPos: (pos: number) => void;
     focus: () => void;
-    addSuggestion: (type: "addition" | "deletion" | "substitution") => void;
-    acceptSuggestion: (entry: SuggestionEntry) => void;
-    rejectSuggestion: (entry: SuggestionEntry) => void;
-    getSuggestions: () => SuggestionEntry[];
   } | null>(null);
 
-  // Auto-show/hide sidebar
-  useEffect(() => {
-    const hasItems = threads.some((t) => !t.resolved) || suggestions.length > 0;
-    if (hasItems && !showComments) setShowComments(true);
-    if (!hasItems && showComments) {
-      setShowComments(false);
-      setFocusedThreadId(null);
-      setFocusedSuggestionId(null);
-    }
-  }, [threads, suggestions.length]);
 
   const docType = getDocumentType(document.content || "");
   const ExtensionEditor = useDocTypeExtension(docType)?.EditorView ?? null;
@@ -524,19 +522,19 @@ function EditableView({
   return (
     <>
       {!ExtensionEditor && (
-        <Toolbar
-          onFormat={(b, a) => editorApi.current?.format(b, a)}
-          onFormatLine={(p) => editorApi.current?.formatLine(p)}
-          suggestionMode={suggestionMode}
-          onToggleSuggestionMode={onToggleSuggestionMode}
-          onLink={() => setLinkModal({
-            mode: "add",
-            onApply: (url) => { editorApi.current?.format("[", `](${url})`); },
-          })}
-        />
+        USE_PM
+          ? <PMToolbar canEdit editorApiRef={editorApi as any} activeState={pmActiveState} trackChangesState={trackChangesState} onLink={() => setLinkModal({ mode: "add", onApply: (url) => { editorApi.current?.format("[", `](${url})`); } })} />
+          : <Toolbar
+              onFormat={(b, a) => editorApi.current?.format(b, a)}
+              onFormatLine={(p) => editorApi.current?.formatLine(p)}
+              onLink={() => setLinkModal({
+                mode: "add",
+                onApply: (url) => { editorApi.current?.format("[", `](${url})`); },
+              })}
+            />
       )}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0, position: "relative" }}>
-        {!editorReady && document.content && !ExtensionEditor && (
+        {!USE_PM && !editorReady && document.content && !ExtensionEditor && (
           <pre
             style={{
               position: "absolute",
@@ -572,6 +570,49 @@ function EditableView({
             onPresenceChange={onPresenceChange}
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
           />
+        ) : USE_PM ? (
+          <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <ProseMirrorEditor
+              docId={document.id}
+              wsUrl={wsUrl}
+              wsParams={{ token: shareToken }}
+              userInfo={guestIdentity}
+              mountRefOut={editorMountRef}
+              onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
+              onPresenceChange={onPresenceChange}
+              onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
+              onChange={(val) => { setContent(val); scheduleSave(val); }}
+              onStateChange={setPmActiveState}
+              onTrackChangesStateChange={setTrackChangesState}
+              onThreadsChange={setThreads}
+              onThreadClick={(thread, pos) => { setFocusedThreadId(thread.id); setFocusedSuggestionId(null); setCommentPopup({ threadId: thread.id, pos }); }}
+              focusedCommentId={focusedThreadId}
+              onSelectionChange={(sel) => {
+                if (!sel) { setSelectionBubble(null); setFocusedThreadId(null); return; }
+                if (sel.to > sel.from) {
+                  setSelectionBubble({ top: sel.top, left: sel.left });
+                } else {
+                  setSelectionBubble(null);
+                  setFocusedThreadId(null);
+                  setCommentPopup(null);
+                }
+              }}
+              autoFocus
+            />
+            {commentPopup && (() => {
+              const thread = threads.find(t => t.id === commentPopup.threadId);
+              return thread ? (
+                <CommentPopup
+                  thread={thread}
+                  pos={commentPopup.pos}
+                  currentUserId={guestIdentity.name}
+                  editorApiRef={editorApi as any}
+                  editorRef={editorMountRef}
+                  onDismiss={() => { setCommentPopup(null); setFocusedThreadId(null); }}
+                />
+              ) : null;
+            })()}
+          </div>
         ) : (
           <Editor
             initialValue={document.content}
@@ -580,16 +621,9 @@ function EditableView({
               scheduleSave(val);
             }}
             onThreadsChange={setThreads}
-            onSuggestionsChange={setSuggestions}
             onThreadClick={(thread) => {
-              setShowComments(true);
-              setFocusedThreadId(thread.id);
+                            setFocusedThreadId(thread.id);
               setFocusedSuggestionId(null);
-            }}
-            onSuggestionClick={(entry) => {
-              setShowComments(true);
-              setFocusedSuggestionId(entry.id);
-              setFocusedThreadId(null);
             }}
             onSelectionChange={(sel) => {
               if (sel && sel.to > sel.from) {
@@ -606,7 +640,6 @@ function EditableView({
             wsUrl={wsUrl}
             wsParams={{ token: shareToken }}
             userInfo={guestIdentity}
-            suggestionMode={suggestionMode}
             userName={guestIdentity.name}
             onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
           />
@@ -627,8 +660,7 @@ function EditableView({
               onMouseDown={(e) => {
                 e.preventDefault();
                 const newId = editorApi.current?.addComment();
-                setShowComments(true);
-                setFocusedThreadId(newId ?? null);
+                                setFocusedThreadId(newId ?? null);
                 setSelectionBubble(null);
               }}
               style={floatingBubbleBtnStyle}
@@ -638,26 +670,6 @@ function EditableView({
           </div>
         )}
 
-        {/* Comment/suggestion sidebar */}
-        {showComments && (
-          <CommentPanel
-            threads={threads}
-            suggestions={suggestions}
-            focusedThreadId={focusedThreadId}
-            focusedSuggestionId={focusedSuggestionId}
-            canResolve={false}
-            onClose={() => { setShowComments(false); setFocusedThreadId(null); setFocusedSuggestionId(null); }}
-            onScrollTo={(pos) => editorApi.current?.scrollToPos(pos)}
-            onReply={(threadId, body) => editorApi.current?.addReply(threadId, body)}
-            onEditComment={(commentId, body) => editorApi.current?.updateComment(commentId, body)}
-            onDeleteComment={(commentId) => editorApi.current?.deleteComment(commentId)}
-            onResolveThread={(threadId) => editorApi.current?.resolveThread(threadId)}
-            onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
-            onFinish={() => editorApi.current?.focus()}
-            onAcceptSuggestion={(entry) => editorApi.current?.acceptSuggestion(entry)}
-            onRejectSuggestion={(entry) => editorApi.current?.rejectSuggestion(entry)}
-          />
-        )}
       </div>
       <DocActionBar content={content} connectionStatus={localConnectionStatus} showBranding />
       <LinkModal

@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useDocument } from "~/lib/DocumentContext";
 import { timeAgo, formatDate } from "~/lib/ui-utils";
 import type { PanelId } from "./ActivityBar";
-import type { SuggestionEntry } from "./criticmarkup";
 import type { ResolvedThread } from "./comment-decorations";
 import { CommentPanel } from "./CommentPanel";
+import { TrackChangesPanel } from "./TrackChangesPanel";
 import { VersionPanel } from "./VersionPanel";
 import { InlineSharePanel } from "./ShareDialog";
 import { useToast } from "~/components/Toast";
@@ -18,7 +18,6 @@ export function SidePanel() {
     setActivePanel,
     document: doc,
     comments,
-    suggestions,
     user,
     focusedCommentId,
     focusedSuggestionId,
@@ -39,28 +38,6 @@ export function SidePanel() {
   const closePanel = () => { setActivePanel(null); setFocusedCommentId(null); setFocusedSuggestionId(null); };
 
   switch (activePanel) {
-    case "comments":
-      return (
-        <CommentPanel
-          threads={comments}
-          suggestions={suggestions}
-          currentUserId={user.id}
-          focusedThreadId={focusedCommentId}
-          focusedSuggestionId={focusedSuggestionId}
-          onClose={closePanel}
-          onScrollTo={(pos) => editorApi.current?.scrollToPos(pos)}
-          onReply={(threadId, body) => editorApi.current?.addReply(threadId, body)}
-          onEditComment={(commentId, body) => editorApi.current?.updateComment(commentId, body)}
-          onDeleteComment={(commentId) => editorApi.current?.deleteComment(commentId)}
-          onResolveThread={(threadId) => { editorApi.current?.resolveThread(threadId); setActivePanel(null); setFocusedCommentId(null); }}
-          onUnresolveThread={(threadId) => editorApi.current?.unresolveThread(threadId)}
-          onFinish={() => editorApi.current?.focus()}
-          onMention={sendMention}
-          onAcceptSuggestion={(entry) => editorApi.current?.acceptSuggestion(entry)}
-          onRejectSuggestion={(entry) => editorApi.current?.rejectSuggestion(entry)}
-        />
-      );
-
     case "history":
       return (
         <VersionPanel
@@ -98,9 +75,28 @@ export function SidePanel() {
         />
       );
 
+    case "changes":
+      return (
+        <PanelShell onClose={closePanel} title="Changes">
+          <TrackChangesPanel />
+        </PanelShell>
+      );
+
     default:
       return null;
   }
+}
+
+function PanelShell({ onClose, title, children }: { onClose: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "280px", borderLeft: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", background: "var(--bg)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 1rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", flexShrink: 0 }}>
+        <span style={{ fontWeight: 600, fontSize: "0.85rem", fontFamily: "var(--font-ui)" }}>{title}</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "color-mix(in srgb, var(--fg) 55%, transparent)", fontSize: "1rem", lineHeight: 1 }} aria-label="Close">×</button>
+      </div>
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>{children}</div>
+    </div>
+  );
 }
 
 // ─── Share panel ─────────────────────────────────────────

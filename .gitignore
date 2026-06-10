@@ -1,3 +1,8 @@
+# Drop-in plugins are install-specific. The bare-metal repo ships none; an
+# opinionated install (e.g. Critica) drops packages into plugins/<name>/.
+/plugins/*
+!/plugins/README.md
+
 node_modules/
 build/
 .react-router/

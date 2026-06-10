@@ -22,16 +22,37 @@ export function initializePersistenceStatements(db: Database.Database) {
       "UPDATE documents SET content = @content, yjs_state = @state, updated_at = unixepoch(), updated_by = COALESCE(@updatedBy, updated_by) WHERE id = @id"
     ),
     createVersion: db.prepare(
-      `INSERT INTO document_versions (id, document_id, title, content, created_by, auto)
-       SELECT @vid, @docId, title, @content, NULL, 1 FROM documents WHERE id = @docId`
+      `INSERT INTO document_versions (id, document_id, title, content, yjs_state, created_by, auto)
+       SELECT @vid, @docId, title, @content, @yjsState, @createdBy, 1 FROM documents WHERE id = @docId`
     ),
     lastVersionContent: db.prepare(
       `SELECT content FROM document_versions WHERE document_id = ? ORDER BY created_at DESC LIMIT 1`
+    ),
+    saveUpdate: db.prepare(
+      `INSERT INTO document_updates (id, document_id, user_id, user_name, yjs_update, created_at)
+       VALUES (@id, @docId, @userId, @userName, @update, @createdAt)`
     ),
   };
 }
 
 export type PersistenceStatements = ReturnType<typeof initializePersistenceStatements>;
+
+/**
+ * Save a Yjs update to the document_updates table.
+ */
+export function saveDocumentUpdate(
+  db: Database.Database,
+  docId: string,
+  userId: string | null,
+  userName: string | null,
+  update: Uint8Array,
+  createdAt: number,
+): void {
+  db.prepare(
+    `INSERT INTO document_updates (id, document_id, user_id, user_name, yjs_update, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(nanoid(16), docId, userId, userName, Buffer.from(update), createdAt);
+}
 
 /**
  * Load a document from the database and apply its persisted Yjs state.
@@ -50,9 +71,12 @@ export function loadDocumentState(
   if (row) {
     if (row.yjs_state && row.yjs_state.byteLength > 0) {
       Y.applyUpdate(doc, row.yjs_state);
-      // If yjs_state produced empty text but DB has content, re-seed
-      // (guards against stale empty yjs_state blobs)
-      if (doc.getText("content").toString().length === 0 && row.content) {
+      // Re-seed Y.Text only for non-PM docs: PM docs use Y.XmlFragment("prosemirror")
+      // and Y.Text("content") is always empty for them — inserting row.content there
+      // would cause getDocContent() to return the (possibly HTML-contaminated) DB text
+      // instead of the clean extraction from the XML fragment.
+      const isPmDoc = doc.getXmlFragment("prosemirror").length > 0;
+      if (!isPmDoc && doc.getText("content").toString().length === 0 && row.content) {
         doc.getText("content").insert(0, row.content);
       }
     } else if (row.content) {
@@ -166,8 +190,10 @@ export function saveIfSafe(
 export function maybeAutoVersion(
   stmts: PersistenceStatements,
   docId: string,
+  doc: Y.Doc,
   content: string,
   lastVersionAt: number,
+  createdBy: string | null = null,
   force = false
 ): number {
   if (!force && Date.now() - lastVersionAt < AUTO_VERSION_INTERVAL) return lastVersionAt;
@@ -175,7 +201,8 @@ export function maybeAutoVersion(
   const lastRow = stmts.lastVersionContent.get(docId) as { content: string } | undefined;
   if (lastRow && lastRow.content === content) return lastVersionAt;
 
-  stmts.createVersion.run({ vid: nanoid(16), docId, content });
+  const yjsState = Buffer.from(Y.encodeStateAsUpdate(doc));
+  stmts.createVersion.run({ vid: nanoid(16), docId, content, yjsState, createdBy });
   return Date.now();
 }
 
@@ -390,5 +417,33 @@ export function getDocContent(doc: Y.Doc): string {
     return `---\ntype: spreadsheet\n---\n${json}`;
   }
 
-  return doc.getText("content").toString();
+  // PM docs: Y.XmlFragment("prosemirror") takes priority — some legacy docs
+  // have stale Y.Text("content") in their yjs_state from before the PM migration,
+  // causing getDocContent to return HTML-contaminated text if Y.Text is checked first.
+  const pmFrag = doc.getXmlFragment("prosemirror");
+  if (pmFrag.length > 0) return extractTextFromXmlFragment(pmFrag);
+
+  // Legacy markdown docs use Y.Text("content")
+  const markdownText = doc.getText("content").toString();
+  if (markdownText.length > 0) return markdownText;
+
+  return "";
+}
+
+function extractTextFromXmlFragment(frag: Y.XmlFragment): string {
+  const parts: string[] = [];
+  frag.forEach((child) => parts.push(extractTextFromYNode(child)));
+  return parts.filter(Boolean).join("\n");
+}
+
+function extractTextFromYNode(node: Y.XmlElement | Y.XmlText): string {
+  if (node instanceof Y.XmlText) {
+    // toString() includes XML mark tags — use delta to get plain text only
+    return (node.toDelta() as Array<{ insert?: string }>)
+      .map(d => (typeof d.insert === "string" ? d.insert : ""))
+      .join("");
+  }
+  const parts: string[] = [];
+  node.forEach((child) => parts.push(extractTextFromYNode(child)));
+  return parts.join("");
 }

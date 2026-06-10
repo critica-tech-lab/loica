@@ -24,6 +24,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     if (!version || version.document_id !== doc.id) {
       throw new Response("Version not found", { status: 404 });
     }
+    // yjs_state is already base64-encoded from getDocumentVersion
     return { version };
   }
 

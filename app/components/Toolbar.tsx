@@ -3,8 +3,6 @@ import { useOptionalDocument } from "~/lib/DocumentContext";
 interface ToolbarProps {
   onFormat?: (before: string, after: string) => void;
   onFormatLine?: (prefix: string) => void;
-  suggestionMode?: boolean;
-  onToggleSuggestionMode?: () => void;
   onImageUpload?: (file: File) => void;
   onCopyFormatted?: () => void;
   onInsertFootnote?: () => void;
@@ -67,21 +65,9 @@ export function Toolbar(props: ToolbarProps = {}) {
 
   const onFormat = props.onFormat ?? ((b: string, a: string) => ctx?.editorApi.current?.format(b, a));
   const onFormatLine = props.onFormatLine ?? ((p: string) => ctx?.editorApi.current?.formatLine(p));
-  const suggestionMode = props.suggestionMode ?? ctx?.suggestionMode ?? false;
   const onImageUpload = props.onImageUpload ?? (ctx?.canEdit ? (file: File) => ctx.editorApi.current?.uploadImage(file) : undefined);
   const onCopyFormatted = props.onCopyFormatted ?? ctx?.copyFormatted;
   const onInsertFootnote = props.onInsertFootnote ?? (ctx?.canEdit ? ctx.insertFootnote : undefined);
-  const onToggleSuggestionMode = props.onToggleSuggestionMode ?? (() => {
-    if (!ctx) return;
-    ctx.setSuggestionMode((s) => {
-      const next = !s;
-      if (!ctx.isShared) {
-        if (next) ctx.setActivePanel("comments");
-        else ctx.setActivePanel(null);
-      }
-      return next;
-    });
-  });
   const variant = props.variant ?? "full";
   const onDismiss = props.onDismiss;
 

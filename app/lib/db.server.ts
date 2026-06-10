@@ -659,3 +659,15 @@ try { db.exec("ALTER TABLE documents ADD COLUMN share_password_hash TEXT"); } ca
 // ─── Per-invite tokens for external shares ───────────────
 try { db.exec("ALTER TABLE document_shares ADD COLUMN token TEXT"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
 try { db.exec("CREATE UNIQUE INDEX idx_doc_shares_token ON document_shares(token) WHERE token IS NOT NULL"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+
+// ─── Yjs update log (Path B history) ────────────────────
+try { db.exec(`CREATE TABLE IF NOT EXISTS document_updates (
+  id          TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  user_id     TEXT,
+  user_name   TEXT,
+  yjs_update  BLOB NOT NULL,
+  created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+)`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_doc_updates ON document_updates(document_id, created_at DESC)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
