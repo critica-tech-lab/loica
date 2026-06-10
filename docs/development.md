@@ -72,7 +72,6 @@ Two processes sharing one SQLite database (`app.db`):
 
 ### Offline support
 
-- `y-indexeddb` persists Yjs CRDT state to browser IndexedDB per document
 - Edits while offline are buffered locally and sync on reconnect
 - Connection status indicator shows connected/reconnecting/offline state
 
