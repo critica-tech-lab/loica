@@ -179,12 +179,14 @@ function LazyTeamspaceTree({
   expandedFolders,
   onToggle,
   crossWorkspaceId,
+  refreshToken,
 }: {
   teamspaceId: string;
   activeItemId?: string | null;
   expandedFolders: Set<string>;
   onToggle: (folderId: string) => void;
   crossWorkspaceId?: string;
+  refreshToken?: number;
 }) {
   // Plain `fetch` instead of `useFetcher.load` to avoid RR's fog-of-war
   // manifest discovery (see FolderTreeSidebar comment for details).
@@ -193,8 +195,7 @@ function LazyTeamspaceTree({
   const hasFetched = useRef(false);
   const urlPrefix = `/t/${teamspaceId}`;
 
-  useEffect(() => {
-    if (hasFetched.current) return;
+  function fetchData() {
     hasFetched.current = true;
     let cancelled = false;
     fetch(`/api/folder-children/${teamspaceId}`, { credentials: "same-origin" })
@@ -203,7 +204,20 @@ function LazyTeamspaceTree({
       .catch(() => { /* leave null */ })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [teamspaceId]);
+  }
+
+  useEffect(() => {
+    if (hasFetched.current) return;
+    return fetchData();
+  }, [teamspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!refreshToken) return;
+    hasFetched.current = false;
+    setData(null);
+    setLoading(true);
+    fetchData();
+  }, [refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading && !data) {
     return (
@@ -228,6 +242,7 @@ function LazyTeamspaceTree({
           onToggle={onToggle}
           urlPrefix={urlPrefix}
           crossWorkspaceId={crossWorkspaceId}
+          refreshToken={refreshToken}
         />
       ))}
       {docs.map((doc) => {
@@ -284,16 +299,28 @@ export function FolderTreeSidebar({
     storageBytes: number;
   };
   const [sidebarData, setSidebarData] = useState<SidebarData | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const fetchSidebarData = useCallback(() => {
+    fetch(`/api/sidebar-data/${workspaceId}`, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setSidebarData(data); })
+      .catch(() => { /* keep prop fallbacks */ });
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!lazy) return;
-    let cancelled = false;
-    fetch(`/api/sidebar-data/${workspaceId}`, { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (!cancelled && data) setSidebarData(data); })
-      .catch(() => { /* keep prop fallbacks */ });
-    return () => { cancelled = true; };
-  }, [lazy, workspaceId]);
+    fetchSidebarData();
+  }, [lazy, fetchSidebarData]);
+
+  useEffect(() => {
+    function handleRefresh() {
+      if (lazy) fetchSidebarData();
+      setRefreshToken((t) => t + 1);
+    }
+    window.addEventListener("loica:sidebar-refresh", handleRefresh);
+    return () => window.removeEventListener("loica:sidebar-refresh", handleRefresh);
+  }, [lazy, fetchSidebarData]);
 
   const rootFolders = sidebarData?.rootFolders ?? propRootFolders ?? [];
   const rootDocs = sidebarData?.rootDocs ?? propRootDocs ?? [];
@@ -522,6 +549,7 @@ export function FolderTreeSidebar({
                   onToggle={handleToggle}
                   urlPrefix={wsUrlPrefix}
                   crossWorkspaceId={activeSection.type === "teamspace" ? workspaceId : undefined}
+                  refreshToken={refreshToken}
                 />
               ))}
               {rootDocs.map((doc) => {
@@ -618,6 +646,7 @@ export function FolderTreeSidebar({
                   expandedFolders={expandedFolders}
                   onToggle={handleToggle}
                   crossWorkspaceId={isCrossWorkspace ? ts.id : undefined}
+                  refreshToken={refreshToken}
                 />
               )}
             </div>

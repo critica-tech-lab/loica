@@ -158,7 +158,6 @@ export default function TeamspaceFolderView() {
       activeItemId={folder.id}
       workspaceName={personalWsName}
       workspaceId={personalWsId}
-      autoCollapse
       lazy
     />
   );

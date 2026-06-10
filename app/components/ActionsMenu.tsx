@@ -63,7 +63,7 @@ export function ActionsMenu({
   const updatePos = useCallback(() => {
     if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
-    const menuHeight = 200; // estimated max height
+    const menuHeight = 280; // estimated max height (~9 items × 28px + padding)
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUp = spaceBelow < menuHeight && rect.top > menuHeight;
     setPos({
@@ -88,9 +88,11 @@ export function ActionsMenu({
     }
     document.addEventListener("mousedown", handleClick);
     window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", updatePos);
     return () => {
       document.removeEventListener("mousedown", handleClick);
       window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", updatePos);
     };
   }, [open, updatePos]);
 
@@ -230,6 +232,7 @@ export function ActionsMenu({
                   Download as Markdown
                 </a>
                 <button
+                  type="button"
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-fg transition-colors hover:bg-fg/5 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={pdfBusy}
                   onClick={async () => {
