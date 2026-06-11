@@ -4,6 +4,7 @@ import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
 import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
+import { TrashIcon } from "~/components/icons";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -173,7 +174,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
               title="Delete"
               style={iconBtnStyle}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              <TrashIcon className="h-3 w-3" />
             </button>
           )}
         </div>

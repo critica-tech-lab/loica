@@ -3,6 +3,7 @@ import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
+import { TrashIcon } from "~/components/icons";
 
 const CARD_MIN_H = 80;
 const CARD_GAP = 8;
@@ -267,7 +268,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
             )}
             {onDelete && (
               <IconBtn title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                <TrashIcon className="h-3.5 w-3.5 opacity-70" />
               </IconBtn>
             )}
           </div>

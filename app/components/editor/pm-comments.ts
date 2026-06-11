@@ -1,18 +1,17 @@
 import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { ResolvedThread } from "~/components/comment-decorations";
+import { COMMENT_INDICATOR_SVG } from "~/components/icons";
 import * as Y from "yjs";
 
 export const pmCommentPluginKey = new PluginKey<DecorationSet>("pm-comments");
-
-const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
 
 function makeIndicator(commentId: string): HTMLElement {
   const el = document.createElement("span");
   el.className = "pm-comment-indicator";
   el.setAttribute("data-comment-id", commentId);
   el.title = "View comment";
-  el.innerHTML = ICON_SVG;
+  el.innerHTML = COMMENT_INDICATOR_SVG;
   return el;
 }
 

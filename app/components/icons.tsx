@@ -377,6 +377,9 @@ export function CommentIcon(props: IconProps) {
   );
 }
 
+// Raw markup for non-React contexts (e.g. ProseMirror widget decorations via innerHTML).
+export const COMMENT_INDICATOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M12 8c0 .7-.6 1.3-1.3 1.3h-8L0 12V1.3C0 .6.6 0 1.3 0h9.3c.7 0 1.3.6 1.3 1.3V8Z"/></svg>`;
+
 export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean }) {
   return (
     <svg

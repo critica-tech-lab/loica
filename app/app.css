@@ -1832,7 +1832,7 @@ html {
   top: 0.1em;
   width: 16px;
   height: 16px;
-  color: #888;
+  fill: #888;
   opacity: 0.28;
   cursor: pointer;
   pointer-events: all;
@@ -1845,7 +1845,7 @@ html {
 }
 .pm-comment-indicator:hover {
   opacity: 0.75;
-  color: #f59e0b;
+  fill: #f59e0b;
 }
 /* Block containing a comment indicator needs relative positioning */
 .pm-editor-mount .ProseMirror .has-comment-indicator {
@@ -1864,6 +1864,7 @@ html {
   background-color: rgba(255, 217, 102, 0.35);
   border-radius: 2px;
   transition: background-color 150ms ease-out;
+  cursor: pointer;
 }
 .pm-comment-highlight:hover {
   background-color: rgba(255, 217, 102, 0.6);
