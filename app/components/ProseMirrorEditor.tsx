@@ -27,6 +27,10 @@ interface Props {
     status: "connected" | "connecting" | "disconnected"
   ) => void;
   onChange?: (content: string) => void;
+  // Fires with the doc's YAML frontmatter (kept out of the PM tree, in the
+  // synced `meta` map). Empty string when none. Lets the host detect the doc
+  // type for frontmatter-based extensions (e.g. presentations).
+  onFrontmatter?: (frontmatter: string) => void;
   // Fires on doc change with the first block's heading text (empty if the first
   // block isn't a heading) — lets the host auto-adopt the H1 as the doc title.
   onTitle?: (headingText: string, fullText: string) => void;
@@ -77,6 +81,7 @@ export function ProseMirrorEditor({
   onPresenceChange,
   onConnectionStatus,
   onChange,
+  onFrontmatter,
   onTitle,
   onStateChange,
   onTrackChangesStateChange,
@@ -107,6 +112,8 @@ export function ProseMirrorEditor({
   onThreadClickRef.current = _onThreadClick;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onFrontmatterRef = useRef(onFrontmatter);
+  onFrontmatterRef.current = onFrontmatter;
   const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
   const onTrackChangeClickRef = useRef(onTrackChangeClick);
@@ -188,6 +195,15 @@ export function ProseMirrorEditor({
         params: wsParams ?? {},
       });
       providerRef.current = provider;
+
+      // Surface YAML frontmatter (kept out of the PM tree) so the host can
+      // detect the doc type. Emit on initial sync and whenever it changes.
+      const emitFrontmatter = () => {
+        const fm = metaMap.get("frontmatter");
+        onFrontmatterRef.current?.(typeof fm === "string" ? fm : "");
+      };
+      metaMap.observe(emitFrontmatter);
+      provider.on("sync", (isSynced: boolean) => { if (isSynced) emitFrontmatter(); });
 
       provider.awareness.setLocalStateField("user", {
         name: userInfo.name,

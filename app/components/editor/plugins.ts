@@ -77,8 +77,10 @@ function buildInputRules(schema: Schema): Plugin {
     ),
     // ``` → code block
     textblockTypeInputRule(/^```$/, schema.nodes.code_block),
-    // --- → horizontal rule
-    new InputRule(/^---$/, (state, _match, start) => {
+    // --- → horizontal rule (slide break). The `emDash` rule above rewrites the
+    // first `--` to an em-dash, so by the third hyphen the block reads `—-`;
+    // match both that and a literal `---` (e.g. from paste).
+    new InputRule(/^(?:---|—-)$/, (state, _match, start) => {
       const $start = state.doc.resolve(start);
       const nodeStart = $start.before();
       const nodeEnd = $start.after();

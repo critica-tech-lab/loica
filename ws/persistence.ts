@@ -9,6 +9,7 @@ import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "y-
 import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { schema as pmSchema } from "../app/components/editor/schema.ts";
 import { loicaMarkdownSerializer, parseMarkdownWithFootnotes } from "../app/components/editor/pm-markdown.ts";
+import { splitFrontmatter } from "../app/lib/markdown.ts";
 import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
 
 /**
@@ -118,8 +119,13 @@ export function loadDocumentState(
 function seedPmFragmentFromMarkdown(doc: Y.Doc, markdown: string): void {
   const frag = doc.getXmlFragment("prosemirror");
   if (frag.length > 0) return;
+  // Keep YAML frontmatter out of the PM tree — it has no schema node and would
+  // be mangled into an hr + heading, destroying `type:` detection. Stash it in
+  // the synced `meta` map; getDocContent() reattaches it on serialize.
+  const { frontmatter, body } = splitFrontmatter(markdown);
+  if (frontmatter) doc.getMap("meta").set("frontmatter", frontmatter);
   try {
-    const parsed = parseMarkdownWithFootnotes(markdown, pmSchema);
+    const parsed = parseMarkdownWithFootnotes(body, pmSchema);
     if (!parsed) return;
     prosemirrorToYXmlFragment(parsed, frag);
   } catch (err) {
@@ -446,7 +452,11 @@ export function getDocContent(doc: Y.Doc): string {
     // serialization ever throws, so a save is never lost.
     try {
       const pmDoc = yXmlFragmentToProseMirrorRootNode(pmFrag, pmSchema);
-      return loicaMarkdownSerializer.serialize(pmDoc);
+      const body = loicaMarkdownSerializer.serialize(pmDoc);
+      // Reattach frontmatter stashed by seedPmFragmentFromMarkdown so the stored
+      // content column (and every export that reads it) keeps its `type:` etc.
+      const fm = doc.getMap("meta").get("frontmatter");
+      return typeof fm === "string" && fm.length > 0 ? `${fm}\n\n${body}` : body;
     } catch (err) {
       console.error("[ws-server] PM→markdown serialize failed, using plaintext:", err);
       return extractTextFromXmlFragment(pmFrag);

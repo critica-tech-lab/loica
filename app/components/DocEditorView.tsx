@@ -61,6 +61,7 @@ export function DocEditorView(_props: DocumentProps) {
 
     scheduleSave,
     handleContentChange,
+    setFrontmatter,
     maybeAdoptTitle,
     registerEditorApi,
     historyPreview,
@@ -298,6 +299,7 @@ export function DocEditorView(_props: DocumentProps) {
               onPresenceChange={setPeers}
               onConnectionStatus={setConnectionStatus}
               onChange={handleContentChange}
+              onFrontmatter={setFrontmatter}
               onTitle={(headingText, fullText) => maybeAdoptTitle(headingText, fullText)}
               onStateChange={setPmActiveState}
               onTrackChangesStateChange={setTrackChangesState}
