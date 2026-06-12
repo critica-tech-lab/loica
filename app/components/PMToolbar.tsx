@@ -133,6 +133,17 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
         }
       />
       <Btn title="Horizontal rule" active={false} onActivate={run(() => api?.insertHr?.())} style={{ letterSpacing: "-1px" }}>{"—"}</Btn>
+      <Btn
+        title="Insert footnote"
+        active={false}
+        onActivate={run(() => api?.insertFootnote?.())}
+        icon={
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor">
+            <text x="1" y="16" fontSize="16" fontFamily="serif" fontWeight="700">A</text>
+            <text x="13" y="9" fontSize="9" fontFamily="serif" fontWeight="700">1</text>
+          </svg>
+        }
+      />
       {imgUpload && (
         <Btn
           title="Upload image"

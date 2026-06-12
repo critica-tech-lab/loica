@@ -740,6 +740,61 @@ html {
   margin-left: 0.25em;
 }
 
+/* ─── Footnote node (ProseMirror editor) ─────────────────── */
+/* The marker is a CSS counter that renumbers itself by DOM order, matching the
+   markdown export numbering. The popup hosts a nested editor for the body. */
+.pm-editor-mount .ProseMirror {
+  counter-reset: pm-footnote;
+}
+footnote {
+  display: inline-block;
+  position: relative;
+  cursor: pointer;
+  line-height: 1;
+}
+footnote::after {
+  content: counter(pm-footnote);
+  counter-increment: pm-footnote;
+  vertical-align: super;
+  font-size: 0.7em;
+  font-family: var(--font-mono);
+  color: var(--color-scarlet, #AF3029);
+  padding: 0 1px;
+}
+footnote.ProseMirror-selectednode::after {
+  outline: 2px solid color-mix(in srgb, var(--color-scarlet, #AF3029) 50%, transparent);
+  border-radius: 2px;
+}
+.footnote-tooltip {
+  cursor: auto;
+  position: absolute;
+  left: -16px;
+  top: calc(100% + 8px);
+  z-index: 200;
+  background: var(--bg);
+  border: 1.5px solid var(--fg);
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent);
+  padding: 0.6rem 0.75rem;
+  width: 380px;
+  max-width: min(380px, 80vw);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.footnote-tooltip::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 18px;
+  border: 6px solid transparent;
+  border-bottom-color: var(--fg);
+  border-top-width: 0;
+}
+.footnote-tooltip .ProseMirror {
+  outline: none;
+  min-height: 1.2em;
+  white-space: pre-wrap;
+}
+
 /* ─── Toolbar button (replaces JS hover handlers) ────────── */
 .toolbar-btn {
   font-family: var(--font-mono);
@@ -1621,7 +1676,7 @@ html {
   width: 100%;
   min-height: 100%;
   font-family: var(--font-editor);
-  font-size: 1rem;
+  font-size: 1.0625rem; /* 17px — slightly larger than the 16px base */
   line-height: 1.6;
   color: var(--fg);
   outline: none;
