@@ -78,8 +78,23 @@ const allNodesWithDT = allNodes.update("bullet_list",  withDT(allNodes.get("bull
                                .update("ordered_list", withDT(allNodes.get("ordered_list")!))
                                .update("list_item",    withDT(allNodes.get("list_item")!));
 
+// Inline footnote: an atom node carrying its own inline content (the note body).
+// Rendered as a superscript counter via CSS + an editing popup (FootnoteView).
+// Serialized to markdown as `[^N]` refs with `[^N]: …` definitions at doc end.
+const footnoteSpec = {
+  group: "inline",
+  content: "inline*",
+  inline: true,
+  atom: true,
+  draggable: true,
+  toDOM() { return ["footnote", 0] as const; },
+  parseDOM: [{ tag: "footnote" }],
+};
+
+const allNodesWithFootnote = allNodesWithDT.addToEnd("footnote", footnoteSpec);
+
 export const schema = new Schema({
-  nodes: allNodesWithDT,
+  nodes: allNodesWithFootnote,
   marks: {
     ...basicMarks,
     underline: {

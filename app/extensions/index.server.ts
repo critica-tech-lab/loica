@@ -14,9 +14,12 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { LoicaExtension, PdfStyle } from "./types";
 import { getEnabledExtensionIds } from "~/lib/db.server";
+import { presentationsServerExtension } from "./presentations/index.server";
 
 /** Built-in extensions compiled into the bare repo. Empty by default. */
-const builtinExtensions: LoicaExtension[] = [];
+const builtinExtensions: LoicaExtension[] = [
+  presentationsServerExtension,
+];
 
 /** Live registry: built-ins + any runtime-discovered drop-in plugins. */
 export const serverExtensions: LoicaExtension[] = [...builtinExtensions];

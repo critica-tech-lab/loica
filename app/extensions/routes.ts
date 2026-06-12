@@ -7,5 +7,8 @@
 // or server bundles — only `app/routes.ts` reads it.
 
 import type { RouteConfigEntry } from "@react-router/dev/routes";
+import { presentationsRoutes } from "./presentations/routes";
 
-export const extensionRoutes: RouteConfigEntry[] = [];
+export const extensionRoutes: RouteConfigEntry[] = [
+  ...presentationsRoutes,
+];

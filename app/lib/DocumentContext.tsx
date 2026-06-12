@@ -7,9 +7,15 @@ import type { PanelId } from "~/components/ActivityBar";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { detectLanguage } from "~/components/DocActionBar";
 import { getDocumentType } from "~/lib/templates";
+import { splitFrontmatter } from "~/lib/markdown";
 import { useDocTypeExtension } from "~/extensions/hooks";
 import { marked } from "marked";
 import { useToast } from "~/components/Toast";
+
+// ProseMirror is the default editor; mirrors DocEditorView's USE_PM. When on,
+// `documents.content` is a ws-server-owned projection — the client must not
+// post it (see `save`).
+const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -76,6 +82,7 @@ export interface EditorApi {
   toggleOrderedList?: () => void;
   insertTable?: () => void;
   insertHr?: () => void;
+  insertFootnote?: () => void;
   setViewOnly?: (on: boolean) => void;
   toggleTrackChanges?: () => void;
   acceptAllChanges?: () => void;
@@ -158,6 +165,7 @@ export interface DocumentContextValue {
   // Actions
   scheduleSave: (title: string, content: string) => void;
   setContent: (content: string) => void;
+  setFrontmatter: (frontmatter: string) => void;
   insertFootnote: () => void;
   copyFormatted: () => void;
   togglePanel: (panel: PanelId) => void;
@@ -273,6 +281,13 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   // ─── State ────────────────────────────────────────────────
   const [title, setTitle] = useState(document.title);
   const [content, setContent] = useState(document.content);
+  // YAML frontmatter the PM editor keeps out of its tree (presentations etc.).
+  // Seeded from the doc's stored content, then kept live by the editor's
+  // onFrontmatter callback. Drives docType independently of the editable body.
+  const [frontmatter, setFrontmatter] = useState(() => {
+    const { frontmatter: fm } = splitFrontmatter(document.content ?? "");
+    return fm;
+  });
   const [peers, setPeers] = useState<Peer[]>([]);
   const [editorKey, setEditorKey] = useState(0);
   const [editorReady, setEditorReady] = useState(false);
@@ -288,7 +303,12 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   useEffect(() => { setMounted(true); }, []);
 
   // ─── Computed ─────────────────────────────────────────────
-  const docType = useMemo(() => getDocumentType(content), [content]);
+  // Frontmatter (kept out of the PM tree) wins; fall back to scanning the body
+  // for legacy markdown docs that still carry frontmatter inline.
+  const docType = useMemo(
+    () => getDocumentType(frontmatter) ?? getDocumentType(content),
+    [frontmatter, content],
+  );
   // Gate on enabled set so a disabled extension stops claiming the
   // editor surface — the doc falls back to the plain markdown editor.
   const docTypeExtension = useDocTypeExtension(docType);
@@ -331,7 +351,15 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
       if (!canEdit) return;
       isSaving.current = true;
       lastSavedContent.current = c;
-      saveFetcher.submit({ intent: "save", title: t, content: c }, { method: "post" });
+      // For PM docs the Yjs binary is the source of truth and `documents.content`
+      // is a write-only markdown projection the ws-server regenerates from it
+      // (getDocContent). The PM editor's onChange only yields *plaintext*, so
+      // posting it here would clobber the server's real markdown (losing slide
+      // `---` separators, headings, frontmatter). Save title only; let the
+      // ws-server own content. The legacy CodeMirror editor still needs it.
+      const fields: Record<string, string> = { intent: "save", title: t };
+      if (!USE_PM) fields.content = c;
+      saveFetcher.submit(fields, { method: "post" });
     },
     [canEdit, saveFetcher]
   );
@@ -575,6 +603,7 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     setTitle,
     content,
     setContent,
+    setFrontmatter,
     peers,
     setPeers,
     editorKey,

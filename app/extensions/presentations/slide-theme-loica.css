@@ -1,0 +1,173 @@
+/*
+ * Loica slide theme — quiet, editorial, brand-aligned.
+ * Applied on top of reveal.js core CSS via <link> injection in PresentView.tsx.
+ * Mirrors the editor's typography/colors (cream bg, plumage fg, scarlet accent)
+ * so a slide deck feels continuous with the rest of the app.
+ */
+
+.reveal {
+  --r-background-color: #FFFCF0;
+  --r-main-color: #100F0F;
+  --r-heading-color: #100F0F;
+  --r-link-color: #AF3029;
+  --r-link-color-hover: #DA702C;
+  --r-selection-color: #ffffff;
+  --r-selection-background-color: #AF3029;
+
+  --r-main-font: "Geist Sans", system-ui, "IBM Plex Sans", sans-serif;
+  --r-main-font-size: 36px;
+  --r-heading-font: "Geist Sans", system-ui, "IBM Plex Sans", sans-serif;
+  --r-code-font: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  font-family: var(--r-main-font);
+  font-size: var(--r-main-font-size);
+  font-weight: 400;
+  color: var(--r-main-color);
+  background-color: var(--r-background-color);
+}
+
+.reveal-viewport {
+  background: var(--r-background-color);
+}
+
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal .slides > section,
+.reveal .slides > section > section {
+  padding: 1em 0;
+  line-height: 1.45;
+}
+
+/* Headings: tight, editorial, no all-caps. */
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+  font-family: var(--r-heading-font);
+  font-weight: 600;
+  color: var(--r-heading-color);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  text-shadow: none;
+  margin: 0 0 0.4em;
+}
+.reveal h1 { font-size: 2.4em; font-weight: 700; }
+.reveal h2 { font-size: 1.7em; }
+.reveal h3 { font-size: 1.25em; }
+.reveal h4 { font-size: 1.05em; }
+.reveal h5,
+.reveal h6 { font-size: 1em; }
+
+/* Body */
+.reveal p { margin: 0.6em 0; }
+.reveal strong, .reveal b { font-weight: 600; }
+.reveal em, .reveal i { font-style: italic; }
+.reveal small { font-size: 0.7em; color: color-mix(in srgb, var(--r-main-color) 60%, transparent); }
+
+/* Links */
+.reveal a {
+  color: var(--r-link-color);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--r-link-color) 35%, transparent);
+  transition: color 0.15s, border-color 0.15s;
+}
+.reveal a:hover {
+  color: var(--r-link-color-hover);
+  border-bottom-color: var(--r-link-color-hover);
+}
+
+/* Lists */
+.reveal ul,
+.reveal ol { margin: 0.6em 0 0.6em 1.4em; }
+.reveal li { margin: 0.2em 0; }
+.reveal ul { list-style: disc; }
+.reveal ul ul { list-style: "—  "; }
+
+/* Blockquote */
+.reveal blockquote {
+  font-style: italic;
+  color: color-mix(in srgb, var(--r-main-color) 70%, transparent);
+  border-left: 3px solid var(--r-link-color);
+  margin: 0.8em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  background: transparent;
+  box-shadow: none;
+  width: auto;
+}
+
+/* Code */
+.reveal code {
+  font-family: var(--r-code-font);
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--r-main-color) 6%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+.reveal pre {
+  font-family: var(--r-code-font);
+  font-size: 0.7em;
+  line-height: 1.4;
+  margin: 0.8em 0;
+  width: 100%;
+  box-shadow: none;
+}
+.reveal pre code {
+  display: block;
+  padding: 0.8em 1em;
+  background: color-mix(in srgb, var(--r-main-color) 5%, transparent);
+  border-radius: 4px;
+  overflow-x: auto;
+  word-wrap: normal;
+  max-height: none;
+}
+
+/* Tables */
+.reveal table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.85em;
+}
+.reveal table th,
+.reveal table td {
+  text-align: left;
+  padding: 0.4em 0.7em;
+  border-bottom: 1px solid color-mix(in srgb, var(--r-main-color) 15%, transparent);
+}
+.reveal table th {
+  font-weight: 600;
+  border-bottom: 2px solid color-mix(in srgb, var(--r-main-color) 40%, transparent);
+}
+
+/* HR — hairline, not a slab */
+.reveal hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--r-main-color) 18%, transparent);
+  margin: 1em 0;
+}
+
+/* Reveal chrome: keep it subtle */
+.reveal .controls {
+  color: color-mix(in srgb, var(--r-main-color) 50%, transparent);
+}
+.reveal .progress {
+  background: color-mix(in srgb, var(--r-main-color) 8%, transparent);
+  color: var(--r-link-color);
+}
+.reveal .slide-number {
+  background: transparent;
+  color: color-mix(in srgb, var(--r-main-color) 45%, transparent);
+  font-family: var(--r-code-font);
+  font-size: 0.6em;
+}
+
+/* Print */
+@media print {
+  .reveal {
+    background: #ffffff;
+  }
+}

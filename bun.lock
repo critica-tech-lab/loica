@@ -48,6 +48,7 @@
         "react": "^19",
         "react-dom": "^19",
         "react-router": "^7",
+        "reveal.js": "^6.0.1",
         "sharp": "^0.34.5",
         "turndown": "^7.2.2",
         "ws": "^8.19.0",
@@ -1145,6 +1146,8 @@
     "regex-utilities": ["regex-utilities@2.3.0", "", {}, "sha512-8VhliFJAWRaUiVvREIiW2NXXTmHs4vMNnSzuJVhscgmGav3g9VDxLrQndI3dZZVVdp0ZO/5v0xmX516/7M9cng=="],
 
     "require-from-string": ["require-from-string@2.0.2", "", {}, "sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw=="],
+
+    "reveal.js": ["reveal.js@6.0.1", "", {}, "sha512-9eacArNIgqO2HGWOK+93gJNn+gvdGDVbSq+i2u3Ja9kjiHps0XNLpgYTZTYjKRH91uXy3clGimeGiw4umHG/tg=="],
 
     "rfdc": ["rfdc@1.4.1", "", {}, "sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA=="],
 

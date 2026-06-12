@@ -14,8 +14,11 @@
 
 import type { LoicaExtension } from "./types";
 import { LOICA_EXTENSION_API_VERSION } from "./types";
+import { presentationsExtension } from "./presentations";
 
-export const extensions: LoicaExtension[] = [];
+export const extensions: LoicaExtension[] = [
+  presentationsExtension,
+];
 
 // Warn (don't crash) when an extension targets an outdated API version.
 for (const e of extensions) {

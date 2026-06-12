@@ -73,6 +73,24 @@ export function stripFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
 }
 
+const FRONTMATTER_BLOCK_RE = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n)?/;
+
+/**
+ * Split leading YAML frontmatter from the body. Returns the raw frontmatter
+ * block (fences included, trailing newline trimmed) and the remaining body.
+ * `frontmatter` is "" when there is none. Used to keep frontmatter out of the
+ * ProseMirror tree (which would mangle it) while preserving it verbatim — the
+ * editor edits `body`, and the frontmatter is reattached on serialize.
+ */
+export function splitFrontmatter(content: string): { frontmatter: string; body: string } {
+  const m = content.match(FRONTMATTER_BLOCK_RE);
+  if (!m) return { frontmatter: "", body: content };
+  return {
+    frontmatter: m[0].replace(/\r?\n?$/, ""),
+    body: content.slice(m[0].length),
+  };
+}
+
 /**
  * Fix nested list indentation for pandoc.
  *

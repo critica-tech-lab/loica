@@ -4,8 +4,7 @@ import type { Peer } from "~/components/Editor";
 import type { PMActiveState, TrackChangesActiveState, TrackedChangeEntry } from "./editor/types";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
-import { defaultMarkdownParser } from "prosemirror-markdown";
-import { loicaMarkdownSerializer } from "~/components/editor/pm-markdown";
+import { serializeWithFootnotes, parseMarkdownWithFootnotes } from "~/components/editor/pm-markdown";
 import { Slice } from "prosemirror-model";
 import {
   addRowBefore, addRowAfter, deleteRow,
@@ -28,6 +27,10 @@ interface Props {
     status: "connected" | "connecting" | "disconnected"
   ) => void;
   onChange?: (content: string) => void;
+  // Fires with the doc's YAML frontmatter (kept out of the PM tree, in the
+  // synced `meta` map). Empty string when none. Lets the host detect the doc
+  // type for frontmatter-based extensions (e.g. presentations).
+  onFrontmatter?: (frontmatter: string) => void;
   // Fires on doc change with the first block's heading text (empty if the first
   // block isn't a heading) — lets the host auto-adopt the H1 as the doc title.
   onTitle?: (headingText: string, fullText: string) => void;
@@ -78,6 +81,7 @@ export function ProseMirrorEditor({
   onPresenceChange,
   onConnectionStatus,
   onChange,
+  onFrontmatter,
   onTitle,
   onStateChange,
   onTrackChangesStateChange,
@@ -108,6 +112,8 @@ export function ProseMirrorEditor({
   onThreadClickRef.current = _onThreadClick;
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+  const onFrontmatterRef = useRef(onFrontmatter);
+  onFrontmatterRef.current = onFrontmatter;
   const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
   const onTrackChangeClickRef = useRef(onTrackChangeClick);
@@ -141,7 +147,7 @@ export function ProseMirrorEditor({
       if (destroyed || !mountRef.current) return;
 
       const [
-        { EditorState },
+        { EditorState, NodeSelection },
         { EditorView },
         { toggleMark, setBlockType, wrapIn, lift },
         { goToNextCell },
@@ -152,6 +158,7 @@ export function ProseMirrorEditor({
       const { wrapInList, liftListItem } = await import("prosemirror-schema-list");
       const { addColumnAfter } = await import("prosemirror-tables");
       const { makeImageNodeView } = await import("./editor/image-view");
+      const { makeFootnoteView } = await import("./editor/footnote-view");
       const { pmCommentPlugin } = await import("./editor/pm-comments");
       const {
         trackChangesPlugin,
@@ -188,6 +195,15 @@ export function ProseMirrorEditor({
         params: wsParams ?? {},
       });
       providerRef.current = provider;
+
+      // Surface YAML frontmatter (kept out of the PM tree) so the host can
+      // detect the doc type. Emit on initial sync and whenever it changes.
+      const emitFrontmatter = () => {
+        const fm = metaMap.get("frontmatter");
+        onFrontmatterRef.current?.(typeof fm === "string" ? fm : "");
+      };
+      metaMap.observe(emitFrontmatter);
+      provider.on("sync", (isSynced: boolean) => { if (isSynced) emitFrontmatter(); });
 
       provider.awareness.setLocalStateField("user", {
         name: userInfo.name,
@@ -488,6 +504,7 @@ export function ProseMirrorEditor({
         editable: () => !readOnlyRef.current,
         nodeViews: {
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
+          footnote: (node: any, view: any, getPos: any) => makeFootnoteView(node, view, getPos),
         },
         handlePaste(_view: any, event: ClipboardEvent) {
           // Image paste (screenshot, copied image) → upload at cursor.
@@ -517,9 +534,8 @@ export function ProseMirrorEditor({
           // Markdown paste → parse and insert as rich content
           if (!html && /^#{1,6} |^[*-] |\*\*\S|\[.+\]\(.+\)|^> |^```/.test(text)) {
             try {
-              const parsed = defaultMarkdownParser.parse(text);
-              if (!parsed) return false;
-              const adapted = schema.nodeFromJSON(parsed.toJSON());
+              const adapted = parseMarkdownWithFootnotes(text, schema);
+              if (!adapted) return false;
               const slice = new Slice(adapted.content, 0, 0);
               const { from, to } = _view.state.selection;
               _view.dispatch(_view.state.tr.replace(from, to, slice));
@@ -732,6 +748,21 @@ export function ProseMirrorEditor({
           const insertPos = $from.after(1);
           view.dispatch(view.state.tr.insert(insertPos, hr).scrollIntoView());
           view.focus();
+        },
+
+        insertFootnote: () => {
+          const fnType = schema.nodes.footnote;
+          if (!fnType) return;
+          const node = fnType.createAndFill();
+          if (!node) return;
+          const { from } = view.state.selection;
+          let tr = view.state.tr.replaceSelectionWith(node);
+          // Select the freshly-inserted footnote so its editing popup opens.
+          // The NodeView's selectNode() opens the popup and focuses its inner
+          // editor — do NOT call view.focus() here, or it steals focus back to
+          // the outer editor and the cursor leaves the popup.
+          tr = tr.setSelection(NodeSelection.create(tr.doc, from)).scrollIntoView();
+          view.dispatch(tr);
         },
 
         // Comments — store plain PM integer positions (no y-prosemirror mapping needed)
@@ -954,7 +985,7 @@ export function ProseMirrorEditor({
 
         replaceContent: () => {},
 
-        getMarkdown: () => loicaMarkdownSerializer.serialize(view.state.doc),
+        getMarkdown: () => serializeWithFootnotes(view.state.doc),
 
         exportDocx: async (filename = "document.docx") => {
           try {

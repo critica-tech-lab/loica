@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Loica slide theme — designer preview</title>
+
+<!-- Reveal.js core (matches the version Loica ships, 6.0.1) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.css">
+
+<!-- Brand fonts (same fallbacks as the theme uses) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- The theme being designed. Lives next to this HTML; edit and refresh. -->
+<link rel="stylesheet" href="./slide-theme-loica.css">
+</head>
+<body>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ── Slide: title ───────────────────────────────────────── -->
+<section>
+  <h1>Loica slide theme</h1>
+  <h2>A brand-aligned reveal.js theme</h2>
+  <p>Cream background, plumage foreground, scarlet accent, Geist typography.</p>
+  <p><small>Press <strong>→</strong> to advance · <strong>S</strong> for speaker view · <strong>F</strong> for fullscreen · <strong>Esc</strong> for overview</small></p>
+</section>
+
+<!-- ── Slide: heading scale ───────────────────────────────── -->
+<section>
+  <h1>Heading 1 — 2.4em / 700</h1>
+  <h2>Heading 2 — 1.7em / 600</h2>
+  <h3>Heading 3 — 1.25em / 600</h3>
+  <h4>Heading 4 — 1.05em / 600</h4>
+  <h5>Heading 5 — 1em / 600</h5>
+  <h6>Heading 6 — 1em / 600</h6>
+</section>
+
+<!-- ── Slide: body copy + emphasis ────────────────────────── -->
+<section>
+  <h2>Body copy</h2>
+  <p>This is a paragraph at <strong>36px</strong> base, line-height 1.45. The theme uses
+    <em>italics</em> sparingly, <strong>bold</strong> at 600, and inline
+    <code>code</code> with a faint backplate. Links carry a soft underline:
+    <a href="https://loica.criti.ca">loica.criti.ca</a>.
+  </p>
+  <p><small>Small text drops to 0.7em and dims for asides, captions, and timestamps.</small></p>
+</section>
+
+<!-- ── Slide: lists ───────────────────────────────────────── -->
+<section>
+  <h2>Lists</h2>
+  <ul>
+    <li>First-level items use a disc bullet</li>
+    <li>Generous line spacing keeps long lists readable
+      <ul>
+        <li>Second level switches to an em-dash for visual variety</li>
+        <li>Stays quiet so it doesn't compete with the text</li>
+      </ul>
+    </li>
+    <li>Items wrap cleanly on long lines without crowding adjacent items</li>
+  </ul>
+  <ol>
+    <li>Ordered lists use the default numerals</li>
+    <li>Same spacing rules apply</li>
+  </ol>
+</section>
+
+<!-- ── Slide: blockquote ──────────────────────────────────── -->
+<section>
+  <h2>Blockquote</h2>
+  <blockquote>
+    “Design is the silent ambassador of your brand.” — Paul Rand
+  </blockquote>
+  <p>Quotes get a scarlet hairline on the left, italic body, slight dim — no
+    big slab of background, no oversized quote marks.</p>
+</section>
+
+<!-- ── Slide: code ────────────────────────────────────────── -->
+<section>
+  <h2>Code</h2>
+  <p>Inline: <code>const x = await fetch("/api/health")</code></p>
+  <pre><code>function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+greet("designer");</code></pre>
+  <p><small>Code blocks are 0.7em, monospace, with a subtle plumage-tinted background.</small></p>
+</section>
+
+<!-- ── Slide: table ───────────────────────────────────────── -->
+<section>
+  <h2>Table</h2>
+  <table>
+    <thead>
+      <tr><th>Token</th><th>Hex</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>plumage</td><td><code>#100F0F</code></td><td>Foreground / text</td></tr>
+      <tr><td>scarlet</td><td><code>#AF3029</code></td><td>Accent / links</td></tr>
+      <tr><td>tawny</td><td><code>#DA702C</code></td><td>Hover / secondary accent</td></tr>
+      <tr><td>sage</td><td><code>#66800B</code></td><td>Positive / success</td></tr>
+      <tr><td>cream</td><td><code>#FFFCF0</code></td><td>Background</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── Slide: hr + vertical sub-slides ────────────────────── -->
+<section>
+  <section>
+    <h2>Vertical sub-slides</h2>
+    <p>Press <strong>↓</strong> to step through sub-slides.</p>
+    <hr>
+    <p>The horizontal rule above is the theme's hairline rule (1px, 18% plumage).</p>
+  </section>
+  <section>
+    <h3>Sub-slide one</h3>
+    <p>Sub-slides reuse the same typography and color tokens as top-level
+      slides — no special styling needed.</p>
+  </section>
+  <section>
+    <h3>Sub-slide two</h3>
+    <p>Use these for progressive disclosure or appendix slides.</p>
+  </section>
+</section>
+
+<!-- ── Slide: knobs to design against ─────────────────────── -->
+<section>
+  <h2>Knobs to design against</h2>
+  <p>The theme exposes these CSS custom properties on <code>.reveal</code>:</p>
+  <pre><code>--r-background-color
+--r-main-color           /* body text */
+--r-heading-color
+--r-link-color
+--r-link-color-hover
+--r-main-font            /* Geist Sans + fallbacks */
+--r-heading-font
+--r-code-font            /* Geist Mono + fallbacks */
+--r-main-font-size       /* 36px base */</code></pre>
+  <p>Override any of these in <code>./slide-theme-loica.css</code>, refresh, and
+    iterate. Reveal core CSS handles layout/transitions; this file owns the
+    look only.</p>
+</section>
+
+</div>
+</div>
+
+<!-- Reveal.js runtime -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: "c/t",
+    transition: "slide",
+    controls: true,
+    progress: true,
+  });
+</script>
+
+</body>
+</html>

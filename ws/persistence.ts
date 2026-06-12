@@ -5,12 +5,11 @@
 import * as Y from "yjs";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
-import { defaultMarkdownParser } from "prosemirror-markdown";
 import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "y-prosemirror";
-import { migrateDocumentComments } from "../app/lib/comment-migration.server.ts";
 import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { schema as pmSchema } from "../app/components/editor/schema.ts";
-import { loicaMarkdownSerializer } from "../app/components/editor/pm-markdown.ts";
+import { loicaMarkdownSerializer, parseMarkdownWithFootnotes } from "../app/components/editor/pm-markdown.ts";
+import { splitFrontmatter } from "../app/lib/markdown.ts";
 import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
 
 /**
@@ -19,8 +18,8 @@ import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
  */
 export function initializePersistenceStatements(db: Database.Database) {
   return {
-    loadDoc: db.prepare<{ id: string }, { content: string; yjs_state: Buffer | null; comments_migrated: number }>(
-      "SELECT content, yjs_state, comments_migrated FROM documents WHERE id = @id"
+    loadDoc: db.prepare<{ id: string }, { content: string; yjs_state: Buffer | null }>(
+      "SELECT content, yjs_state FROM documents WHERE id = @id"
     ),
     saveDoc: db.prepare<{ id: string; content: string; state: Buffer; updatedBy: string | null }>(
       "UPDATE documents SET content = @content, yjs_state = @state, updated_at = unixepoch(), updated_by = COALESCE(@updatedBy, updated_by) WHERE id = @id"
@@ -69,7 +68,7 @@ export function loadDocumentState(
   docId: string
 ): void {
   const row = stmts.loadDoc.get({ id: docId }) as
-    | { content: string; yjs_state: Buffer | null; comments_migrated: number }
+    | { content: string; yjs_state: Buffer | null }
     | undefined;
 
   if (row) {
@@ -105,16 +104,6 @@ export function loadDocumentState(
     }
   }
 
-  // Migrate CriticMarkup comments if needed
-  if (row && !row.comments_migrated) {
-    try {
-      migrateDocumentComments(db, doc, docId);
-      console.log(`[ws-server] Migrated CriticMarkup comments for doc ${docId}`);
-    } catch (err) {
-      console.error(`[ws-server] Comment migration failed for doc ${docId}:`, err);
-    }
-  }
-
   // Seed comments from DB into Yjs map
   seedCommentsMap(db, doc, docId);
 }
@@ -122,18 +111,21 @@ export function loadDocumentState(
 /**
  * Seed Y.XmlFragment("prosemirror") from a markdown string so a freshly
  * created (or pre-PM) doc renders in the ProseMirror editor instead of blank.
- * Mirrors the editor's markdown-paste path. The default markdown schema's node
- * type names (paragraph, heading, bullet_list, list_item, …) match the app
- * schema, so the client reads the fragment back fine and fills attr defaults.
- * (We don't import the app schema here — it uses extensionless imports that the
- * ws server's node ESM loader can't resolve.) No-op if the fragment already has
- * content. Failures are logged and swallowed (the Y.Text seed still applies).
+ * Mirrors the editor's markdown-paste path, parsing into the app schema so
+ * footnote refs (`[^N]` + `[^N]: …`) are reconstructed as footnote nodes rather
+ * than dropped to literal text. No-op if the fragment already has content.
+ * Failures are logged and swallowed (the Y.Text seed still applies).
  */
 function seedPmFragmentFromMarkdown(doc: Y.Doc, markdown: string): void {
   const frag = doc.getXmlFragment("prosemirror");
   if (frag.length > 0) return;
+  // Keep YAML frontmatter out of the PM tree — it has no schema node and would
+  // be mangled into an hr + heading, destroying `type:` detection. Stash it in
+  // the synced `meta` map; getDocContent() reattaches it on serialize.
+  const { frontmatter, body } = splitFrontmatter(markdown);
+  if (frontmatter) doc.getMap("meta").set("frontmatter", frontmatter);
   try {
-    const parsed = defaultMarkdownParser.parse(markdown);
+    const parsed = parseMarkdownWithFootnotes(body, pmSchema);
     if (!parsed) return;
     prosemirrorToYXmlFragment(parsed, frag);
   } catch (err) {
@@ -460,7 +452,11 @@ export function getDocContent(doc: Y.Doc): string {
     // serialization ever throws, so a save is never lost.
     try {
       const pmDoc = yXmlFragmentToProseMirrorRootNode(pmFrag, pmSchema);
-      return loicaMarkdownSerializer.serialize(pmDoc);
+      const body = loicaMarkdownSerializer.serialize(pmDoc);
+      // Reattach frontmatter stashed by seedPmFragmentFromMarkdown so the stored
+      // content column (and every export that reads it) keeps its `type:` etc.
+      const fm = doc.getMap("meta").get("frontmatter");
+      return typeof fm === "string" && fm.length > 0 ? `${fm}\n\n${body}` : body;
     } catch (err) {
       console.error("[ws-server] PM→markdown serialize failed, using plaintext:", err);
       return extractTextFromXmlFragment(pmFrag);
