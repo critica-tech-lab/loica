@@ -7,7 +7,6 @@ import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
 import { defaultMarkdownParser } from "prosemirror-markdown";
 import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "y-prosemirror";
-import { migrateDocumentComments } from "../app/lib/comment-migration.server.ts";
 import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { schema as pmSchema } from "../app/components/editor/schema.ts";
 import { loicaMarkdownSerializer } from "../app/components/editor/pm-markdown.ts";
@@ -19,8 +18,8 @@ import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
  */
 export function initializePersistenceStatements(db: Database.Database) {
   return {
-    loadDoc: db.prepare<{ id: string }, { content: string; yjs_state: Buffer | null; comments_migrated: number }>(
-      "SELECT content, yjs_state, comments_migrated FROM documents WHERE id = @id"
+    loadDoc: db.prepare<{ id: string }, { content: string; yjs_state: Buffer | null }>(
+      "SELECT content, yjs_state FROM documents WHERE id = @id"
     ),
     saveDoc: db.prepare<{ id: string; content: string; state: Buffer; updatedBy: string | null }>(
       "UPDATE documents SET content = @content, yjs_state = @state, updated_at = unixepoch(), updated_by = COALESCE(@updatedBy, updated_by) WHERE id = @id"
@@ -69,7 +68,7 @@ export function loadDocumentState(
   docId: string
 ): void {
   const row = stmts.loadDoc.get({ id: docId }) as
-    | { content: string; yjs_state: Buffer | null; comments_migrated: number }
+    | { content: string; yjs_state: Buffer | null }
     | undefined;
 
   if (row) {
@@ -102,16 +101,6 @@ export function loadDocumentState(
     const meta = doc.getMap("ss-meta");
     if (!meta.has("cols")) {
       seedSpreadsheetMaps(doc, rawContent);
-    }
-  }
-
-  // Migrate CriticMarkup comments if needed
-  if (row && !row.comments_migrated) {
-    try {
-      migrateDocumentComments(db, doc, docId);
-      console.log(`[ws-server] Migrated CriticMarkup comments for doc ${docId}`);
-    } catch (err) {
-      console.error(`[ws-server] Comment migration failed for doc ${docId}:`, err);
     }
   }
 
