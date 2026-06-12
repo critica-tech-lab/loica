@@ -18,3 +18,9 @@ body {
 pre, table, blockquote, figure { page-break-inside: avoid; }
 h1, h2, h3, h4 { page-break-after: avoid; }
 img { max-width: 100%; }
+
+/* Drop pandoc's footnote back-reference arrow (↩, U+21A9). The body font
+   lacks the glyph so WeasyPrint renders tofu ("?"), and font fallback for it
+   is unreliable across hosts. The arrow is a screen-only return link with no
+   value in print, so hide it; the footnote number + body remain. */
+.footnote-back, a.footnote-back { display: none; }
