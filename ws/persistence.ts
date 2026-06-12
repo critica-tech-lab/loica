@@ -5,11 +5,10 @@
 import * as Y from "yjs";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
-import { defaultMarkdownParser } from "prosemirror-markdown";
 import { prosemirrorToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from "y-prosemirror";
 import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { schema as pmSchema } from "../app/components/editor/schema.ts";
-import { loicaMarkdownSerializer } from "../app/components/editor/pm-markdown.ts";
+import { loicaMarkdownSerializer, parseMarkdownWithFootnotes } from "../app/components/editor/pm-markdown.ts";
 import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
 
 /**
@@ -111,18 +110,16 @@ export function loadDocumentState(
 /**
  * Seed Y.XmlFragment("prosemirror") from a markdown string so a freshly
  * created (or pre-PM) doc renders in the ProseMirror editor instead of blank.
- * Mirrors the editor's markdown-paste path. The default markdown schema's node
- * type names (paragraph, heading, bullet_list, list_item, …) match the app
- * schema, so the client reads the fragment back fine and fills attr defaults.
- * (We don't import the app schema here — it uses extensionless imports that the
- * ws server's node ESM loader can't resolve.) No-op if the fragment already has
- * content. Failures are logged and swallowed (the Y.Text seed still applies).
+ * Mirrors the editor's markdown-paste path, parsing into the app schema so
+ * footnote refs (`[^N]` + `[^N]: …`) are reconstructed as footnote nodes rather
+ * than dropped to literal text. No-op if the fragment already has content.
+ * Failures are logged and swallowed (the Y.Text seed still applies).
  */
 function seedPmFragmentFromMarkdown(doc: Y.Doc, markdown: string): void {
   const frag = doc.getXmlFragment("prosemirror");
   if (frag.length > 0) return;
   try {
-    const parsed = defaultMarkdownParser.parse(markdown);
+    const parsed = parseMarkdownWithFootnotes(markdown, pmSchema);
     if (!parsed) return;
     prosemirrorToYXmlFragment(parsed, frag);
   } catch (err) {
