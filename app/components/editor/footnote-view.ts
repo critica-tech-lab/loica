@@ -1,5 +1,5 @@
 import { EditorView } from "prosemirror-view";
-import { EditorState } from "prosemirror-state";
+import { EditorState, Selection } from "prosemirror-state";
 import { StepMap } from "prosemirror-transform";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap } from "prosemirror-commands";
@@ -51,6 +51,10 @@ export class FootnoteView {
             "Mod-z": () => undo(this.outerView.state),
             "Mod-y": () => redo(this.outerView.state),
             "Mod-Shift-z": () => redo(this.outerView.state),
+            // Enter commits the note and returns to the main editor (instead of
+            // inserting a hard break, which inline-only footnote content can't
+            // hold anyway). Shift-Enter still does the baseKeymap default.
+            "Enter": () => { this.closeToOuter(); return true; },
           }),
           keymap(baseKeymap),
         ],
@@ -72,6 +76,20 @@ export class FootnoteView {
     this.innerView.destroy();
     this.innerView = null;
     this.dom.textContent = "";
+  }
+
+  // Commit the note: move the outer selection just past the footnote node.
+  // That deselects the node, which fires deselectNode() → close(), tearing down
+  // the popup; then refocus the main editor so typing continues in the body.
+  closeToOuter() {
+    const pos = this.getPos();
+    const outer = this.outerView;
+    if (pos != null) {
+      const after = pos + this.node.nodeSize;
+      const sel = Selection.near(outer.state.doc.resolve(after));
+      outer.dispatch(outer.state.tr.setSelection(sel).scrollIntoView());
+    }
+    outer.focus();
   }
 
   dispatchInner(tr: any) {

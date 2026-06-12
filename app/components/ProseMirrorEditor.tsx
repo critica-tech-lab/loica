@@ -742,9 +742,11 @@ export function ProseMirrorEditor({
           const { from } = view.state.selection;
           let tr = view.state.tr.replaceSelectionWith(node);
           // Select the freshly-inserted footnote so its editing popup opens.
+          // The NodeView's selectNode() opens the popup and focuses its inner
+          // editor — do NOT call view.focus() here, or it steals focus back to
+          // the outer editor and the cursor leaves the popup.
           tr = tr.setSelection(NodeSelection.create(tr.doc, from)).scrollIntoView();
           view.dispatch(tr);
-          view.focus();
         },
 
         // Comments — store plain PM integer positions (no y-prosemirror mapping needed)
