@@ -4,6 +4,7 @@ export interface PMActiveState {
   underline: boolean;
   strikethrough: boolean;
   code: boolean;
+  highlight: boolean;
   heading: 0 | 1 | 2 | 3 | 4;
   inBlockquote: boolean;
   inBulletList: boolean;

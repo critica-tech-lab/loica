@@ -292,6 +292,7 @@ export function ProseMirrorEditor({
           underline: markActive(schema.marks.underline),
           strikethrough: markActive(schema.marks.strikethrough),
           code: markActive(schema.marks.code),
+          highlight: markActive(schema.marks.highlight),
           heading,
           inBlockquote,
           inBulletList,
@@ -664,6 +665,7 @@ export function ProseMirrorEditor({
             "__": schema.marks.underline,
             "~~": schema.marks.strikethrough,
             "`": schema.marks.code,
+            "{==": schema.marks.highlight,
           };
           const mark = markMap[before];
           if (mark) {
