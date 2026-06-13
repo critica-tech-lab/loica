@@ -627,9 +627,13 @@ export function ProseMirrorEditor({
           // Emit track-changes state
           emitTCState(view.state);
           // Emit selection for bubble menu
-          const { from, to } = view.state.selection;
+          const sel = view.state.selection;
+          const { from, to } = sel;
+          // A footnote node-selection spans the atom (to > from) but must NOT
+          // raise the text-selection bubble — its own popup handles editing.
+          const isFootnoteNode = sel instanceof NodeSelection && sel.node.type === schema.nodes.footnote;
           if (onSelectionChangeRef.current) {
-            if (to > from) {
+            if (to > from && !isFootnoteNode) {
               let top = 0, left = 0;
               try { const c = view.coordsAtPos(from); top = c.top; left = c.left; } catch {}
               onSelectionChangeRef.current({ from, to, top, left });
