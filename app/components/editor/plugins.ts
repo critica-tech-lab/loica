@@ -25,7 +25,20 @@ import {
 } from "prosemirror-inputrules";
 import { trailingNode } from "prosemirror-trailing-node";
 import type { Schema } from "prosemirror-model";
-import type { Plugin } from "prosemirror-state";
+import type { Plugin, Command } from "prosemirror-state";
+
+// Toggle a heading level: if the cursor is already in a heading of that level,
+// revert to a paragraph; otherwise convert to the heading.
+function toggleHeading(schema: Schema, level: number): Command {
+  return (state, dispatch, view) => {
+    const parent = state.selection.$from.parent;
+    const isSame = parent.type === schema.nodes.heading && parent.attrs.level === level;
+    const target = isSame
+      ? setBlockType(schema.nodes.paragraph)
+      : setBlockType(schema.nodes.heading, { level });
+    return target(state, dispatch, view);
+  };
+}
 
 function markInputRule(regexp: RegExp, markType: any, guardPrecedingChar?: string) {
   return new InputRule(regexp, (state, match, start, end) => {
@@ -112,9 +125,9 @@ export function buildPlugins(schema: Schema, readOnly: boolean): Plugin[] {
       "Mod-[": liftListItem(schema.nodes.list_item),
       "Mod-]": sinkListItem(schema.nodes.list_item),
       // Heading shortcuts
-      "Mod-Alt-1": setBlockType(schema.nodes.heading, { level: 1 }),
-      "Mod-Alt-2": setBlockType(schema.nodes.heading, { level: 2 }),
-      "Mod-Alt-3": setBlockType(schema.nodes.heading, { level: 3 }),
+      "Mod-Alt-1": toggleHeading(schema, 1),
+      "Mod-Alt-2": toggleHeading(schema, 2),
+      "Mod-Alt-3": toggleHeading(schema, 3),
       "Mod-Alt-0": setBlockType(schema.nodes.paragraph),
       // Blockquote
       "Mod-Shift->": wrapIn(schema.nodes.blockquote),

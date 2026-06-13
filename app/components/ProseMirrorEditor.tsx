@@ -684,7 +684,14 @@ export function ProseMirrorEditor({
 
         // ProseMirror block commands
         setHeading: (level: number) => {
-          setBlockType(schema.nodes.heading, { level })(view.state, view.dispatch);
+          const { $from } = view.state.selection;
+          const parent = $from.parent;
+          const isSameHeading = parent.type === schema.nodes.heading && parent.attrs.level === level;
+          if (isSameHeading) {
+            setBlockType(schema.nodes.paragraph)(view.state, view.dispatch);
+          } else {
+            setBlockType(schema.nodes.heading, { level })(view.state, view.dispatch);
+          }
           view.focus();
         },
         clearFormatting: () => {
