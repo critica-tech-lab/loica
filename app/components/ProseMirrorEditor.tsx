@@ -11,6 +11,8 @@ import {
   addColumnBefore, addColumnAfter, deleteColumn,
   deleteTable,
 } from "prosemirror-tables";
+import { slashMenuKey, type SlashItem } from "./editor/slash-menu";
+import { SlashMenu } from "./editor/SlashMenu";
 
 interface Props {
   docId: string;
@@ -95,6 +97,7 @@ export function ProseMirrorEditor({
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
+  const apiRef = useRef<EditorApi | null>(null);
   const providerRef = useRef<any>(null);
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
@@ -104,6 +107,8 @@ export function ProseMirrorEditor({
   currentUserIdRef.current = currentUserId;
   const [tableMenu, setTableMenu] = useState<{ x: number; y: number; inHeaderRow: boolean } | null>(null);
   const [linkBubble, setLinkBubble] = useState<{ url: string; x: number; y: number; from: number; to: number } | null>(null);
+  // Slash command menu — driven by the slashMenuPlugin's state.
+  const [slash, setSlash] = useState<{ query: string; x: number; top: number; bottom: number; from: number; to: number } | null>(null);
   // Stable ref to current threads — lets addComment() append without going through the plugin
   const threadsRef = useRef<ResolvedThread[]>([]);
   const onThreadsChangeRef = useRef(onThreadsChange);
@@ -638,6 +643,15 @@ export function ProseMirrorEditor({
               onSelectionChangeRef.current({ from, to: from, top: 0, left: 0 });
             }
           }
+          // Slash menu: mirror the plugin's state into React for the popup.
+          const sm = slashMenuKey.getState(view.state);
+          if (sm?.open) {
+            let x = 0, top = 0, bottom = 0;
+            try { const c = view.coordsAtPos(sm.from); x = c.left; top = c.top; bottom = c.bottom; } catch {}
+            setSlash({ query: sm.query, x, top, bottom, from: sm.from, to: sm.to });
+          } else {
+            setSlash((prev) => (prev ? null : prev));
+          }
         },
       });
       viewRef.current = view;
@@ -1008,6 +1022,7 @@ export function ProseMirrorEditor({
           }
         },
       };
+      apiRef.current = api;
 
       // Signal ready after the Yjs provider has completed its first sync.
       // For brand-new docs (no server state) the sync fires quickly; for
@@ -1083,6 +1098,31 @@ export function ProseMirrorEditor({
           }
         }}
       />
+      {slash && (
+        <SlashMenu
+          query={slash.query}
+          x={slash.x}
+          top={slash.top}
+          bottom={slash.bottom}
+          onClose={() => {
+            setSlash(null);
+            viewRef.current?.focus();
+          }}
+          onExecute={(item: SlashItem) => {
+            const view = viewRef.current;
+            const api = apiRef.current;
+            if (!view || !api) return;
+            // Drop the "/query" text, then run the block command on the now-empty
+            // paragraph. Read positions from live plugin state to avoid staleness.
+            const sm = slashMenuKey.getState(view.state);
+            const range = sm?.open ? { from: sm.from, to: sm.to } : { from: slash.from, to: slash.to };
+            view.dispatch(view.state.tr.delete(range.from, range.to));
+            item.run({ api, view, schema: view.state.schema });
+            setSlash(null);
+            view.focus();
+          }}
+        />
+      )}
       {tableMenu && (
         <TableContextMenu
           x={tableMenu.x}
