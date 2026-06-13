@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
@@ -71,6 +71,20 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
     return () => window.removeEventListener("resize", update);
   }, [pos, editorRef]);
 
+  // computeLayout clamps `top` against a rough height guess; the popup is taller
+  // once replies/quote render. Re-clamp against the real measured height so a
+  // comment low in the document doesn't slide off the bottom of the viewport.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || window.innerWidth < MOBILE_BP) return;
+    const maxTop = window.innerHeight - el.offsetHeight - GAP;
+    setLayout(prev => {
+      if (typeof prev.top !== "number") return prev;
+      const clamped = Math.max(GAP, Math.min(prev.top, maxTop));
+      return clamped === prev.top ? prev : { ...prev, top: clamped };
+    });
+  }, [layout.top, thread.replies.length, thread.body, thread.anchorText, editing, reply, draftText]);
+
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -131,12 +145,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
       {isDraft && (
         <div style={{ paddingTop: "3px" }}>
           {thread.anchorText && (
-            <div style={{
-              margin: "10px 12px 0", padding: "3px 8px",
-              borderLeft: "2px solid var(--accent)", fontSize: "0.71rem",
-              color: "color-mix(in srgb, var(--fg) 55%, transparent)", fontStyle: "italic",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
+            <div style={quoteStyle}>
               {thread.anchorText}
             </div>
           )}
@@ -180,15 +189,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         </div>
 
         {thread.anchorText && (
-          <div style={{
-            margin: "0 0 8px",
-            padding: "3px 8px",
-            borderLeft: "2px solid var(--accent)",
-            fontSize: "0.71rem",
-            color: "color-mix(in srgb, var(--fg) 55%, transparent)",
-            fontStyle: "italic",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
+          <div style={{ ...quoteStyle, margin: "0 0 8px" }}>
             {thread.anchorText}
           </div>
         )}
@@ -357,6 +358,21 @@ const iconBtnStyle: React.CSSProperties = {
   color: "color-mix(in srgb, var(--fg) 35%, transparent)",
   display: "flex", alignItems: "center", justifyContent: "center",
   flexShrink: 0,
+};
+
+// Quoted anchor text: show the full commented passage, wrapping across lines.
+// Very long selections scroll inside a capped height instead of bloating the popup.
+const quoteStyle: React.CSSProperties = {
+  margin: "10px 12px 0",
+  padding: "3px 8px",
+  borderLeft: "2px solid var(--accent)",
+  fontSize: "0.71rem",
+  color: "color-mix(in srgb, var(--fg) 55%, transparent)",
+  fontStyle: "italic",
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
+  maxHeight: "7.5rem",
+  overflowY: "auto",
 };
 
 const inlineTextarea: React.CSSProperties = {
