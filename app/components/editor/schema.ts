@@ -78,6 +78,32 @@ const allNodesWithDT = allNodes.update("bullet_list",  withDT(allNodes.get("bull
                                .update("ordered_list", withDT(allNodes.get("ordered_list")!))
                                .update("list_item",    withDT(allNodes.get("list_item")!));
 
+// Callout / admonition block (GitHub-style alerts). A container of block content
+// tagged with a `type` (note/tip/important/warning/caution); the coloured label
+// is drawn via CSS ::before so the body stays fully editable.
+const CALLOUT_TYPES = ["note", "tip", "important", "warning", "caution"];
+const calloutSpec = {
+  group: "block",
+  content: "block+",
+  defining: true,
+  attrs: { type: { default: "note" } },
+  toDOM(node: any) {
+    const type = CALLOUT_TYPES.includes(node.attrs.type) ? node.attrs.type : "note";
+    return ["div", { class: `callout callout-${type}`, "data-callout": type }, 0] as const;
+  },
+  parseDOM: [
+    {
+      tag: "div.callout",
+      getAttrs(dom: any) {
+        const t = dom.getAttribute("data-callout");
+        return { type: CALLOUT_TYPES.includes(t) ? t : "note" };
+      },
+    },
+  ],
+};
+
+const allNodesWithCallout = allNodesWithDT.addToEnd("callout", withDT(calloutSpec));
+
 // Inline footnote: an atom node carrying its own inline content (the note body).
 // Rendered as a superscript counter via CSS + an editing popup (FootnoteView).
 // Serialized to markdown as `[^N]` refs with `[^N]: …` definitions at doc end.
@@ -90,7 +116,7 @@ const footnoteSpec = {
   parseDOM: [{ tag: "footnote" }],
 };
 
-const allNodesWithFootnote = allNodesWithDT.addToEnd("footnote", footnoteSpec);
+const allNodesWithFootnote = allNodesWithCallout.addToEnd("footnote", footnoteSpec);
 
 export const schema = new Schema({
   nodes: allNodesWithFootnote,

@@ -191,6 +191,38 @@ html {
   background-color: #AF3029;
 }
 
+/* ─── ProseMirror callout / admonition blocks ───────────────── */
+.callout {
+  --callout-color: #205EA6;
+  border-left: 3px solid var(--callout-color);
+  background: color-mix(in srgb, var(--callout-color) 7%, transparent);
+  padding: 0.5rem 0.9rem;
+  margin: 0.85rem 0;
+  border-radius: 0 4px 4px 0;
+}
+.callout::before {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--callout-color);
+  margin-bottom: 0.25rem;
+}
+.callout > :first-child { margin-top: 0; }
+.callout > :last-child { margin-bottom: 0; }
+
+.callout-note      { --callout-color: #205EA6; }
+.callout-note::before      { content: "Note"; }
+.callout-tip       { --callout-color: #66800B; }
+.callout-tip::before       { content: "Tip"; }
+.callout-important { --callout-color: #5E409D; }
+.callout-important::before { content: "Important"; }
+.callout-warning   { --callout-color: #AD8301; }
+.callout-warning::before   { content: "Warning"; }
+.callout-caution   { --callout-color: #AF3029; }
+.callout-caution::before   { content: "Caution"; }
+
 /* ─── Horizontal rule ────────────────────────────────────── */
 .cm-hr {
   border: none;

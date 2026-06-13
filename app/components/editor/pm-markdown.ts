@@ -23,6 +23,16 @@ export const loicaMarkdownSerializer = new MarkdownSerializer(
       if (Number.isFinite(w) && w > 0) state.write(`{width=${w}px}`);
     },
 
+    // Callout → GitHub alert: a blockquote whose first line is `[!TYPE]`.
+    callout(state, node) {
+      const type = String(node.attrs.type || "note").toUpperCase();
+      state.wrapBlock("> ", null, node, () => {
+        state.write(`[!${type}]`);
+        state.ensureNewLine();
+        state.renderContent(node);
+      });
+    },
+
     table(state, node) {
       const rows: string[][] = [];
       node.forEach((row) => {
@@ -91,6 +101,28 @@ type FnJSONNode = { type: string; text?: string; content?: FnJSONNode[]; marks?:
 
 const FN_DEF_RE = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
 
+// GitHub alert → callout. The default parser yields a blockquote whose first
+// paragraph opens with `[!TYPE]`; rewrite those into `callout` nodes, stripping
+// the marker. Recurses so nested blockquotes are handled too.
+const ALERT_RE = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n?/i;
+function calloutize(node: FnJSONNode): FnJSONNode {
+  const mapped = node.content ? { ...node, content: node.content.map(calloutize) } : node;
+  if (mapped.type !== "blockquote" || !mapped.content?.length) return mapped;
+  const first = mapped.content[0];
+  if (first?.type !== "paragraph" || first.content?.[0]?.type !== "text") return mapped;
+  const m = ALERT_RE.exec(first.content[0].text || "");
+  if (!m) return mapped;
+  const type = m[1].toLowerCase();
+  const rest = (first.content[0].text || "").slice(m[0].length);
+  const firstContent = rest
+    ? [{ ...first.content[0], text: rest }, ...first.content.slice(1)]
+    : first.content.slice(1);
+  const body = firstContent.length
+    ? [{ ...first, content: firstContent }, ...mapped.content.slice(1)]
+    : mapped.content.slice(1);
+  return { type: "callout", attrs: { type }, content: body.length ? body : [{ type: "paragraph" }] };
+}
+
 export function parseMarkdownWithFootnotes(markdown: string, schema: any): any {
   const defs = new Map<string, string>();
   const bodyLines: string[] = [];
@@ -102,7 +134,7 @@ export function parseMarkdownWithFootnotes(markdown: string, schema: any): any {
 
   const mdDoc = defaultMarkdownParser.parse(bodyLines.join("\n"));
   if (!mdDoc) return null;
-  const json: FnJSONNode = mdDoc.toJSON();
+  const json: FnJSONNode = calloutize(mdDoc.toJSON());
   if (defs.size === 0) return schema.nodeFromJSON(json);
 
   // Parse each definition's body once into its inline JSON (the first block's

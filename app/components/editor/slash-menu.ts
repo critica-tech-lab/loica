@@ -1,5 +1,5 @@
 import { Plugin, PluginKey } from "prosemirror-state";
-import { setBlockType } from "prosemirror-commands";
+import { setBlockType, wrapIn } from "prosemirror-commands";
 import type { EditorApi } from "~/lib/DocumentContext";
 
 // Slash command menu. Typing "/" at the start of a paragraph (or after a space)
@@ -87,8 +87,18 @@ export const SLASH_ITEMS: SlashItem[] = [
     run: ({ api }) => api.insertTable?.() },
   { title: "Divider", hint: "Horizontal rule", keywords: ["divider", "hr", "rule", "separator", "line"],
     run: ({ api }) => api.insertHr?.() },
-  { title: "Footnote", hint: "Insert a footnote", keywords: ["footnote", "note", "reference"],
+  { title: "Footnote", hint: "Insert a footnote", keywords: ["footnote", "reference"],
     run: ({ api }) => api.insertFootnote?.() },
+  { title: "Note callout", hint: "Highlighted info block", keywords: ["callout", "note", "info", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "note" })(view.state, view.dispatch) },
+  { title: "Tip callout", hint: "Highlighted tip block", keywords: ["callout", "tip", "hint", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "tip" })(view.state, view.dispatch) },
+  { title: "Important callout", hint: "Highlighted important block", keywords: ["callout", "important", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "important" })(view.state, view.dispatch) },
+  { title: "Warning callout", hint: "Highlighted warning block", keywords: ["callout", "warning", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "warning" })(view.state, view.dispatch) },
+  { title: "Caution callout", hint: "Highlighted caution block", keywords: ["callout", "caution", "danger", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "caution" })(view.state, view.dispatch) },
   { title: "Image", hint: "Upload an image", keywords: ["image", "picture", "photo", "upload"],
     run: ({ api }) => {
       const input = document.createElement("input");
