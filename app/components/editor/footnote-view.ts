@@ -41,6 +41,7 @@ export class FootnoteView {
   open() {
     const tooltip = this.dom.appendChild(document.createElement("div"));
     tooltip.className = "footnote-tooltip";
+
     this.innerView = new EditorView(tooltip, {
       state: EditorState.create({
         doc: this.node,
@@ -70,6 +71,22 @@ export class FootnoteView {
       },
     });
     this.innerView.focus();
+
+    // Footer toolbar with a subtle "Remove" action, mirroring the link bubble.
+    // mousedown (not click) + preventDefault so the inner view's mousedown
+    // focus kludge doesn't fire before the node is deleted.
+    const footer = tooltip.appendChild(document.createElement("div"));
+    footer.className = "footnote-tooltip-footer";
+    const remove = footer.appendChild(document.createElement("button"));
+    remove.type = "button";
+    remove.className = "footnote-remove";
+    remove.title = "Remove footnote";
+    remove.textContent = "Remove";
+    remove.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.removeFootnote();
+    });
   }
 
   close() {
@@ -88,6 +105,16 @@ export class FootnoteView {
       const after = pos + this.node.nodeSize;
       const sel = Selection.near(outer.state.doc.resolve(after));
       outer.dispatch(outer.state.tr.setSelection(sel).scrollIntoView());
+    }
+    outer.focus();
+  }
+
+  // Remove the whole footnote node from the outer doc, then refocus the body.
+  removeFootnote() {
+    const pos = this.getPos();
+    const outer = this.outerView;
+    if (pos != null) {
+      outer.dispatch(outer.state.tr.delete(pos, pos + this.node.nodeSize));
     }
     outer.focus();
   }

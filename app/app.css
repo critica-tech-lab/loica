@@ -794,6 +794,26 @@ footnote.ProseMirror-selectednode::after {
   min-height: 1.2em;
   white-space: pre-wrap;
 }
+.footnote-tooltip-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+.footnote-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+  transition: color 100ms;
+}
+.footnote-remove:hover {
+  color: var(--color-scarlet, #AF3029);
+}
 
 /* ─── Toolbar button (replaces JS hover handlers) ────────── */
 .toolbar-btn {

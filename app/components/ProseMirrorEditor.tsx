@@ -292,6 +292,7 @@ export function ProseMirrorEditor({
           underline: markActive(schema.marks.underline),
           strikethrough: markActive(schema.marks.strikethrough),
           code: markActive(schema.marks.code),
+          highlight: markActive(schema.marks.highlight),
           heading,
           inBlockquote,
           inBulletList,
@@ -626,9 +627,13 @@ export function ProseMirrorEditor({
           // Emit track-changes state
           emitTCState(view.state);
           // Emit selection for bubble menu
-          const { from, to } = view.state.selection;
+          const sel = view.state.selection;
+          const { from, to } = sel;
+          // A footnote node-selection spans the atom (to > from) but must NOT
+          // raise the text-selection bubble — its own popup handles editing.
+          const isFootnoteNode = sel instanceof NodeSelection && sel.node.type === schema.nodes.footnote;
           if (onSelectionChangeRef.current) {
-            if (to > from) {
+            if (to > from && !isFootnoteNode) {
               let top = 0, left = 0;
               try { const c = view.coordsAtPos(from); top = c.top; left = c.left; } catch {}
               onSelectionChangeRef.current({ from, to, top, left });
@@ -664,6 +669,7 @@ export function ProseMirrorEditor({
             "__": schema.marks.underline,
             "~~": schema.marks.strikethrough,
             "`": schema.marks.code,
+            "{==": schema.marks.highlight,
           };
           const mark = markMap[before];
           if (mark) {
@@ -684,7 +690,14 @@ export function ProseMirrorEditor({
 
         // ProseMirror block commands
         setHeading: (level: number) => {
-          setBlockType(schema.nodes.heading, { level })(view.state, view.dispatch);
+          const { $from } = view.state.selection;
+          const parent = $from.parent;
+          const isSameHeading = parent.type === schema.nodes.heading && parent.attrs.level === level;
+          if (isSameHeading) {
+            setBlockType(schema.nodes.paragraph)(view.state, view.dispatch);
+          } else {
+            setBlockType(schema.nodes.heading, { level })(view.state, view.dispatch);
+          }
           view.focus();
         },
         clearFormatting: () => {

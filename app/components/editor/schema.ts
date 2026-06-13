@@ -86,7 +86,6 @@ const footnoteSpec = {
   content: "inline*",
   inline: true,
   atom: true,
-  draggable: true,
   toDOM() { return ["footnote", 0] as const; },
   parseDOM: [{ tag: "footnote" }],
 };
