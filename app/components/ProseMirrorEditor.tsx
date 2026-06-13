@@ -109,6 +109,8 @@ export function ProseMirrorEditor({
   const [linkBubble, setLinkBubble] = useState<{ url: string; x: number; y: number; from: number; to: number } | null>(null);
   // Slash command menu — driven by the slashMenuPlugin's state.
   const [slash, setSlash] = useState<{ query: string; x: number; top: number; bottom: number; from: number; to: number } | null>(null);
+  // Navigation handlers registered by the open SlashMenu, consumed by handleKeyDown.
+  const slashNavRef = useRef<{ move: (d: number) => void; execute: () => void; close: () => void } | null>(null);
   // Stable ref to current threads — lets addComment() append without going through the plugin
   const threadsRef = useRef<ResolvedThread[]>([]);
   const onThreadsChangeRef = useRef(onThreadsChange);
@@ -508,6 +510,20 @@ export function ProseMirrorEditor({
       view = new EditorView(mountRef.current, {
         state,
         editable: () => !readOnlyRef.current,
+        // When the slash menu is open it owns the navigation keys, so they never
+        // reach the editor (no caret movement). Runs before plugin keymaps.
+        handleKeyDown: (_v: any, event: KeyboardEvent) => {
+          const nav = slashNavRef.current;
+          if (!nav) return false;
+          switch (event.key) {
+            case "ArrowDown": nav.move(1); return true;
+            case "ArrowUp":   nav.move(-1); return true;
+            case "Enter":
+            case "Tab":       nav.execute(); return true;
+            case "Escape":    nav.close(); return true;
+          }
+          return false;
+        },
         nodeViews: {
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
           footnote: (node: any, view: any, getPos: any) => makeFootnoteView(node, view, getPos),
@@ -1117,9 +1133,18 @@ export function ProseMirrorEditor({
           x={slash.x}
           top={slash.top}
           bottom={slash.bottom}
+          navRef={slashNavRef}
           onClose={() => {
+            // Explicit dismiss (Esc): remove the "/query" text the user typed to
+            // open the menu, so no stray "/" is left behind.
+            const view = viewRef.current;
+            if (view) {
+              const sm = slashMenuKey.getState(view.state);
+              const range = sm?.open ? { from: sm.from, to: sm.to } : null;
+              if (range) view.dispatch(view.state.tr.delete(range.from, range.to));
+              view.focus();
+            }
             setSlash(null);
-            viewRef.current?.focus();
           }}
           onExecute={(item: SlashItem) => {
             const view = viewRef.current;

@@ -63,43 +63,36 @@ export interface SlashItem {
   title: string;
   hint: string;
   keywords: string[];
+  group: string;
+  icon: string;        // short mono glyph shown in the icon tile
+  iconColor?: string;  // optional tint (used by callouts)
   run: (ctx: SlashCtx) => void;
 }
 
 export const SLASH_ITEMS: SlashItem[] = [
-  { title: "Text", hint: "Plain paragraph", keywords: ["paragraph", "text", "body", "p"],
+  { group: "Basic", icon: "¶", title: "Text", hint: "Plain paragraph", keywords: ["paragraph", "text", "body", "p"],
     run: ({ api }) => api.clearFormatting?.() },
-  { title: "Heading 1", hint: "Large section heading", keywords: ["h1", "title", "heading"],
+  { group: "Basic", icon: "H1", title: "Heading 1", hint: "Large section heading", keywords: ["h1", "title", "heading"],
     run: ({ api }) => api.setHeading?.(1) },
-  { title: "Heading 2", hint: "Medium section heading", keywords: ["h2", "subtitle", "heading"],
+  { group: "Basic", icon: "H2", title: "Heading 2", hint: "Medium section heading", keywords: ["h2", "subtitle", "heading"],
     run: ({ api }) => api.setHeading?.(2) },
-  { title: "Heading 3", hint: "Small section heading", keywords: ["h3", "heading"],
+  { group: "Basic", icon: "H3", title: "Heading 3", hint: "Small section heading", keywords: ["h3", "heading"],
     run: ({ api }) => api.setHeading?.(3) },
-  { title: "Bulleted list", hint: "Unordered list", keywords: ["bullet", "unordered", "list", "ul"],
+  { group: "Lists", icon: "•", title: "Bulleted list", hint: "Unordered list", keywords: ["bullet", "unordered", "list", "ul"],
     run: ({ api }) => api.toggleBulletList?.() },
-  { title: "Numbered list", hint: "Ordered list", keywords: ["numbered", "ordered", "list", "ol"],
+  { group: "Lists", icon: "1.", title: "Numbered list", hint: "Ordered list", keywords: ["numbered", "ordered", "list", "ol"],
     run: ({ api }) => api.toggleOrderedList?.() },
-  { title: "Quote", hint: "Blockquote", keywords: ["quote", "blockquote", "citation"],
+  { group: "Lists", icon: "❝", title: "Quote", hint: "Blockquote", keywords: ["quote", "blockquote", "citation"],
     run: ({ api }) => api.toggleBlockquote?.() },
-  { title: "Code block", hint: "Monospace code", keywords: ["code", "pre", "snippet", "monospace"],
+  { group: "Insert", icon: "</>", title: "Code block", hint: "Monospace code", keywords: ["code", "pre", "snippet", "monospace"],
     run: ({ view, schema }) => setBlockType(schema.nodes.code_block)(view.state, view.dispatch) },
-  { title: "Table", hint: "Insert a table", keywords: ["table", "grid"],
+  { group: "Insert", icon: "▦", title: "Table", hint: "Insert a table", keywords: ["table", "grid"],
     run: ({ api }) => api.insertTable?.() },
-  { title: "Divider", hint: "Horizontal rule", keywords: ["divider", "hr", "rule", "separator", "line"],
+  { group: "Insert", icon: "—", title: "Divider", hint: "Horizontal rule", keywords: ["divider", "hr", "rule", "separator", "line"],
     run: ({ api }) => api.insertHr?.() },
-  { title: "Footnote", hint: "Insert a footnote", keywords: ["footnote", "reference"],
+  { group: "Insert", icon: "¹", title: "Footnote", hint: "Insert a footnote", keywords: ["footnote", "reference"],
     run: ({ api }) => api.insertFootnote?.() },
-  { title: "Note callout", hint: "Highlighted info block", keywords: ["callout", "note", "info", "admonition"],
-    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "note" })(view.state, view.dispatch) },
-  { title: "Tip callout", hint: "Highlighted tip block", keywords: ["callout", "tip", "hint", "admonition"],
-    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "tip" })(view.state, view.dispatch) },
-  { title: "Important callout", hint: "Highlighted important block", keywords: ["callout", "important", "admonition"],
-    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "important" })(view.state, view.dispatch) },
-  { title: "Warning callout", hint: "Highlighted warning block", keywords: ["callout", "warning", "admonition"],
-    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "warning" })(view.state, view.dispatch) },
-  { title: "Caution callout", hint: "Highlighted caution block", keywords: ["callout", "caution", "danger", "admonition"],
-    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "caution" })(view.state, view.dispatch) },
-  { title: "Image", hint: "Upload an image", keywords: ["image", "picture", "photo", "upload"],
+  { group: "Insert", icon: "▣", title: "Image", hint: "Upload an image", keywords: ["image", "picture", "photo", "upload"],
     run: ({ api }) => {
       const input = document.createElement("input");
       input.type = "file";
@@ -107,6 +100,16 @@ export const SLASH_ITEMS: SlashItem[] = [
       input.onchange = () => { const f = input.files?.[0]; if (f) api.uploadImage?.(f); };
       input.click();
     } },
+  { group: "Callouts", icon: "!", iconColor: "#205EA6", title: "Note callout", hint: "Highlighted info block", keywords: ["callout", "note", "info", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "note" })(view.state, view.dispatch) },
+  { group: "Callouts", icon: "!", iconColor: "#66800B", title: "Tip callout", hint: "Highlighted tip block", keywords: ["callout", "tip", "hint", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "tip" })(view.state, view.dispatch) },
+  { group: "Callouts", icon: "!", iconColor: "#5E409D", title: "Important callout", hint: "Highlighted important block", keywords: ["callout", "important", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "important" })(view.state, view.dispatch) },
+  { group: "Callouts", icon: "!", iconColor: "#AD8301", title: "Warning callout", hint: "Highlighted warning block", keywords: ["callout", "warning", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "warning" })(view.state, view.dispatch) },
+  { group: "Callouts", icon: "!", iconColor: "#AF3029", title: "Caution callout", hint: "Highlighted caution block", keywords: ["callout", "caution", "danger", "admonition"],
+    run: ({ view, schema }) => wrapIn(schema.nodes.callout, { type: "caution" })(view.state, view.dispatch) },
 ];
 
 // Substring match on title + keywords, preserving the declared order.
