@@ -178,7 +178,7 @@ html {
 
 /* ─── CriticMarkup: comment indicator on highlighted text ── */
 .cm-critic-commented {
-  border-bottom: 2px solid var(--comment-color, #facc15);
+  border-bottom: 2px solid var(--comment-color);
   padding-bottom: 1px;
 }
 
@@ -193,28 +193,28 @@ html {
 }
 
 .cm-callout-note .cm-callout-badge {
-  background-color: #205EA6;
+  background-color: var(--color-blue);
 }
 
 .cm-callout-tip .cm-callout-badge {
-  background-color: #66800B;
+  background-color: var(--color-sage);
 }
 
 .cm-callout-important .cm-callout-badge {
-  background-color: #5E409D;
+  background-color: var(--color-purple);
 }
 
 .cm-callout-warning .cm-callout-badge {
-  background-color: #AD8301;
+  background-color: var(--warning);
 }
 
 .cm-callout-caution .cm-callout-badge {
-  background-color: #AF3029;
+  background-color: var(--color-scarlet);
 }
 
 /* ─── ProseMirror callout / admonition blocks ───────────────── */
 .callout {
-  --callout-color: #205EA6;
+  --callout-color: var(--color-blue);
   border-left: 3px solid var(--callout-color);
   background: color-mix(in srgb, var(--callout-color) 7%, transparent);
   padding: 0.5rem 0.9rem;
@@ -233,15 +233,15 @@ html {
 .callout > :first-child { margin-top: 0; }
 .callout > :last-child { margin-bottom: 0; }
 
-.callout-note      { --callout-color: #205EA6; }
+.callout-note      { --callout-color: var(--color-blue); }
 .callout-note::before      { content: "Note"; }
-.callout-tip       { --callout-color: #66800B; }
+.callout-tip       { --callout-color: var(--color-sage); }
 .callout-tip::before       { content: "Tip"; }
-.callout-important { --callout-color: #5E409D; }
+.callout-important { --callout-color: var(--color-purple); }
 .callout-important::before { content: "Important"; }
-.callout-warning   { --callout-color: #AD8301; }
+.callout-warning   { --callout-color: var(--warning); }
 .callout-warning::before   { content: "Warning"; }
-.callout-caution   { --callout-color: #AF3029; }
+.callout-caution   { --callout-color: var(--color-scarlet); }
 .callout-caution::before   { content: "Caution"; }
 
 /* ─── Horizontal rule ────────────────────────────────────── */
@@ -309,7 +309,7 @@ html {
 }
 .cm-table-resize-handle:hover,
 .cm-table-resize-active {
-  background: var(--accent, #2563eb);
+  background: var(--accent);
   opacity: 0.4;
 }
 .cm-table-widget .cm-table-input {
@@ -333,13 +333,13 @@ html {
   font-weight: 600;
 }
 .cm-table-widget .cm-table-input:focus {
-  background: color-mix(in srgb, var(--color-link, #2563eb) 8%, transparent);
+  background: color-mix(in srgb, var(--color-link) 8%, transparent);
 }
 /* Context menu for row/column deletion */
 .cm-table-ctx {
   position: fixed;
   z-index: 1000;
-  background: var(--bg, #fff);
+  background: var(--bg);
   border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
   border-radius: var(--radius-md, 6px);
   box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1));
@@ -603,7 +603,7 @@ html {
   background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 .spreadsheet-ctx-item.danger {
-  color: var(--color-scarlet, #AF3029);
+  color: var(--color-scarlet);
 }
 .spreadsheet-ctx-sep {
   height: 1px;
@@ -642,7 +642,7 @@ html {
   font-size: 0.6rem;
   line-height: 1;
   padding: 1px 4px;
-  color: #fff;
+  color: var(--accent-fg);
   border-radius: 0 0 0 3px;
   pointer-events: none;
   z-index: 2;
@@ -732,7 +732,7 @@ html {
 .spreadsheet-modal-save {
   margin-left: auto;
   background: var(--color-link, var(--accent));
-  color: #fff;
+  color: var(--accent-fg);
   border: none;
   padding: 0.3rem 0.8rem;
   border-radius: var(--radius-sm);
@@ -748,7 +748,7 @@ html {
 .cm-footnote-ref {
   font-family: var(--font-mono);
   font-size: 0.7em;
-  color: var(--color-scarlet, #AF3029);
+  color: var(--color-scarlet);
   cursor: pointer;
   vertical-align: super;
   line-height: 1;
@@ -784,7 +784,7 @@ html {
   vertical-align: super;
   line-height: 1;
   text-decoration: none;
-  color: var(--color-scarlet, #AF3029);
+  color: var(--color-scarlet);
 }
 [data-footnote-backref] {
   font-size: 0.75em;
@@ -811,11 +811,11 @@ footnote::after {
   vertical-align: super;
   font-size: 0.7em;
   font-family: var(--font-mono);
-  color: var(--color-scarlet, #AF3029);
+  color: var(--color-scarlet);
   padding: 0 1px;
 }
 footnote.ProseMirror-selectednode::after {
-  outline: 2px solid color-mix(in srgb, var(--color-scarlet, #AF3029) 50%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-scarlet) 50%, transparent);
   border-radius: 2px;
 }
 .footnote-tooltip {
@@ -865,7 +865,7 @@ footnote.ProseMirror-selectednode::after {
   transition: color 100ms;
 }
 .footnote-remove:hover {
-  color: var(--color-scarlet, #AF3029);
+  color: var(--color-scarlet);
 }
 
 /* ─── Toolbar button (replaces JS hover handlers) ────────── */
@@ -1177,8 +1177,8 @@ footnote.ProseMirror-selectednode::after {
   line-height: 0.75rem;
   text-align: center;
   border-radius: 9rem;
-  background: var(--color-scarlet, #AF3029);
-  color: #fff;
+  background: var(--color-scarlet);
+  color: var(--accent-fg);
   padding: 0 0.125rem;
 }
 
@@ -1938,17 +1938,17 @@ footnote.ProseMirror-selectednode::after {
 
 /* ─── Comment thread card focus flash (Google Docs style) ── */
 @keyframes comment-thread-flash {
-  0%   { background: #fff8e1; border-color: #f9ab00; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
-  65%  { background: #fffde7; border-color: rgba(249,171,0,0.4); box-shadow: 0 1px 2px rgba(0,0,0,0.10); }
-  100% { background: var(--bg); border-color: color-mix(in srgb, var(--fg) 10%, transparent); box-shadow: none; }
+  0%   { background: color-mix(in srgb, var(--warning) 12%, var(--bg)); border-color: var(--warning); box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+  65%  { background: color-mix(in srgb, var(--warning) 7%, var(--bg)); border-color: color-mix(in srgb, var(--warning) 40%, transparent); box-shadow: 0 1px 2px rgba(0,0,0,0.10); }
+  100% { background: var(--bg); border-color: var(--border); box-shadow: none; }
 }
 .comment-thread-focused {
   animation: comment-thread-flash 2.5s ease-out forwards;
 }
 .comment-thread-writing {
   animation: none !important;
-  background: #fffde7 !important;
-  border-color: rgba(249, 171, 0, 0.5) !important;
+  background: color-mix(in srgb, var(--warning) 7%, var(--bg)) !important;
+  border-color: color-mix(in srgb, var(--warning) 50%, transparent) !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.13) !important;
 }
 
@@ -1960,7 +1960,7 @@ footnote.ProseMirror-selectednode::after {
   top: 0.1em;
   width: 16px;
   height: 16px;
-  fill: #888;
+  fill: var(--muted);
   opacity: 0.28;
   cursor: pointer;
   pointer-events: all;
@@ -1973,7 +1973,7 @@ footnote.ProseMirror-selectednode::after {
 }
 .pm-comment-indicator:hover {
   opacity: 0.75;
-  fill: #f59e0b;
+  fill: var(--warning);
 }
 /* Block containing a comment indicator needs relative positioning */
 .pm-editor-mount .ProseMirror .has-comment-indicator {
@@ -1989,44 +1989,44 @@ footnote.ProseMirror-selectednode::after {
 }
 
 .pm-comment-highlight {
-  background-color: rgba(255, 217, 102, 0.35);
+  background-color: color-mix(in srgb, var(--highlight) 35%, transparent);
   border-radius: 2px;
   transition: background-color 150ms ease-out;
   cursor: pointer;
 }
 .pm-comment-highlight:hover {
-  background-color: rgba(255, 217, 102, 0.6);
+  background-color: color-mix(in srgb, var(--highlight) 60%, transparent);
 }
 .pm-comment-highlight.pm-comment-focused {
-  background-color: rgba(255, 217, 102, 0.85);
+  background-color: color-mix(in srgb, var(--highlight) 85%, transparent);
 }
 
 /* Track changes — color only, no underline/border, visually distinct from comments */
 ins.tracked-insert {
   text-decoration: underline;
-  text-decoration-color: #15803d;
+  text-decoration-color: var(--insert);
   text-decoration-thickness: 2px;
-  color: #15803d;
+  color: var(--insert);
   background: none;
   cursor: pointer;
   font-style: normal;
 }
 ins.tracked-insert:hover,
 ins.tracked-insert.tc-focused {
-  background-color: rgba(21,128,61,0.08);
+  background-color: color-mix(in srgb, var(--insert) 10%, transparent);
   border-radius: 2px;
 }
 
 del.tracked-delete {
   text-decoration: line-through;
   text-decoration-color: currentColor;
-  color: #b91c1c;
+  color: var(--delete);
   background: none;
   cursor: pointer;
 }
 del.tracked-delete:hover,
 del.tracked-delete.tc-focused {
-  background-color: rgba(185,28,28,0.08);
+  background-color: color-mix(in srgb, var(--delete) 8%, transparent);
   border-radius: 2px;
 }
 

@@ -202,7 +202,7 @@ function Btn({
 
 const MODE_META: Record<EditingMode, { label: string; icon: ReactNode; color?: string }> = {
   editing:    { label: "Editing",    icon: <EditModeIcon /> },
-  suggesting: { label: "Suggesting", icon: <SuggestModeIcon />, color: "#16a34a" },
+  suggesting: { label: "Suggesting", icon: <SuggestModeIcon />, color: "var(--success)" },
   viewing:    { label: "Viewing",    icon: <ViewModeIcon /> },
 };
 

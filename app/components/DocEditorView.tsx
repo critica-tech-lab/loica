@@ -197,10 +197,10 @@ export function DocEditorView(_props: DocumentProps) {
         {editingMode === "suggesting" && (
           <div style={{
             padding: "0.3rem 1rem",
-            background: "color-mix(in srgb, #16a34a 10%, transparent)",
-            borderBottom: "1px solid color-mix(in srgb, #16a34a 25%, transparent)",
+            background: "color-mix(in srgb, var(--success) 10%, transparent)",
+            borderBottom: "1px solid color-mix(in srgb, var(--success) 25%, transparent)",
             fontSize: "0.75rem",
-            color: "#15803d",
+            color: "var(--insert)",
             fontFamily: "var(--font-ui)",
             display: "flex",
             alignItems: "center",
@@ -616,9 +616,9 @@ function HistoryPreviewPane({
           <span style={{ opacity: 0.8 }}>{label}</span>
           {hasChanges && (
             <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
-              <span style={{ background: "color-mix(in srgb, #22c55e 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+              <span style={{ background: "color-mix(in srgb, var(--success) 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
               {" "}
-              <span style={{ background: "color-mix(in srgb, #ef4444 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+              <span style={{ background: "color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
             </span>
           )}
         </div>
@@ -695,7 +695,7 @@ function HistoryPreviewPane({
                 <span
                   key={i}
                   style={{
-                    background: "color-mix(in srgb, #22c55e 18%, transparent)",
+                    background: "color-mix(in srgb, var(--success) 18%, transparent)",
                     borderRadius: "2px",
                   }}
                 >
@@ -708,7 +708,7 @@ function HistoryPreviewPane({
                 <span
                   key={i}
                   style={{
-                    background: "color-mix(in srgb, #ef4444 18%, transparent)",
+                    background: "color-mix(in srgb, var(--danger) 18%, transparent)",
                     textDecoration: "line-through",
                     borderRadius: "2px",
                   }}
@@ -1193,23 +1193,23 @@ function TopbarBadge({ count }: { count: number }) {
 function DocFooterLeft() {
   const { connectionStatus, saving } = useDocument();
 
-  // Stoplight palette: green (all good) → yellow (in progress) → red (broken).
-  // Flexoki's sage (#66800B) and green-400 (#879A39) are olive-leaning and read grey
-  // at the 6-7px dot size, so we use saturated greens/yellows/reds to read at a glance.
-  let color = "#16A34A"; // vivid green
+  // Stoplight palette: green (all good) → amber (in progress) → red (broken).
+  // Uses the saturated semantic tokens (Tailwind hues) which read at the 6-7px
+  // dot size, unlike Flexoki's olive-leaning greens.
+  let color = "var(--success)";
   let label = "Saved";
   let showLabel = false;
 
   if (connectionStatus === "disconnected") {
-    color = "#DC2626"; // vivid red
+    color = "var(--danger)";
     label = "Offline";
     showLabel = true;
   } else if (connectionStatus === "connecting") {
-    color = "#EAB308"; // vivid amber
+    color = "var(--warning)";
     label = "Reconnecting…";
     showLabel = true;
   } else if (saving) {
-    color = "#EAB308"; // vivid amber
+    color = "var(--warning)";
     label = "Saving…";
     showLabel = true;
   }

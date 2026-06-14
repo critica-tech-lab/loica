@@ -311,7 +311,7 @@ function ThreadCard({
                   transition: "color 120ms ease-out",
                   flexShrink: 0,
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#22c55e")}
+                onMouseEnter={e => (e.currentTarget.style.color = "var(--success)")}
                 onMouseLeave={e => (e.currentTarget.style.color = thread.resolved ? "var(--accent)" : "color-mix(in srgb, var(--fg) 35%, transparent)")}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -465,12 +465,12 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
       onClick={onClick}
       style={{
         background: "none", border: "none", cursor: "pointer", padding: "0.2rem",
-        color: danger ? "#ef4444" : "color-mix(in srgb, var(--fg) 45%, transparent)",
+        color: danger ? "var(--danger)" : "color-mix(in srgb, var(--fg) 45%, transparent)",
         display: "flex", alignItems: "center", borderRadius: "4px",
         transition: "background 100ms ease-out, color 100ms ease-out",
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 8%, transparent)"; e.currentTarget.style.color = danger ? "#ef4444" : "var(--fg)"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = danger ? "#ef4444" : "color-mix(in srgb, var(--fg) 45%, transparent)"; }}
+      onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 8%, transparent)"; e.currentTarget.style.color = danger ? "var(--danger)" : "var(--fg)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = danger ? "var(--danger)" : "color-mix(in srgb, var(--fg) 45%, transparent)"; }}
     >
       {children}
     </button>
@@ -494,7 +494,7 @@ function renderBodyWithMentions(body: string): React.ReactNode {
     if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
     const name = match[1];
     parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: "#D0A215" }}>@{name}</span>
+      <span key={match.index} style={{ fontWeight: 700, color: "var(--warning)" }}>@{name}</span>
     );
     lastIndex = re.lastIndex;
   }

@@ -31,7 +31,7 @@ export function renderMentions(body: string): React.ReactNode {
   while ((match = re.exec(body)) !== null) {
     if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
     parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: "#D0A215" }}>@{match[1]}</span>
+      <span key={match.index} style={{ fontWeight: 700, color: "var(--warning)" }}>@{match[1]}</span>
     );
     lastIndex = re.lastIndex;
   }
