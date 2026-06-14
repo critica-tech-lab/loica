@@ -497,3 +497,137 @@ export function ChevronRight(props: IconProps) {
     </svg>
   );
 }
+
+// ─── Editor toolbar icons ────────────────────────────────────────────────
+// Default sizes baked in to match the toolbar's compact density; callers may
+// still override via {...props}.
+
+export function HighlightIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 11l6 6" />
+      <path d="M4 20l4-1 11-11-3-3-11 11z" />
+      <line x1="14" y1="6" x2="18" y2="10" />
+    </svg>
+  );
+}
+
+export function BulletListIcon(props: IconProps) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="9" y1="6" x2="21" y2="6" /><line x1="9" y1="12" x2="21" y2="12" /><line x1="9" y1="18" x2="21" y2="18" />
+      <circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function OrderedListIcon(props: IconProps) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="11" y1="6" x2="21" y2="6" /><line x1="11" y1="12" x2="21" y2="12" /><line x1="11" y1="18" x2="21" y2="18" />
+      <text x="2" y="8" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">1</text>
+      <text x="2" y="14.5" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">2</text>
+      <text x="2" y="21" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">3</text>
+    </svg>
+  );
+}
+
+export function TableIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="3" y1="9" x2="21" y2="9" />
+      <line x1="3" y1="15" x2="21" y2="15" />
+      <line x1="12" y1="3" x2="12" y2="21" />
+    </svg>
+  );
+}
+
+export function FootnoteIcon(props: IconProps) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" {...props}>
+      <text x="1" y="16" fontSize="16" fontFamily="serif" fontWeight="700">A</text>
+      <text x="13" y="9" fontSize="9" fontFamily="serif" fontWeight="700">1</text>
+    </svg>
+  );
+}
+
+export function ImageIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  );
+}
+
+export function AlignLeftIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+export function AlignCenterIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="6" y1="12" x2="18" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
+export function AlignRightIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="9" y1="12" x2="21" y2="12" /><line x1="6" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+export function AlignJustifyIcon(props: IconProps) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+// ─── Editing-mode icons (track-changes control) ──────────────────────────
+// A coherent "pen states" family: direct write / proposed change / read-only.
+
+/** Editing: pen writing on a baseline — direct authoring. */
+export function EditModeIcon(props: IconProps) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+/** Suggesting: pen with a plus badge — proposing tracked changes. */
+export function SuggestModeIcon(props: IconProps) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M13 6.5 4 15.5 3 20l4.5-1 9-9Z" />
+      <path d="M11.5 8 14.5 11" />
+      <circle cx="18.5" cy="5.5" r="3.5" />
+      <line x1="18.5" y1="3.8" x2="18.5" y2="7.2" />
+      <line x1="16.8" y1="5.5" x2="20.2" y2="5.5" />
+    </svg>
+  );
+}
+
+/** Viewing: eye — read-only. */
+export function ViewModeIcon(props: IconProps) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}

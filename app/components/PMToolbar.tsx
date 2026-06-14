@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { useOptionalDocument } from "~/lib/DocumentContext";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { PMActiveState, TrackChangesActiveState, EditingMode } from "./editor/types";
+import {
+  HighlightIcon, BulletListIcon, OrderedListIcon, TableIcon, FootnoteIcon, ImageIcon,
+  AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon,
+  EditModeIcon, SuggestModeIcon, ViewModeIcon,
+} from "./icons";
 
 interface Props {
   activeState: PMActiveState | null;
@@ -67,13 +73,7 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
         title="Highlight"
         active={active?.highlight}
         onActivate={fmt("{==", "==}")}
-        icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 11l6 6" />
-            <path d="M4 20l4-1 11-11-3-3-11 11z" />
-            <line x1="14" y1="6" x2="18" y2="10" />
-          </svg>
-        }
+        icon={<HighlightIcon />}
       />
       <Btn title="Link (Ctrl+K)" active={false} onActivate={run(() => onLink?.())} style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>Link</Btn>
 
@@ -92,27 +92,13 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
         title="Bullet list"
         active={active?.inBulletList}
         onActivate={run(() => api?.toggleBulletList?.())}
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="9" y1="6" x2="21" y2="6" /><line x1="9" y1="12" x2="21" y2="12" /><line x1="9" y1="18" x2="21" y2="18" />
-            <circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none" />
-          </svg>
-        }
+        icon={<BulletListIcon />}
       />
       <Btn
         title="Ordered list"
         active={active?.inOrderedList}
         onActivate={run(() => api?.toggleOrderedList?.())}
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="11" y1="6" x2="21" y2="6" /><line x1="11" y1="12" x2="21" y2="12" /><line x1="11" y1="18" x2="21" y2="18" />
-            <text x="2" y="8" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">1</text>
-            <text x="2" y="14.5" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">2</text>
-            <text x="2" y="21" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">3</text>
-          </svg>
-        }
+        icon={<OrderedListIcon />}
       />
       <Btn title="Blockquote" active={active?.inBlockquote} style={{ fontSize: "1rem", fontWeight: 700, opacity: active?.inBlockquote ? 1 : 0.6 }} onActivate={run(() => api?.toggleBlockquote?.())}>&#8220;</Btn>
 
@@ -123,26 +109,14 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
         title="Insert table"
         active={false}
         onActivate={run(() => api?.insertTable?.())}
-        icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <line x1="3" y1="9" x2="21" y2="9" />
-            <line x1="3" y1="15" x2="21" y2="15" />
-            <line x1="12" y1="3" x2="12" y2="21" />
-          </svg>
-        }
+        icon={<TableIcon />}
       />
       <Btn title="Horizontal rule" active={false} onActivate={run(() => api?.insertHr?.())} style={{ letterSpacing: "-1px" }}>{"—"}</Btn>
       <Btn
         title="Insert footnote"
         active={false}
         onActivate={run(() => api?.insertFootnote?.())}
-        icon={
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor">
-            <text x="1" y="16" fontSize="16" fontFamily="serif" fontWeight="700">A</text>
-            <text x="13" y="9" fontSize="9" fontFamily="serif" fontWeight="700">1</text>
-          </svg>
-        }
+        icon={<FootnoteIcon />}
       />
       {imgUpload && (
         <Btn
@@ -155,13 +129,7 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
             input.onchange = () => { const f = input.files?.[0]; if (f) imgUpload(f); };
             input.click();
           })}
-          icon={
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          }
+          icon={<ImageIcon />}
         />
       )}
 
@@ -180,11 +148,6 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
     </div>
   );
 }
-
-const AlignLeftIcon   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="18" y2="18" /></svg>;
-const AlignCenterIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="6" y1="12" x2="18" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>;
-const AlignRightIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="9" y1="12" x2="21" y2="12" /><line x1="6" y1="18" x2="21" y2="18" /></svg>;
-const AlignJustifyIcon= () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6"  x2="21" y2="6"  /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>;
 
 function Sep() {
   return (
@@ -237,10 +200,10 @@ function Btn({
   );
 }
 
-const MODE_META: Record<EditingMode, { label: string; icon: string; color?: string }> = {
-  editing:    { label: "Editing",    icon: "✏" },
-  suggesting: { label: "Suggesting", icon: "💬", color: "#16a34a" },
-  viewing:    { label: "Viewing",    icon: "👁" },
+const MODE_META: Record<EditingMode, { label: string; icon: ReactNode; color?: string }> = {
+  editing:    { label: "Editing",    icon: <EditModeIcon /> },
+  suggesting: { label: "Suggesting", icon: <SuggestModeIcon />, color: "#16a34a" },
+  viewing:    { label: "Viewing",    icon: <ViewModeIcon /> },
 };
 
 function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
@@ -290,7 +253,7 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ fontSize: "0.85rem", lineHeight: 1 }}>{meta.icon}</span>
+        <span style={{ display: "inline-flex", lineHeight: 1 }}>{meta.icon}</span>
         <span style={{ fontSize: "0.55rem", opacity: 0.5 }}>▾</span>
       </button>
 
@@ -339,7 +302,7 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
                 onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = active ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent"; }}
               >
-                <span style={{ fontSize: "0.9rem", width: 18, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+                <span style={{ display: "inline-flex", justifyContent: "center", width: 18, flexShrink: 0 }}>{item.icon}</span>
                 <span style={{ flex: 1 }}>{item.label}</span>
                 {active && <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>✓</span>}
               </button>
