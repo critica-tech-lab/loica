@@ -132,9 +132,10 @@ html {
 }
 
 /* ─── Selection ──────────────────────────────────────────── */
+/* Translucent so background marks (e.g. highlight) remain visible while the
+   range is selected; native browser selection blends over the text. */
 ::selection {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 /* ─── Blockquote line decoration ─────────────────────────── */
