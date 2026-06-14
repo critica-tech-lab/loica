@@ -1,12 +1,9 @@
 // Shared UI utilities — used by both client and server route modules
 
-const FALLBACK_COLORS = ["#AF3029","#66800B","#DA702C","#205EA6","#5E409D","#A02F6F","#D0A215","#24837B"];
+import { colorForKey } from "./user-colors";
 
-export function nameColor(name: string): string {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return FALLBACK_COLORS[Math.abs(h) % FALLBACK_COLORS.length];
-}
+/** Deterministic color for a name (sidebar/teamspace icons). */
+export const nameColor = colorForKey;
 
 export function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

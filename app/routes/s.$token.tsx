@@ -4,6 +4,7 @@ import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
+import { USER_COLORS, colorForKey } from "~/lib/user-colors";
 import type { Peer } from "~/components/Editor";
 import { useDocTypeExtension } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
@@ -43,21 +44,10 @@ const BIRDS = [
   "Tordo","Trile","Piranga","Tangara","Chirihue","Cometocino","Diuca",
   "Semillero","Negrillo","Pizarrita","Monterita","Naranjero","Celestino",
 ];
-const PALETTE = [
-  "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F",
-  "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
-];
-
 function randomGuestIdentity() {
   const name = BIRDS[Math.floor(Math.random() * BIRDS.length)];
-  const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  const color = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
   return { name, color };
-}
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return h;
 }
 
 // ─── Route ───────────────────────────────────────────────────
@@ -259,7 +249,7 @@ export default function SharePage() {
   const randomIdentity = useMemo(() => randomGuestIdentity(), []);
   const guestIdentity = useMemo(() => {
     if (externalEmail) {
-      return { name: externalEmail, color: PALETTE[Math.abs(hashCode(externalEmail)) % PALETTE.length] };
+      return { name: externalEmail, color: colorForKey(externalEmail) };
     }
     return randomIdentity;
   }, [externalEmail, randomIdentity]);

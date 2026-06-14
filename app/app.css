@@ -83,6 +83,26 @@
   --fg: var(--color-plumage);
   --accent: var(--color-scarlet);
   --accent-fg: #ffffff;
+
+  /* Semantic colors — single source of truth. Call sites use the base hue
+     inside color-mix() with their own alpha; *-bg are the common tints. */
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #eab308;
+  --info: #2563eb;
+  --highlight: #facc15;
+  --insert: var(--success);
+  --delete: var(--danger);
+  --success-bg: color-mix(in srgb, var(--success) 14%, transparent);
+  --danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --highlight-bg: color-mix(in srgb, var(--highlight) 28%, transparent);
+
+  /* Neutrals derived from --fg/--bg (no raw greys). */
+  --surface: var(--bg);
+  --border: color-mix(in srgb, var(--fg) 12%, transparent);
+  --muted: color-mix(in srgb, var(--fg) 55%, transparent);
+
+  --comment-color: var(--warning);
 }
 
 /* ─── Base ───────────────────────────────────────────────── */

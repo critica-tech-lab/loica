@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { EditorView as EditorViewType } from "@codemirror/view";
 import type { ResolvedThread } from "./comment-decorations";
+import { USER_COLORS } from "~/lib/user-colors";
 import {
   createImageDecorations,
   createListMarkerDecorations,
@@ -1088,10 +1089,7 @@ export function Editor({
             const provider = new WebsocketProvider(wsUrl, docId, ydoc, {
               params: wsParams ?? {},
             });
-            const PRESENCE_COLORS = [
-              "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F",
-              "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
-            ];
+            const PRESENCE_COLORS = USER_COLORS;
 
             const userName = userInfo?.name ?? "Guest";
             provider.awareness.setLocalStateField("user", {

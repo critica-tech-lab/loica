@@ -1,22 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Form } from "react-router";
-
-const AVATAR_COLORS = [
-  "#AF3029", // red
-  "#DA702C", // orange
-  "#D0A215", // yellow
-  "#66800B", // green
-  "#205EA6", // blue
-  "#5E409D", // purple
-  "#A02F6F", // magenta
-  "#24837B", // cyan
-];
-
-function avatarColor(name: string): string {
-  let hash = 0;
-  for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
+import { colorForKey } from "~/lib/user-colors";
 
 const menuStyle: React.CSSProperties = {
   position: "absolute",
@@ -80,7 +64,7 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const color = useMemo(() => avatarColor(userName), [userName]);
+  const color = useMemo(() => colorForKey(userName), [userName]);
   const initials = getInitials(userName);
 
   useEffect(() => {
