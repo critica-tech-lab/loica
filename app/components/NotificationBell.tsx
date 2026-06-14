@@ -218,8 +218,8 @@ export function NotificationBell() {
                     width: "100%",
                     padding: "0.75rem 1rem",
                     border: "none",
-                    borderBottom: "1px solid var(--border, rgba(28,22,18,0.1))",
-                    background: notif.read_at ? "transparent" : "var(--accent, rgba(0,0,0,0.02))",
+                    borderBottom: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
+                    background: notif.read_at ? "transparent" : "color-mix(in srgb, var(--accent) 8%, transparent)",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "background 0.2s",
@@ -227,13 +227,13 @@ export function NotificationBell() {
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background =
                       notif.read_at
-                        ? "rgba(28,22,18,0.05)"
-                        : "var(--accent, rgba(0,0,0,0.04))";
+                        ? "color-mix(in srgb, var(--fg) 5%, transparent)"
+                        : "color-mix(in srgb, var(--accent) 12%, transparent)";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = notif.read_at
                       ? "transparent"
-                      : "var(--accent, rgba(0,0,0,0.02))";
+                      : "color-mix(in srgb, var(--accent) 8%, transparent)";
                   }}
                 >
                   <div

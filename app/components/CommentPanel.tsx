@@ -256,7 +256,7 @@ function ThreadCard({
         borderRadius: "6px",
         border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         background: "var(--bg)",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+        boxShadow: "var(--shadow-sm)",
         padding: "0.75rem 0.85rem",
         marginBottom: "0.5rem",
         opacity: thread.resolved ? 0.55 : 1,

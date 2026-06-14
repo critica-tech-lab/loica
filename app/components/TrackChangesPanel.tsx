@@ -220,7 +220,7 @@ function ModeBtn({ label, active, onClick }: { label: string; active: boolean; o
     <button onClick={onClick} style={{
       flex: 1, padding: "0.3rem 0.5rem", border: "none", borderRadius: "6px",
       background: active ? "var(--bg)" : "transparent",
-      boxShadow: active ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+      boxShadow: active ? "var(--shadow-sm)" : "none",
       color: active ? "var(--fg)" : "color-mix(in srgb, var(--fg) 50%, transparent)",
       fontSize: "0.75rem", fontWeight: active ? 600 : 400, cursor: "pointer",
       fontFamily: "var(--font-ui)", transition: "all 100ms", whiteSpace: "nowrap",
