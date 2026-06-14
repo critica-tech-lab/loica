@@ -49,7 +49,7 @@ export function PresenceIndicator(props?: { peers?: Peer[]; currentUser?: Peer }
           border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
           borderRadius: "var(--radius-pill)",
           cursor: "pointer",
-          fontSize: "var(--text-xs)",
+          fontSize: "var(--fs-xs)",
           color: "var(--fg)",
           lineHeight: 1,
           transition: "background var(--ease-out)",
@@ -98,7 +98,7 @@ export function PresenceIndicator(props?: { peers?: Peer[]; currentUser?: Peer }
           <div
             style={{
               padding: "0.25rem 0.75rem 0.375rem",
-              fontSize: "var(--text-2xs)",
+              fontSize: "var(--fs-2xs)",
               opacity: 0.4,
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -114,7 +114,7 @@ export function PresenceIndicator(props?: { peers?: Peer[]; currentUser?: Peer }
                 alignItems: "center",
                 gap: "0.5rem",
                 padding: "0.3rem 0.75rem",
-                fontSize: "var(--text-base)",
+                fontSize: "var(--fs-base)",
               }}
             >
               <span

@@ -91,8 +91,8 @@ function PanelShell({ onClose, title, children }: { onClose: () => void; title: 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "280px", borderLeft: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", background: "var(--bg)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 1rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", flexShrink: 0 }}>
-        <span style={{ fontWeight: 600, fontSize: "var(--text-md)", fontFamily: "var(--font-ui)" }}>{title}</span>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "color-mix(in srgb, var(--fg) 55%, transparent)", fontSize: "var(--text-xl)", lineHeight: 1 }} aria-label="Close">×</button>
+        <span style={{ fontWeight: 600, fontSize: "var(--fs-md)", fontFamily: "var(--font-ui)" }}>{title}</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "color-mix(in srgb, var(--fg) 55%, transparent)", fontSize: "var(--fs-xl)", lineHeight: 1 }} aria-label="Close">×</button>
       </div>
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>{children}</div>
     </div>

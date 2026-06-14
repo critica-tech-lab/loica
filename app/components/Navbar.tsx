@@ -49,7 +49,7 @@ export function Navbar({ left, actions }: NavbarProps) {
         </Link>
         {left && (
           <>
-            <span style={{ opacity: 0.2, fontSize: "var(--text-base)", flexShrink: 0 }}>/</span>
+            <span style={{ opacity: 0.2, fontSize: "var(--fs-base)", flexShrink: 0 }}>/</span>
             {left}
           </>
         )}

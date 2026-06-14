@@ -82,11 +82,11 @@ export function CommentPanel({
         alignItems: "center",
         padding: "0.85rem 1rem 0",
       }}>
-        <span style={{ fontWeight: 600, fontSize: "var(--text-lg)" }}>Comments</span>
+        <span style={{ fontWeight: 600, fontSize: "var(--fs-lg)" }}>Comments</span>
         <button
           onClick={onClose}
           title="Close"
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-2xl)", opacity: 0.4, padding: "0 0.2rem", color: "var(--fg)", lineHeight: 1 }}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "var(--fs-2xl)", opacity: 0.4, padding: "0 0.2rem", color: "var(--fg)", lineHeight: 1 }}
           onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
           onMouseLeave={e => (e.currentTarget.style.opacity = "0.4")}
         >×</button>
@@ -99,7 +99,7 @@ export function CommentPanel({
             key={t}
             onClick={() => setTab(t)}
             style={{
-              fontSize: "var(--text-base)",
+              fontSize: "var(--fs-base)",
               fontFamily: "var(--font-ui)",
               padding: "0.2rem 0.65rem",
               borderRadius: "var(--radius-pill)",
@@ -123,7 +123,7 @@ export function CommentPanel({
       {/* Thread list */}
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "0 0.75rem 1rem" }}>
         {mergedItems.length === 0 && (
-          <div style={{ textAlign: "center", padding: "2rem 1rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", fontSize: "var(--text-base)" }}>
+          <div style={{ textAlign: "center", padding: "2rem 1rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", fontSize: "var(--fs-base)" }}>
             <div style={{ marginBottom: "0.5rem", opacity: 0.4, display: "flex", justifyContent: "center" }}><CommentIcon width={22} height={22} /></div>
             {tab === "open" ? "No open comments. Select text to add one." : "No resolved comments."}
           </div>
@@ -266,7 +266,7 @@ function ThreadCard({
       {/* New empty comment — textarea to type */}
       {isNew ? (
         <div>
-          <div style={{ fontSize: "var(--text-base)", fontWeight: 600, marginBottom: "0.35rem", color: "var(--fg)" }}>
+          <div style={{ fontSize: "var(--fs-base)", fontWeight: 600, marginBottom: "0.35rem", color: "var(--fg)" }}>
             {thread.userName}
           </div>
           <MentionTextarea
@@ -283,7 +283,7 @@ function ThreadCard({
             style={textareaStyle}
             rows={2}
           />
-          <div style={{ fontSize: "var(--text-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.3rem" }}>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.3rem" }}>
             Enter to post · Esc to cancel
           </div>
         </div>
@@ -405,9 +405,9 @@ function CommentBody({
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       {/* Header: name · time · actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: "0.25rem" }}>
-        <span style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--fg)" }}>{userName}</span>
-        <span style={{ fontSize: "var(--text-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>·</span>
-        <span style={{ fontSize: "var(--text-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>{timeAgo(createdAt)}</span>
+        <span style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--fg)" }}>{userName}</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>·</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>{timeAgo(createdAt)}</span>
 
         {/* Actions — appear on hover */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.15rem", opacity: (hovered && !readOnly && isOwn && !editing) ? 1 : 0, transition: "opacity var(--ease-fast)" }}>
@@ -448,10 +448,10 @@ function CommentBody({
             style={textareaStyle}
             rows={1}
           />
-          <div style={{ fontSize: "var(--text-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.2rem" }}>Enter to save · Esc to cancel</div>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.2rem" }}>Enter to save · Esc to cancel</div>
         </>
       ) : (
-        <div style={{ fontSize: "var(--text-base)", lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}>
+        <div style={{ fontSize: "var(--fs-base)", lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}>
           {body ? renderMentions(body) : <span style={{ opacity: 0.3, fontStyle: "italic" }}>empty comment</span>}
         </div>
       )}
@@ -481,7 +481,7 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
 
 const textareaStyle: React.CSSProperties = {
   width: "100%",
-  fontSize: "var(--text-base)",
+  fontSize: "var(--fs-base)",
   lineHeight: "1.55",
   background: "none",
   border: "none",

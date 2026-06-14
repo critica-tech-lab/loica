@@ -199,7 +199,7 @@ export function DocEditorView(_props: DocumentProps) {
             padding: "0.3rem 1rem",
             background: "color-mix(in srgb, var(--color-success) 10%, transparent)",
             borderBottom: "1px solid color-mix(in srgb, var(--color-success) 25%, transparent)",
-            fontSize: "var(--text-sm)",
+            fontSize: "var(--fs-sm)",
             color: "var(--color-success)",
             fontFamily: "var(--font-ui)",
             display: "flex",
@@ -494,7 +494,7 @@ function PMHistoryPreviewPane({
           padding: "0.5rem 1rem",
           background: "color-mix(in srgb, var(--accent) 12%, transparent)",
           borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-          fontSize: "var(--text-sm)",
+          fontSize: "var(--fs-sm)",
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
@@ -522,7 +522,7 @@ function PMHistoryPreviewPane({
                 border: "none",
                 cursor: "pointer",
                 padding: "0.3rem 0.6rem",
-                fontSize: "var(--text-xs)",
+                fontSize: "var(--fs-xs)",
                 fontWeight: 600,
                 fontFamily: "var(--font-ui)",
                 transition: "opacity var(--ease-fast)",
@@ -544,7 +544,7 @@ function PMHistoryPreviewPane({
               padding: "0 4px",
               color: "var(--fg)",
               opacity: 0.6,
-              fontSize: "var(--text-xl)",
+              fontSize: "var(--fs-xl)",
               lineHeight: 1,
               transition: "opacity var(--ease-fast)",
             }}
@@ -602,7 +602,7 @@ function HistoryPreviewPane({
           padding: "0.5rem 1rem",
           background: "color-mix(in srgb, var(--accent) 12%, transparent)",
           borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-          fontSize: "var(--text-sm)",
+          fontSize: "var(--fs-sm)",
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
@@ -615,7 +615,7 @@ function HistoryPreviewPane({
           <span style={{ color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>Viewing version:</span>
           <span style={{ opacity: 0.8 }}>{label}</span>
           {hasChanges && (
-            <span style={{ opacity: 0.5, fontSize: "var(--text-xs)", flexShrink: 0 }}>
+            <span style={{ opacity: 0.5, fontSize: "var(--fs-xs)", flexShrink: 0 }}>
               <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px" }}>added</span>
               {" "}
               <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
@@ -632,7 +632,7 @@ function HistoryPreviewPane({
                 border: "none",
                 cursor: "pointer",
                 padding: "0.25rem 0.6rem",
-                fontSize: "var(--text-xs)",
+                fontSize: "var(--fs-xs)",
                 fontWeight: 600,
                 fontFamily: "var(--font-ui)",
               }}
@@ -650,7 +650,7 @@ function HistoryPreviewPane({
               padding: "0 4px",
               color: "var(--fg)",
               opacity: 0.6,
-              fontSize: "var(--text-xl)",
+              fontSize: "var(--fs-xl)",
               lineHeight: 1,
               transition: "opacity var(--ease-fast)",
             }}
@@ -668,24 +668,24 @@ function HistoryPreviewPane({
             maxWidth: "70ch",
             margin: "0 auto",
             fontFamily: "var(--font-editor)",
-            fontSize: "var(--text-lg)",
+            fontSize: "var(--fs-lg)",
             lineHeight: 1.6,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
         >
           {title && hasChanges && (
-            <h1 style={{ marginTop: 0, fontSize: "var(--text-3xl)" }}>
+            <h1 style={{ marginTop: 0, fontSize: "var(--fs-3xl)" }}>
               {title}
             </h1>
           )}
           {!content && (
-            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--text-md)" }}>
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--fs-md)" }}>
               Content unavailable — this version predates rich history storage.
             </p>
           )}
           {!hasChanges && content && (
-            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--text-md)" }}>
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--fs-md)" }}>
               No changes compared to previous snapshot.
             </p>
           )}
@@ -893,7 +893,7 @@ function DocNavLeft() {
           gap: "0.25rem",
           color: "color-mix(in srgb, var(--fg) 55%, transparent)",
           textDecoration: "none",
-          fontSize: "var(--text-sm)",
+          fontSize: "var(--fs-sm)",
           padding: "0.15rem 0.3rem",
           borderRadius: "var(--radius-xs)",
           flexShrink: 0,
@@ -925,7 +925,7 @@ function DocNavLeft() {
             minWidth: 0,
             flex: "0 1 auto",
             fontFamily: "var(--font-ui)",
-            fontSize: "var(--text-md)",
+            fontSize: "var(--fs-md)",
             fontWeight: 500,
             letterSpacing: "-0.01em",
             background: "none",
@@ -944,7 +944,7 @@ function DocNavLeft() {
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-ui)",
-            fontSize: "var(--text-md)",
+            fontSize: "var(--fs-md)",
             fontWeight: 500,
             letterSpacing: "-0.01em",
             color: "var(--fg)",

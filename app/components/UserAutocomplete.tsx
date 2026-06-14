@@ -147,8 +147,8 @@ export function UserAutocomplete({
                 gap: "1px",
               }}
             >
-              <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{user.name}</span>
-              <span style={{ fontSize: "var(--text-2xs)", opacity: 0.5 }}>{user.email}</span>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>{user.name}</span>
+              <span style={{ fontSize: "var(--fs-2xs)", opacity: 0.5 }}>{user.email}</span>
             </button>
           ))}
         </div>

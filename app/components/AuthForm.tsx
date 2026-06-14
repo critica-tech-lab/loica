@@ -36,7 +36,7 @@ export function AuthForm({
             <span
               style={{
                 fontWeight: 700,
-                fontSize: "var(--text-3xl)",
+                fontSize: "var(--fs-3xl)",
                 letterSpacing: "-0.03em",
                 color: "var(--fg)",
               }}
@@ -49,7 +49,7 @@ export function AuthForm({
         {title && (
           <h1
             style={{
-              fontSize: "var(--text-xl)",
+              fontSize: "var(--fs-xl)",
               fontWeight: 700,
               margin: "0 0 2rem",
             }}
@@ -70,7 +70,7 @@ export function AuthForm({
               border:
                 "1px solid color-mix(in srgb, var(--color-scarlet) 40%, transparent)",
               borderRadius: "var(--radius-md)",
-              fontSize: "var(--text-base)",
+              fontSize: "var(--fs-base)",
               color: "var(--fg)",
             }}
           >
@@ -104,7 +104,7 @@ export function Field({
         display: "flex",
         flexDirection: "column",
         gap: "0.375rem",
-        fontSize: "var(--text-base)",
+        fontSize: "var(--fs-base)",
       }}
     >
       <span style={{ opacity: 0.6 }}>{label}</span>
@@ -134,7 +134,7 @@ export function SubmitButton({
       style={{
         width: "100%",
         padding: "0.625rem 1rem",
-        fontSize: "var(--text-md)",
+        fontSize: "var(--fs-md)",
         fontWeight: 700,
         background: "var(--fg)",
         color: "var(--bg)",

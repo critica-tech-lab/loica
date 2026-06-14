@@ -361,8 +361,8 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
                   gap: "1px",
                 }}
               >
-                <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{user.name}</span>
-                <span style={{ fontSize: "var(--text-2xs)", opacity: 0.5 }}>{user.email}</span>
+                <span style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>{user.name}</span>
+                <span style={{ fontSize: "var(--fs-2xs)", opacity: 0.5 }}>{user.email}</span>
               </button>
             ))}
           </div>
@@ -376,7 +376,7 @@ const submitBtnStyle: React.CSSProperties = {
   display: "block",
   marginLeft: "auto",
   marginTop: "0.25rem",
-  fontSize: "var(--text-2xs)",
+  fontSize: "var(--fs-2xs)",
   fontWeight: 600,
   letterSpacing: "0.05em",
   background: "none",

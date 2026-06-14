@@ -44,7 +44,7 @@ const itemStyle: React.CSSProperties = {
   width: "100%",
   gap: "8px",
   padding: "6px 12px",
-  fontSize: "var(--text-xs)",
+  fontSize: "var(--fs-xs)",
   color: "var(--fg)",
   background: "none",
   border: "none",
@@ -80,7 +80,7 @@ const pillsRowStyle: React.CSSProperties = {
 const pillBtnStyle: React.CSSProperties = {
   flex: 1,
   padding: "5px 8px",
-  fontSize: "var(--text-2xs)",
+  fontSize: "var(--fs-2xs)",
   fontWeight: 500,
   letterSpacing: "0.01em",
   textTransform: "uppercase",
@@ -95,7 +95,7 @@ const pillBtnStyle: React.CSSProperties = {
 const pillsHeadingStyle: React.CSSProperties = {
   display: "block",
   padding: "4px 12px 2px",
-  fontSize: "var(--text-2xs)",
+  fontSize: "var(--fs-2xs)",
   fontWeight: 500,
   letterSpacing: "0.04em",
   textTransform: "uppercase",

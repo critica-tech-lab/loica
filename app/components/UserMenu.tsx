@@ -36,7 +36,7 @@ const itemStyle: React.CSSProperties = {
   alignItems: "center",
   width: "100%",
   padding: "6px 12px",
-  fontSize: "var(--text-xs)",
+  fontSize: "var(--fs-xs)",
   color: "var(--fg)",
   textDecoration: "none",
   background: "none",
@@ -132,7 +132,7 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
           {/* Header with name */}
           <div style={{
             padding: "8px 12px 6px",
-            fontSize: "var(--text-xs)",
+            fontSize: "var(--fs-xs)",
             fontWeight: 600,
             color: "var(--fg)",
             opacity: 0.5,

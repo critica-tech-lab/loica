@@ -53,7 +53,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         zIndex: 400,
         ...popoverSurface,
         fontFamily: "var(--font-ui)",
-        fontSize: "var(--text-base)",
+        fontSize: "var(--fs-base)",
         color: "var(--fg)",
       }}
     >
@@ -62,10 +62,10 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: snippet ? "8px" : 0 }}>
           <Avatar name={change.authorName || "?"} color={authorColor} size={26} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: "var(--text-base)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+            <div style={{ fontWeight: 700, fontSize: "var(--fs-base)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
               {change.authorName || "Unknown"}
             </div>
-            <div style={{ fontSize: "var(--text-2xs)", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
               {timeAgo(change.createdAt)}
             </div>
           </div>
@@ -75,7 +75,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
           <div style={{
             padding: "3px 8px",
             borderLeft: `2px solid ${authorColor}`,
-            fontSize: "var(--text-xs)",
+            fontSize: "var(--fs-xs)",
             color: "color-mix(in srgb, var(--fg) 55%, transparent)",
             fontStyle: "italic",
             overflow: "hidden",
@@ -106,7 +106,7 @@ function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary
         ? "1px solid var(--fg)"
         : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
       borderRadius: 0,
-      fontSize: "var(--text-xs)",
+      fontSize: "var(--fs-xs)",
       fontWeight: 600,
       cursor: "pointer",
       background: primary ? "var(--fg)" : "transparent",

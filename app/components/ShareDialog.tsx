@@ -751,12 +751,12 @@ export function InlineSharePanel({
         {/* Current user + group + external shares */}
         {(shares.length > 0 || groupShares.length > 0 || externalShares.length > 0) && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, opacity: 0.4 }}>Shared with</span>
+            <span style={{ fontSize: "var(--fs-xs)", fontWeight: 600, opacity: 0.4 }}>Shared with</span>
             {groupShares.map((gs) => (
-              <div key={gs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "0.2rem 0" }}>
+              <div key={gs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--fs-xs)", padding: "0.2rem 0" }}>
                 <span>
                   <span style={{ fontWeight: 600 }}>{gs.group_name}</span>
-                  <span style={{ marginLeft: "0.3rem", opacity: 0.4, fontSize: "var(--text-2xs)" }}>{gs.member_count} {gs.member_count !== 1 ? "members" : "member"}</span>
+                  <span style={{ marginLeft: "0.3rem", opacity: 0.4, fontSize: "var(--fs-2xs)" }}>{gs.member_count} {gs.member_count !== 1 ? "members" : "member"}</span>
                 </span>
                 <shareFetcher.Form method="post" style={{ display: "flex" }}>
                   <input type="hidden" name="intent" value="unshare-doc" />
@@ -765,7 +765,7 @@ export function InlineSharePanel({
                     type="submit"
                     disabled={shareBusy}
                     onClick={(e) => { if (!confirm(`Remove access for ${gs.group_name}?`)) e.preventDefault(); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--text-base)", padding: "0 0.2rem" }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--fs-base)", padding: "0 0.2rem" }}
                   >
                     &times;
                   </button>
@@ -773,10 +773,10 @@ export function InlineSharePanel({
               </div>
             ))}
             {shares.map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "0.2rem 0" }}>
+              <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--fs-xs)", padding: "0.2rem 0" }}>
                 <span>
                   <span style={{ fontWeight: 600 }}>{s.user_name}</span>
-                  {s.status === "pending" && <span style={{ marginLeft: "0.3rem", opacity: 0.5, fontSize: "var(--text-2xs)" }}>pending</span>}
+                  {s.status === "pending" && <span style={{ marginLeft: "0.3rem", opacity: 0.5, fontSize: "var(--fs-2xs)" }}>pending</span>}
                 </span>
                 <shareFetcher.Form method="post" style={{ display: "flex" }}>
                   <input type="hidden" name="intent" value="unshare-doc" />
@@ -785,7 +785,7 @@ export function InlineSharePanel({
                     type="submit"
                     disabled={shareBusy}
                     onClick={(e) => { if (!confirm(`Remove ${s.user_name}'s access?`)) e.preventDefault(); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--text-base)", padding: "0 0.2rem" }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--fs-base)", padding: "0 0.2rem" }}
                   >
                     &times;
                   </button>
@@ -793,10 +793,10 @@ export function InlineSharePanel({
               </div>
             ))}
             {externalShares.map((es) => (
-              <div key={es.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "0.2rem 0" }}>
+              <div key={es.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "var(--fs-xs)", padding: "0.2rem 0" }}>
                 <span>
                   <span style={{ fontWeight: 600 }}>{es.external_email}</span>
-                  <span style={{ marginLeft: "0.3rem", opacity: 0.4, fontSize: "var(--text-2xs)" }}>invited</span>
+                  <span style={{ marginLeft: "0.3rem", opacity: 0.4, fontSize: "var(--fs-2xs)" }}>invited</span>
                 </span>
                 <shareFetcher.Form method="post" style={{ display: "flex" }}>
                   <input type="hidden" name="intent" value="unshare-doc" />
@@ -805,7 +805,7 @@ export function InlineSharePanel({
                     type="submit"
                     disabled={shareBusy}
                     onClick={(e) => { if (!confirm(`Remove access for ${es.external_email}?`)) e.preventDefault(); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--text-base)", padding: "0 0.2rem" }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg)", opacity: 0.3, fontSize: "var(--fs-base)", padding: "0 0.2rem" }}
                   >
                     &times;
                   </button>
@@ -818,7 +818,7 @@ export function InlineSharePanel({
 
         {/* Public links */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)", borderRadius: "0.5rem", padding: "0.75rem" }}>
-          <span style={{ fontSize: "var(--text-2xs)", fontWeight: 500, opacity: 0.4 }}>Public links</span>
+          <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 500, opacity: 0.4 }}>Public links</span>
           <ShareToggleSection
             label="View only"
             enabled={!!currentViewToken}
@@ -880,7 +880,7 @@ export function InlineSharePanel({
   return (
     <div style={inlinePanelStyle}>
       <div style={inlineHeaderStyle}>
-        <span style={{ fontWeight: 700, fontSize: "var(--text-md)" }}>Share</span>
+        <span style={{ fontWeight: 700, fontSize: "var(--fs-md)" }}>Share</span>
         <button
           onClick={onClose}
           style={inlineCloseBtnStyle}
@@ -916,7 +916,7 @@ const inlineHeaderStyle: React.CSSProperties = {
 const inlineCloseBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
-  fontSize: "var(--text-2xl)",
+  fontSize: "var(--fs-2xl)",
   color: "var(--fg)",
   cursor: "pointer",
   padding: "0 0.25rem",
@@ -927,7 +927,7 @@ const inlineCloseBtnStyle: React.CSSProperties = {
 const inlineInputStyle: React.CSSProperties = {
   flex: 1,
   minWidth: "100px",
-  fontSize: "var(--text-xs)",
+  fontSize: "var(--fs-xs)",
   padding: "0.3rem 0.5rem",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
   borderRadius: "var(--radius-xs)",
@@ -937,7 +937,7 @@ const inlineInputStyle: React.CSSProperties = {
 };
 
 const inlineSubmitBtnStyle: React.CSSProperties = {
-  fontSize: "var(--text-xs)",
+  fontSize: "var(--fs-xs)",
   padding: "0.3rem 0.5rem",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
   borderRadius: "var(--radius-xs)",

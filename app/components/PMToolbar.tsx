@@ -81,10 +81,10 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
       <Sep />
 
       {/* Headings */}
-      <Btn title="Heading 1 (Ctrl+Alt+1)" active={blockType === "h1"} style={{ fontWeight: 700, fontSize: "var(--text-lg)" }} onActivate={run(() => api?.setHeading?.(1))}>H1</Btn>
-      <Btn title="Heading 2 (Ctrl+Alt+2)" active={blockType === "h2"} style={{ fontWeight: 700, fontSize: "var(--text-lg)" }} onActivate={run(() => api?.setHeading?.(2))}>H2</Btn>
-      <Btn title="Heading 3 (Ctrl+Alt+3)" active={blockType === "h3"} style={{ fontWeight: 700, fontSize: "var(--text-base)" }} onActivate={run(() => api?.setHeading?.(3))}>H3</Btn>
-      <Btn title="Heading 4 (Ctrl+Alt+4)" active={blockType === "h4"} style={{ fontWeight: 700, fontSize: "var(--text-sm)" }} onActivate={run(() => api?.setHeading?.(4))}>H4</Btn>
+      <Btn title="Heading 1 (Ctrl+Alt+1)" active={blockType === "h1"} style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }} onActivate={run(() => api?.setHeading?.(1))}>H1</Btn>
+      <Btn title="Heading 2 (Ctrl+Alt+2)" active={blockType === "h2"} style={{ fontWeight: 700, fontSize: "var(--fs-lg)" }} onActivate={run(() => api?.setHeading?.(2))}>H2</Btn>
+      <Btn title="Heading 3 (Ctrl+Alt+3)" active={blockType === "h3"} style={{ fontWeight: 700, fontSize: "var(--fs-base)" }} onActivate={run(() => api?.setHeading?.(3))}>H3</Btn>
+      <Btn title="Heading 4 (Ctrl+Alt+4)" active={blockType === "h4"} style={{ fontWeight: 700, fontSize: "var(--fs-sm)" }} onActivate={run(() => api?.setHeading?.(4))}>H4</Btn>
 
       <Sep />
 
@@ -115,7 +115,7 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
           </svg>
         }
       />
-      <Btn title="Blockquote" active={active?.inBlockquote} style={{ fontSize: "var(--text-xl)", fontWeight: 700, opacity: active?.inBlockquote ? 1 : 0.6 }} onActivate={run(() => api?.toggleBlockquote?.())}>&#8220;</Btn>
+      <Btn title="Blockquote" active={active?.inBlockquote} style={{ fontSize: "var(--fs-xl)", fontWeight: 700, opacity: active?.inBlockquote ? 1 : 0.6 }} onActivate={run(() => api?.toggleBlockquote?.())}>&#8220;</Btn>
 
       <Sep />
 
@@ -330,7 +330,7 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
                   border: "none",
                   background: active ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent",
                   color: item.color ?? "var(--fg)",
-                  fontSize: "var(--text-base)",
+                  fontSize: "var(--fs-base)",
                   fontWeight: active ? 600 : 400,
                   cursor: "pointer",
                   textAlign: "left",

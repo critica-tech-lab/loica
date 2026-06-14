@@ -66,7 +66,7 @@ export function detectLanguage(text: string): "en" | "es" {
 // ─── Shared style for floating bubble buttons ────────────
 
 export const floatingBubbleBtnStyle: React.CSSProperties = {
-  fontSize: "var(--text-base)",
+  fontSize: "var(--fs-base)",
   fontWeight: 600,
   padding: "0.4rem 0.75rem",
   background: "var(--fg)",
@@ -107,7 +107,7 @@ export function DocActionBar({ content, connectionStatus, showBranding }: DocAct
         padding: "0.2rem max(1rem, calc(50% - 22rem))",
         borderTop: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)",
         flexShrink: 0,
-        fontSize: "var(--text-xs)",
+        fontSize: "var(--fs-xs)",
         color: "color-mix(in srgb, var(--fg) 45%, transparent)",
         letterSpacing: "0.02em",
       }}
