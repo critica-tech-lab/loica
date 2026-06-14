@@ -117,12 +117,12 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
         top,
         right: 10,
         width: CARD_W - 20,
-        background: "#fff",
+        background: "var(--surface)",
         borderRadius: "4px",
         boxShadow: focused
           ? "0 1px 8px rgba(0,0,0,0.20), 0 2px 4px rgba(0,0,0,0.12)"
           : "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
-        border: focused ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+        border: focused ? "1px solid var(--border)" : "1px solid color-mix(in srgb, var(--fg) 8%, transparent)",
         pointerEvents: "all",
         cursor: focused ? "default" : "pointer",
         transition: "box-shadow 120ms, border-color 120ms",
@@ -149,7 +149,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
 
       {/* Replies */}
       {thread.replies.length > 0 && (
-        <div style={{ borderTop: "1px solid #e0e0e0" }}>
+        <div style={{ borderTop: "1px solid var(--border)" }}>
           {thread.replies.map(r => (
             <CommentEntry
               key={r.id}
@@ -171,7 +171,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
       {focused && (
         <div
           onClick={e => e.stopPropagation()}
-          style={{ borderTop: "1px solid #e0e0e0", padding: "6px 12px 8px" }}
+          style={{ borderTop: "1px solid var(--border)", padding: "6px 12px 8px" }}
         >
           {replyOpen ? (
             <>
@@ -184,9 +184,9 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 rows={2}
                 style={{
                   width: "100%", resize: "none", border: "none", outline: "none",
-                  borderBottom: "2px solid #1a73e8", padding: "2px 0",
+                  borderBottom: "2px solid var(--accent)", padding: "2px 0",
                   fontSize: "0.8rem", fontFamily: "var(--font-ui)",
-                  background: "transparent", color: "#202124", lineHeight: 1.5,
+                  background: "transparent", color: "var(--fg)", lineHeight: 1.5,
                   boxSizing: "border-box",
                 }}
               />
@@ -201,7 +201,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 onClick={() => setReplyOpen(true)}
                 style={{
                   flex: 1, textAlign: "left", background: "none", border: "none",
-                  color: "#80868b", fontSize: "0.78rem", cursor: "text",
+                  color: "var(--muted)", fontSize: "0.78rem", cursor: "text",
                   fontFamily: "var(--font-ui)", padding: "2px 0",
                 }}
               >
@@ -210,7 +210,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
               <GButton
                 variant="text"
                 onClick={() => { editorApi.current?.resolveThread(thread.id); onFocus(null); }}
-                style={{ color: "#137333", fontWeight: 600 }}
+                style={{ color: "var(--success)", fontWeight: 600 }}
               >
                 Resolve
               </GButton>
@@ -244,16 +244,16 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
         <span style={{
           width: 28, height: 28, borderRadius: "50%", background: color, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: "0.7rem", fontWeight: 700, userSelect: "none",
+          color: "var(--accent-fg)", fontSize: "0.7rem", fontWeight: 700, userSelect: "none",
         }}>
           {userName.slice(0, 1).toUpperCase()}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--fg)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {userName}
           </div>
           {createdAt > 0 && (
-            <div style={{ fontSize: "0.68rem", color: "#80868b", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "0.68rem", color: "var(--muted)", lineHeight: 1.2 }}>
               {timeAgo(createdAt)}
             </div>
           )}
@@ -285,9 +285,9 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
             rows={2}
             style={{
               width: "100%", resize: "none", border: "none", outline: "none",
-              borderBottom: "2px solid #1a73e8", padding: "2px 0",
+              borderBottom: "2px solid var(--accent)", padding: "2px 0",
               fontSize: "0.8rem", fontFamily: "var(--font-ui)",
-              background: "transparent", color: "#202124", lineHeight: 1.5,
+              background: "transparent", color: "var(--fg)", lineHeight: 1.5,
               boxSizing: "border-box",
             }}
           />
@@ -297,8 +297,8 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
           </div>
         </>
       ) : (
-        <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
-          {body || <em style={{ color: "#80868b" }}>Empty comment</em>}
+        <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "var(--fg)", wordBreak: "break-word" }}>
+          {body || <em style={{ color: "var(--muted)" }}>Empty comment</em>}
         </p>
       )}
     </div>
@@ -326,8 +326,8 @@ function GButton({ variant, children, onClick, disabled, style }: {
         fontFamily: "var(--font-ui)",
         transition: "background 100ms",
         ...(variant === "filled"
-          ? { background: disabled ? "#e8eaed" : "#1a73e8", color: disabled ? "#80868b" : "#fff" }
-          : { background: "transparent", color: "#1a73e8" }),
+          ? { background: disabled ? "color-mix(in srgb, var(--fg) 8%, transparent)" : "var(--accent)", color: disabled ? "var(--muted)" : "var(--accent-fg)" }
+          : { background: "transparent", color: "var(--accent)" }),
         ...style,
       }}
     >
@@ -343,11 +343,11 @@ function IconBtn({ title, onClick, children }: { title: string; onClick: (e: Rea
       onClick={onClick}
       style={{
         width: 26, height: 26, border: "none", borderRadius: "50%",
-        background: "transparent", cursor: "pointer", color: "#5f6368",
+        background: "transparent", cursor: "pointer", color: "var(--muted)",
         display: "flex", alignItems: "center", justifyContent: "center",
         transition: "background 100ms",
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = "#f1f3f4"; }}
+      onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
       {children}
