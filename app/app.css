@@ -78,6 +78,19 @@
   --shadow-md: 0 4px 16px rgba(16,15,15,0.15);
   --shadow-lg: 0 8px 32px rgba(16,15,15,0.20);
 
+  /* Type scale — anchored at the common existing sizes; near-duplicate values
+     snap to the nearest step (shifts ≤0.05rem). */
+  --text-2xs:  0.65rem;
+  --text-xs:   0.7rem;
+  --text-sm:   0.75rem;
+  --text-base: 0.8rem;
+  --text-md:   0.85rem;
+  --text-lg:   0.9rem;
+  --text-xl:   1rem;
+  --text-2xl:  1.1rem;
+  --text-3xl:  1.5rem;
+  --text-4xl:  3rem;
+
   /* Timing */
   --ease-out: 150ms ease-out;
   --ease-fast: 120ms ease-out;

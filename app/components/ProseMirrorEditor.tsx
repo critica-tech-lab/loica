@@ -1175,7 +1175,7 @@ function TableContextMenu({ x, y, onClose, onAddRowBefore, onAddRowAfter, onDele
         position: "fixed", top, left, width: W, zIndex: "var(--z-modal)",
         ...popoverSurface,
         fontFamily: "var(--font-ui)",
-        fontSize: "0.8rem",
+        fontSize: "var(--text-base)",
         color: "var(--fg)",
         userSelect: "none",
       }}
@@ -1258,7 +1258,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
         ...popoverSurface,
         padding: "0.3rem 0.6rem",
         fontFamily: "var(--font-ui)",
-        fontSize: "0.75rem",
+        fontSize: "var(--text-sm)",
         color: "var(--fg)",
       }}
     >
@@ -1274,7 +1274,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", textDecoration: "none", whiteSpace: "nowrap" }}
+        style={{ opacity: 0.55, fontSize: "var(--text-xs)", color: "var(--fg)", textDecoration: "none", whiteSpace: "nowrap" }}
         onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
         onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.55"; }}
       >
@@ -1283,7 +1283,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
       <span style={{ opacity: 0.25, userSelect: "none" }}>|</span>
       <button
         onClick={onEdit}
-        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", whiteSpace: "nowrap" }}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "var(--text-xs)", color: "var(--fg)", whiteSpace: "nowrap" }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.55"; }}
       >
@@ -1291,7 +1291,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
       </button>
       <button
         onClick={onRemove}
-        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "0.7rem", color: "var(--fg)", whiteSpace: "nowrap" }}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, opacity: 0.55, fontSize: "var(--text-xs)", color: "var(--fg)", whiteSpace: "nowrap" }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.55"; }}
       >

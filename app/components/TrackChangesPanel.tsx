@@ -71,7 +71,7 @@ export function TrackChangesPanel() {
             borderRadius: "var(--radius-md)",
             background: showMarkup ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
             color: showMarkup ? "var(--accent)" : "color-mix(in srgb, var(--fg) 55%, transparent)",
-            fontSize: "0.74rem",
+            fontSize: "var(--text-sm)",
             fontWeight: 500,
             cursor: "pointer",
             fontFamily: "var(--font-ui)",
@@ -83,7 +83,7 @@ export function TrackChangesPanel() {
         </button>
 
         {enabled && (
-          <p style={{ margin: "0.4rem 0 0", fontSize: "0.72rem", color: "color-mix(in srgb, var(--fg) 50%, transparent)", lineHeight: 1.4 }}>
+          <p style={{ margin: "0.4rem 0 0", fontSize: "var(--text-xs)", color: "color-mix(in srgb, var(--fg) 50%, transparent)", lineHeight: 1.4 }}>
             Your edits appear as suggestions. Others can accept or reject them.
           </p>
         )}
@@ -92,7 +92,7 @@ export function TrackChangesPanel() {
       {/* Navigation + bulk actions */}
       {changes.length > 0 && (
         <div style={{ padding: "0.35rem 0.75rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", flexShrink: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span style={{ fontSize: "0.74rem", color: "color-mix(in srgb, var(--fg) 55%, transparent)", flex: 1 }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "color-mix(in srgb, var(--fg) 55%, transparent)", flex: 1 }}>
             {activeIdx + 1} / {changes.length}
           </span>
           {changes.length > 1 && (
@@ -111,10 +111,10 @@ export function TrackChangesPanel() {
         {changes.length === 0 ? (
           <div style={{ padding: "2.5rem 1rem", textAlign: "center" }}>
             <div style={{ marginBottom: "0.5rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)" }}>{enabled ? <PencilIcon width={22} height={22} /> : <EyeIcon width={22} height={22} />}</div>
-            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--fg)", marginBottom: "0.25rem" }}>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--fg)", marginBottom: "0.25rem" }}>
               {enabled ? "Suggesting mode on" : "No pending changes"}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "color-mix(in srgb, var(--fg) 45%, transparent)", lineHeight: 1.5 }}>
               {enabled
                 ? "Start typing — your edits will appear as suggestions."
                 : "Switch to Suggesting to track edits."}
@@ -168,26 +168,26 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
         <span style={{
           width: 20, height: 20, borderRadius: "50%", background: color, flexShrink: 0,
           display: "inline-flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: "0.6rem", fontWeight: 700, userSelect: "none",
+          color: "#fff", fontSize: "var(--text-2xs)", fontWeight: 700, userSelect: "none",
         }}>
           {(change.authorId || "?").slice(0, 1).toUpperCase()}
         </span>
-        <span style={{ fontSize: "0.74rem", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {change.authorId || "Unknown"}
         </span>
         {date && (
-          <span style={{ fontSize: "0.67rem", color: "color-mix(in srgb, var(--fg) 38%, transparent)", flexShrink: 0 }}>{date}</span>
+          <span style={{ fontSize: "var(--text-2xs)", color: "color-mix(in srgb, var(--fg) 38%, transparent)", flexShrink: 0 }}>{date}</span>
         )}
       </div>
 
       {/* Diff preview */}
       <div style={{
-        fontSize: "0.78rem", marginBottom: "0.4rem",
+        fontSize: "var(--text-base)", marginBottom: "0.4rem",
         padding: "0.25rem 0.4rem", borderRadius: "var(--radius-xs)",
         background: isInsert ? `color-mix(in srgb, ${color} 10%, transparent)` : isDelete ? "color-mix(in srgb, var(--color-danger) 8%, transparent)" : "color-mix(in srgb, var(--fg) 5%, transparent)",
         borderLeft: `2px solid ${color}`,
       }}>
-        <span style={{ fontSize: "0.65rem", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "0.35rem" }}>
+        <span style={{ fontSize: "var(--text-2xs)", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "0.35rem" }}>
           {isInsert ? "+" : isDelete ? "−" : "~"}
         </span>
         <span style={{ color: "color-mix(in srgb, var(--fg) 80%, transparent)", textDecoration: isDelete ? `line-through ${color}` : "none", fontStyle: isDelete ? "italic" : "normal" }}>
@@ -224,7 +224,7 @@ function ModeBtn({ label, active, onClick }: { label: React.ReactNode; active: b
       background: active ? "var(--bg)" : "transparent",
       boxShadow: active ? "var(--shadow-sm)" : "none",
       color: active ? "var(--fg)" : "color-mix(in srgb, var(--fg) 50%, transparent)",
-      fontSize: "0.75rem", fontWeight: active ? 600 : 400, cursor: "pointer",
+      fontSize: "var(--text-sm)", fontWeight: active ? 600 : 400, cursor: "pointer",
       fontFamily: "var(--font-ui)", transition: "all 100ms", whiteSpace: "nowrap",
     }}>{label}</button>
   );
@@ -236,16 +236,16 @@ function NavBtn({ label, title, onClick, disabled }: { label: string; title: str
       width: 24, height: 24, border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
       borderRadius: "var(--radius-xs)", background: "none", cursor: disabled ? "default" : "pointer",
       color: disabled ? "color-mix(in srgb, var(--fg) 25%, transparent)" : "var(--fg)",
-      fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: "var(--text-base)", display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "var(--font-ui)",
     }}>{label}</button>
   );
 }
 
 function bulkBtn(color: string): React.CSSProperties {
-  return { padding: "0.2rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 35%, transparent)`, borderRadius: "5px", background: `color-mix(in srgb, ${color} 8%, transparent)`, color, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-ui)" };
+  return { padding: "0.2rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 35%, transparent)`, borderRadius: "5px", background: `color-mix(in srgb, ${color} 8%, transparent)`, color, fontSize: "var(--text-xs)", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-ui)" };
 }
 
 function cardActionBtn(color: string): React.CSSProperties {
-  return { padding: "0.18rem 0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, borderRadius: "var(--radius-xs)", background: `color-mix(in srgb, ${color} 7%, transparent)`, color, fontSize: "0.7rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-ui)" };
+  return { padding: "0.18rem 0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, borderRadius: "var(--radius-xs)", background: `color-mix(in srgb, ${color} 7%, transparent)`, color, fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-ui)" };
 }

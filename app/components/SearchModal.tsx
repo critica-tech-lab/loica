@@ -125,7 +125,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
             placeholder="Search documents…"
             style={{
               flex: 1,
-              fontSize: "0.9rem",
+              fontSize: "var(--text-lg)",
               background: "none",
               border: "none",
               color: "var(--fg)",
@@ -136,7 +136,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
           <kbd
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: "0.65rem",
+              fontSize: "var(--text-2xs)",
               padding: "0.15rem 0.4rem",
               borderRadius: "var(--radius-sm)",
               border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
@@ -150,12 +150,12 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
         {query.trim() && (
           <div style={{ maxHeight: "20rem", overflowY: "auto" }}>
             {loading && results.length === 0 && (
-              <div style={{ padding: "1rem", textAlign: "center", opacity: 0.4, fontSize: "0.8rem" }}>
+              <div style={{ padding: "1rem", textAlign: "center", opacity: 0.4, fontSize: "var(--text-base)" }}>
                 Searching…
               </div>
             )}
             {!loading && results.length === 0 && (
-              <div style={{ padding: "1rem", textAlign: "center", opacity: 0.4, fontSize: "0.8rem" }}>
+              <div style={{ padding: "1rem", textAlign: "center", opacity: 0.4, fontSize: "var(--text-base)" }}>
                 No results found.
               </div>
             )}
@@ -169,7 +169,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
                   width: "100%",
                   textAlign: "left",
                   padding: "0.6rem 1rem",
-                  fontSize: "0.8rem",
+                  fontSize: "var(--text-base)",
                   background: i === selectedIndex
                     ? "color-mix(in srgb, var(--fg) 6%, transparent)"
                     : "none",
@@ -181,10 +181,10 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
               >
                 <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>{r.title}</div>
                 <div
-                  style={{ opacity: 0.5, fontSize: "0.75rem", lineHeight: 1.4 }}
+                  style={{ opacity: 0.5, fontSize: "var(--text-sm)", lineHeight: 1.4 }}
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(r.snippet) }}
                 />
-                <div style={{ opacity: 0.3, fontSize: "0.65rem", marginTop: "0.15rem" }}>
+                <div style={{ opacity: 0.3, fontSize: "var(--text-2xs)", marginTop: "0.15rem" }}>
                   {r.workspace_name}
                 </div>
               </button>

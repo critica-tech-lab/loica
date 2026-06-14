@@ -85,7 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.6rem",
-                fontSize: "0.8rem",
+                fontSize: "var(--text-base)",
                 padding: t.action ? "0.35rem 0.35rem 0.35rem 0.85rem" : "0.5rem 1rem",
                 borderRadius: "var(--radius-lg)",
                 border: "1px solid",
@@ -111,7 +111,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     dismiss(t.id);
                   }}
                   style={{
-                    fontSize: "0.72rem",
+                    fontSize: "var(--text-xs)",
                     fontWeight: 600,
                     letterSpacing: "-0.005em",
                     padding: "0.3rem 0.75rem",

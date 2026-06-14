@@ -186,7 +186,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 style={{
                   width: "100%", resize: "none", border: "none", outline: "none",
                   borderBottom: "2px solid #1a73e8", padding: "2px 0",
-                  fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+                  fontSize: "var(--text-base)", fontFamily: "var(--font-ui)",
                   background: "transparent", color: "#202124", lineHeight: 1.5,
                   boxSizing: "border-box",
                 }}
@@ -202,7 +202,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 onClick={() => setReplyOpen(true)}
                 style={{
                   flex: 1, textAlign: "left", background: "none", border: "none",
-                  color: "#80868b", fontSize: "0.78rem", cursor: "text",
+                  color: "#80868b", fontSize: "var(--text-base)", cursor: "text",
                   fontFamily: "var(--font-ui)", padding: "2px 0",
                 }}
               >
@@ -244,11 +244,11 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
         <Avatar name={userName} color={color} size={28} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {userName}
           </div>
           {createdAt > 0 && (
-            <div style={{ fontSize: "0.68rem", color: "#80868b", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "#80868b", lineHeight: 1.2 }}>
               {timeAgo(createdAt)}
             </div>
           )}
@@ -281,7 +281,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
             style={{
               width: "100%", resize: "none", border: "none", outline: "none",
               borderBottom: "2px solid #1a73e8", padding: "2px 0",
-              fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+              fontSize: "var(--text-base)", fontFamily: "var(--font-ui)",
               background: "transparent", color: "#202124", lineHeight: 1.5,
               boxSizing: "border-box",
             }}
@@ -292,7 +292,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
           </div>
         </>
       ) : (
-        <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
+        <p style={{ margin: 0, fontSize: "var(--text-base)", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
           {body || <em style={{ color: "#80868b" }}>Empty comment</em>}
         </p>
       )}
@@ -315,7 +315,7 @@ function GButton({ variant, children, onClick, disabled, style }: {
         padding: "5px 12px",
         border: "none",
         borderRadius: "var(--radius-xs)",
-        fontSize: "0.75rem",
+        fontSize: "var(--text-sm)",
         fontWeight: 600,
         cursor: disabled ? "default" : "pointer",
         fontFamily: "var(--font-ui)",

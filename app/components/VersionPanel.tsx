@@ -142,11 +142,11 @@ export function VersionPanel({
     <div style={inline ? inlinePanelStyle : panelStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <span style={{ fontWeight: 700, fontSize: "0.85rem" }}>Version history</span>
+        <span style={{ fontWeight: 700, fontSize: "var(--text-md)" }}>Version history</span>
         <button
           onClick={onClose}
           aria-label="Close"
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", opacity: 0.5, padding: "0 2px", color: "var(--fg)" }}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-2xl)", opacity: 0.5, padding: "0 2px", color: "var(--fg)" }}
         >×</button>
       </div>
 
@@ -160,10 +160,10 @@ export function VersionPanel({
       {/* History list */}
       <div style={{ flex: 1, overflowY: "auto" }}>
         {historyFetcher.state === "loading" && rows.length === 0 && (
-          <div style={{ padding: "1rem 0.75rem", fontSize: "0.78rem", opacity: 0.4 }}>Loading…</div>
+          <div style={{ padding: "1rem 0.75rem", fontSize: "var(--text-base)", opacity: 0.4 }}>Loading…</div>
         )}
         {historyFetcher.state !== "loading" && rows.length === 0 && (
-          <div style={{ padding: "1rem 0.75rem", fontSize: "0.78rem", opacity: 0.4 }}>
+          <div style={{ padding: "1rem 0.75rem", fontSize: "var(--text-base)", opacity: 0.4 }}>
             No saved versions yet. Versions are saved automatically every minute while editing.
           </div>
         )}
@@ -178,7 +178,7 @@ export function VersionPanel({
               borderBottom: "1px solid color-mix(in srgb, var(--fg) 6%, transparent)",
             }}
           >
-            <span style={{ fontWeight: 600, fontSize: "0.82rem" }}>Current version</span>
+            <span style={{ fontWeight: 600, fontSize: "var(--text-base)" }}>Current version</span>
             <span style={badgeStyle("live")}>live</span>
           </button>
         )}
@@ -201,18 +201,18 @@ export function VersionPanel({
                 }}
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontSize: "0.82rem", fontWeight: isSelected ? 600 : 400 }}>
+                  <span style={{ fontSize: "var(--text-base)", fontWeight: isSelected ? 600 : 400 }}>
                     {session.userName || "Anonymous"}
                   </span>
-                  <span style={{ fontSize: "0.75rem", opacity: 0.45, marginLeft: "0.4rem" }}>
+                  <span style={{ fontSize: "var(--text-sm)", opacity: 0.45, marginLeft: "0.4rem" }}>
                     {timeAgo(session.endedAt)}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
                   {isSelected && (
-                    <span style={{ fontSize: "0.65rem", opacity: 0.55, color: "var(--accent)" }}>preview ↗</span>
+                    <span style={{ fontSize: "var(--text-2xs)", opacity: 0.55, color: "var(--accent)" }}>preview ↗</span>
                   )}
-                  <span style={{ fontSize: "0.68rem", opacity: 0.45 }}>
+                  <span style={{ fontSize: "var(--text-xs)", opacity: 0.45 }}>
                     {session.updateCount} edit{session.updateCount !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -231,14 +231,14 @@ export function VersionPanel({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
-                  <span style={{ fontSize: "0.82rem", fontWeight: isSelected ? 600 : 400, color: "var(--fg)" }}>
+                  <span style={{ fontSize: "var(--text-base)", fontWeight: isSelected ? 600 : 400, color: "var(--fg)" }}>
                     {timeAgo(version.created_at)}
                   </span>
-                  {isVersionLoading && <span style={{ fontSize: "0.68rem", opacity: 0.5 }}>loading…</span>}
+                  {isVersionLoading && <span style={{ fontSize: "var(--text-xs)", opacity: 0.5 }}>loading…</span>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
                   {version.creator_name && !version.auto && (
-                    <span style={{ fontSize: "0.7rem", opacity: 0.55, maxWidth: "6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "var(--text-xs)", opacity: 0.55, maxWidth: "6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {version.creator_name}
                     </span>
                   )}
@@ -258,7 +258,7 @@ export function VersionPanel({
           <button onClick={handleRestore} style={restoreBtnStyle}>
             Restore this version
           </button>
-          <p style={{ margin: "0.4rem 0 0", fontSize: "0.68rem", opacity: 0.5, lineHeight: 1.4 }}>
+          <p style={{ margin: "0.4rem 0 0", fontSize: "var(--text-xs)", opacity: 0.5, lineHeight: 1.4 }}>
             Current content will be overwritten. A backup is saved automatically before restoring.
           </p>
         </div>
@@ -318,7 +318,7 @@ const rowStyle: React.CSSProperties = {
 };
 
 const saveBtnStyle: React.CSSProperties = {
-  fontSize: "0.78rem",
+  fontSize: "var(--text-base)",
   width: "100%",
   padding: "0.4rem 0.5rem",
   background: "color-mix(in srgb, var(--fg) 8%, transparent)",
@@ -330,7 +330,7 @@ const saveBtnStyle: React.CSSProperties = {
 };
 
 const restoreBtnStyle: React.CSSProperties = {
-  fontSize: "0.78rem",
+  fontSize: "var(--text-base)",
   width: "100%",
   padding: "0.4rem 0.5rem",
   background: "var(--accent)",
@@ -350,7 +350,7 @@ function badgeStyle(type: "auto" | "manual" | "live" | "session"): React.CSSProp
     session: "color-mix(in srgb, var(--color-orange) 20%, transparent)",
   };
   return {
-    fontSize: "0.62rem",
+    fontSize: "var(--text-2xs)",
     padding: "1px 5px",
     background: colors[type],
     color: "var(--fg)",
