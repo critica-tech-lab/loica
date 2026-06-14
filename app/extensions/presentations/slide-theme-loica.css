@@ -6,13 +6,15 @@
  */
 
 .reveal {
-  --r-background-color: #FFFCF0;
-  --r-main-color: #100F0F;
-  --r-heading-color: #100F0F;
-  --r-link-color: #AF3029;
-  --r-link-color-hover: #DA702C;
-  --r-selection-color: #ffffff;
-  --r-selection-background-color: #AF3029;
+  /* Prefer app tokens (continuous with the editor); fall back to the Flexoki
+     literals so an exported/standalone deck still renders on-brand. */
+  --r-background-color: var(--bg, #FFFCF0);
+  --r-main-color: var(--fg, #100F0F);
+  --r-heading-color: var(--fg, #100F0F);
+  --r-link-color: var(--accent, #AF3029);
+  --r-link-color-hover: var(--color-tawny, #DA702C);
+  --r-selection-color: var(--accent-fg, #ffffff);
+  --r-selection-background-color: var(--accent, #AF3029);
 
   --r-main-font: "Geist Sans", system-ui, "IBM Plex Sans", sans-serif;
   --r-main-font-size: 36px;

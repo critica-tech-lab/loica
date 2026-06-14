@@ -32,7 +32,7 @@ const ITEMS: Item[] = [
   { kind: "inline", label: "B",     title: "Bold (Ctrl+B)",          before: "**",   after: "**",     style: { fontWeight: 700 } },
   { kind: "inline", label: "I",     title: "Italic (Ctrl+I)",        before: "*",    after: "*",      style: { fontStyle: "italic" } },
   { kind: "inline", label: "S",     title: "Strikethrough",          before: "~~",   after: "~~",     style: { textDecoration: "line-through" } },
-  { kind: "inline", label: "",      title: "Highlight (Ctrl+Shift+H)", before: "{==",  after: "==}",    style: { color: "#D0A215" }, icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l6 6" /><path d="M4 20l4-1 11-11-3-3-11 11z" /><line x1="14" y1="6" x2="18" y2="10" /></svg> },
+  { kind: "inline", label: "",      title: "Highlight (Ctrl+Shift+H)", before: "{==",  after: "==}",    style: { color: "var(--warning)" }, icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l6 6" /><path d="M4 20l4-1 11-11-3-3-11 11z" /><line x1="14" y1="6" x2="18" y2="10" /></svg> },
   { kind: "sep" },
   // Link
   { kind: "inline", label: "Link",  title: "Link (Ctrl+K)",          before: "__link__",    after: "" },

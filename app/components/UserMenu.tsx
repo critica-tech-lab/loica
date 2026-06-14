@@ -96,7 +96,7 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
           borderRadius: "50%",
           border: "none",
           background: color,
-          color: "#fff",
+          color: "var(--accent-fg)",
           fontSize: initials.length > 1 ? "0.6rem" : "0.75rem",
           fontWeight: 600,
           cursor: "pointer",

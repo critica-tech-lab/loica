@@ -15,7 +15,7 @@ const SLIDE_EDITOR_CSS = `
 .loica-slide-editor .ProseMirror hr {
   counter-increment: loica-slide;
   border: none;
-  border-top: 2px dashed var(--border, #d4d4d8);
+  border-top: 2px dashed var(--border);
   background: none;
   height: 0;
   margin: 2.6em 0;
@@ -29,19 +29,19 @@ const SLIDE_EDITOR_CSS = `
   left: 50%;
   transform: translateX(-50%);
   padding: 0.12em 0.75em;
-  background: var(--bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--muted, #9a9a9a);
+  color: var(--muted);
   white-space: nowrap;
 }
 .loica-slide-editor .ProseMirror hr.ProseMirror-selectednode {
   outline: none;
-  border-top-color: var(--accent, #AF3029);
+  border-top-color: var(--accent);
 }`;
 
 /**
@@ -105,7 +105,7 @@ export function PresentationEditorImpl({
             docId={docId ?? ""}
             wsUrl={wsUrl ?? ""}
             wsParams={wsParams}
-            userInfo={userInfo ?? { name: "?", color: "#888888" }}
+            userInfo={userInfo ?? { name: "?", color: "var(--muted)" }}
             readOnly={readOnly}
             autoFocus={!readOnly}
             onReady={(api) => {
@@ -151,8 +151,8 @@ function SlidePreview({ markdown }: { markdown: string }) {
         width: PANEL,
         flexShrink: 0,
         overflowY: "auto",
-        background: "var(--nc-bg-2, #f6f8fa)",
-        borderLeft: "1px solid var(--border, #e5e7eb)",
+        background: "color-mix(in srgb, var(--fg) 3%, var(--bg))",
+        borderLeft: "1px solid var(--border)",
         padding: PAD,
       }}
     >
@@ -167,7 +167,7 @@ function SlidePreview({ markdown }: { markdown: string }) {
         const bg = bgMatch ? bgMatch[1] : undefined;
         return (
           <div key={i} style={{ position: "relative", marginBottom: 12 }}>
-            <div style={{ position: "absolute", top: 4, left: 6, fontSize: 10, opacity: 0.4, zIndex: 2, color: "#888" }}>
+            <div style={{ position: "absolute", top: 4, left: 6, fontSize: 10, opacity: 0.4, zIndex: 2, color: "var(--muted)" }}>
               {i + 1}
             </div>
             {/* Card: fixed thumbnail box that clips the scaled full-size stage. */}
@@ -176,9 +176,9 @@ function SlidePreview({ markdown }: { markdown: string }) {
                 width: cardW,
                 height: cardW * (STAGE_H / STAGE_W),
                 overflow: "hidden",
-                border: "1px solid var(--border, #e5e7eb)",
+                border: "1px solid var(--border)",
                 borderRadius: 6,
-                background: bg ?? "var(--r-background-color, #FFFCF0)",
+                background: bg ?? "var(--r-background-color, var(--bg))",
               }}
             >
               {/* Stage: full deck dimensions + real font size, scaled down. */}
