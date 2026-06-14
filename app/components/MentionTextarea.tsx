@@ -32,7 +32,7 @@ export function renderMentions(body: string): React.ReactNode {
   while ((match = re.exec(body)) !== null) {
     if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
     parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: "#D0A215" }}>@{match[1]}</span>
+      <span key={match.index} style={{ fontWeight: 700, color: "var(--color-star)" }}>@{match[1]}</span>
     );
     lastIndex = re.lastIndex;
   }
@@ -393,7 +393,7 @@ const dropdownStyle: React.CSSProperties = {
   bottom: "100%",
   left: 0,
   right: 0,
-  zIndex: 100,
+  zIndex: "var(--z-dropdown)",
   background: "var(--bg)",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
   borderRadius: "var(--radius-md)",

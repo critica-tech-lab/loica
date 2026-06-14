@@ -57,6 +57,13 @@
   --color-purple: #5E409D;
   --color-magenta: #A02F6F;
   --color-link: var(--color-scarlet);
+
+  /* Semantic colors — map intent (success/danger/…) onto the palette so UI
+     never reaches for off-palette tailwind greens/reds. */
+  --color-success: var(--color-sage);    /* accept, insert, added */
+  --color-danger:  var(--color-scarlet); /* reject, delete, removed */
+  --color-highlight: var(--color-star);  /* comment highlight */
+
   --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
 
   /* Radius scale */
@@ -71,6 +78,16 @@
 
   /* Timing */
   --ease-out: 150ms ease-out;
+
+  /* Z-index scale — one ladder so overlays can't collide by accident.
+     preview(behind editor chrome) < sticky < panel < dropdown < popover < modal < toast */
+  --z-preview: 5;
+  --z-sticky: 10;
+  --z-panel: 50;
+  --z-dropdown: 100;
+  --z-popover: 300;
+  --z-modal: 500;
+  --z-toast: 1000;
 }
 
 /* ─── Design tokens ─────────────────────────────────────── */

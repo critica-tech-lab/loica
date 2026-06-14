@@ -134,7 +134,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         ...layout,
         overflowY: "auto",
         ...popoverSurface,
-        zIndex: 300,
+        zIndex: "var(--z-popover)",
         fontFamily: "var(--font-ui)",
         fontSize: "0.82rem",
         color: "var(--fg)",

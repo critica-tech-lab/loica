@@ -149,7 +149,7 @@ export function NotificationBell() {
             border: "1px solid var(--border, rgba(28,22,18,0.15))",
             borderRadius: "var(--radius-lg)",
             boxShadow: "var(--shadow-md)",
-            zIndex: 1000,
+            zIndex: "var(--z-toast)",
             minWidth: "350px",
             maxWidth: "90vw",
             maxHeight: "500px",
