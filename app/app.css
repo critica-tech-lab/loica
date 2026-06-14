@@ -1507,7 +1507,7 @@ footnote.ProseMirror-selectednode::after {
 
 
 .archive-meta {
-  font-size: 0.875rem; /* one step below the row's base, scales with root */
+  font-size: 0.8125rem; /* 13px — a step below the text-sm row title */
   color: color-mix(in srgb, var(--fg) 30%, transparent);
   text-align: right;
   padding: 0 0.5rem;
