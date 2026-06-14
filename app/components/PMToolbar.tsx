@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useOptionalDocument } from "~/lib/DocumentContext";
 import type { EditorApi } from "~/lib/DocumentContext";
 import type { PMActiveState, TrackChangesActiveState, EditingMode } from "./editor/types";
+import { PencilIcon, CommentIcon, EyeIcon, CheckIcon } from "~/components/icons";
 
 interface Props {
   activeState: PMActiveState | null;
@@ -237,10 +238,10 @@ function Btn({
   );
 }
 
-const MODE_META: Record<EditingMode, { label: string; icon: string; color?: string }> = {
-  editing:    { label: "Editing",    icon: "✏" },
-  suggesting: { label: "Suggesting", icon: "💬", color: "var(--color-success)" },
-  viewing:    { label: "Viewing",    icon: "👁" },
+const MODE_META: Record<EditingMode, { label: string; Icon: (p: React.SVGProps<SVGSVGElement>) => React.ReactElement; color?: string }> = {
+  editing:    { label: "Editing",    Icon: PencilIcon },
+  suggesting: { label: "Suggesting", Icon: CommentIcon, color: "var(--color-success)" },
+  viewing:    { label: "Viewing",    Icon: EyeIcon },
 };
 
 function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
@@ -290,7 +291,7 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span style={{ fontSize: "0.85rem", lineHeight: 1 }}>{meta.icon}</span>
+        <span style={{ display: "inline-flex", lineHeight: 1 }}><meta.Icon width={15} height={15} /></span>
         <span style={{ fontSize: "0.55rem", opacity: 0.5 }}>▾</span>
       </button>
 
@@ -339,9 +340,9 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
                 onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = active ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent"; }}
               >
-                <span style={{ fontSize: "0.9rem", width: 18, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+                <span style={{ display: "inline-flex", width: 18, justifyContent: "center", flexShrink: 0 }}><item.Icon width={16} height={16} /></span>
                 <span style={{ flex: 1 }}>{item.label}</span>
-                {active && <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>✓</span>}
+                {active && <CheckIcon width={14} height={14} style={{ color: "var(--accent)" }} />}
               </button>
             );
           })}

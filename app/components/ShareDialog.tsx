@@ -921,7 +921,7 @@ const inlineCloseBtnStyle: React.CSSProperties = {
   cursor: "pointer",
   padding: "0 0.25rem",
   opacity: 0.5,
-  transition: "opacity 150ms ease-out",
+  transition: "opacity var(--ease-out)",
 };
 
 const inlineInputStyle: React.CSSProperties = {
@@ -930,7 +930,7 @@ const inlineInputStyle: React.CSSProperties = {
   fontSize: "0.72rem",
   padding: "0.3rem 0.5rem",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
-  borderRadius: "4px",
+  borderRadius: "var(--radius-xs)",
   background: "var(--bg)",
   color: "var(--fg)",
   outline: "none",
@@ -940,11 +940,11 @@ const inlineSubmitBtnStyle: React.CSSProperties = {
   fontSize: "0.72rem",
   padding: "0.3rem 0.5rem",
   border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
-  borderRadius: "4px",
+  borderRadius: "var(--radius-xs)",
   background: "color-mix(in srgb, var(--fg) 8%, transparent)",
   color: "var(--fg)",
   cursor: "pointer",
-  transition: "background 150ms ease-out",
+  transition: "background var(--ease-out)",
 };
 
 // ─── Folder share dialog ────────────────────────────────

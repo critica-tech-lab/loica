@@ -192,7 +192,7 @@ export function DocEditorView(_props: DocumentProps) {
             </div>
           </div>
         )}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity 150ms ease-out", position: "relative" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity var(--ease-out)", position: "relative" }}>
         {/* Suggesting mode banner */}
         {editingMode === "suggesting" && (
           <div style={{
@@ -207,7 +207,7 @@ export function DocEditorView(_props: DocumentProps) {
             gap: "0.4rem",
             flexShrink: 0,
           }}>
-            <span>💬</span>
+            <CommentIcon width={15} height={15} style={{ flexShrink: 0 }} />
             <span><strong>You&apos;re suggesting.</strong> Your edits will be tracked and can be accepted or rejected.</span>
           </div>
         )}
@@ -525,7 +525,7 @@ function PMHistoryPreviewPane({
                 fontSize: "0.7rem",
                 fontWeight: 600,
                 fontFamily: "var(--font-ui)",
-                transition: "opacity 120ms ease-out",
+                transition: "opacity var(--ease-fast)",
                 opacity: 0.9,
               }}
               onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
@@ -546,7 +546,7 @@ function PMHistoryPreviewPane({
               opacity: 0.6,
               fontSize: "1rem",
               lineHeight: 1,
-              transition: "opacity 120ms ease-out",
+              transition: "opacity var(--ease-fast)",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
@@ -616,9 +616,9 @@ function HistoryPreviewPane({
           <span style={{ opacity: 0.8 }}>{label}</span>
           {hasChanges && (
             <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
-              <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+              <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px" }}>added</span>
               {" "}
-              <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+              <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
             </span>
           )}
         </div>
@@ -652,7 +652,7 @@ function HistoryPreviewPane({
               opacity: 0.6,
               fontSize: "1rem",
               lineHeight: 1,
-              transition: "opacity 120ms ease-out",
+              transition: "opacity var(--ease-fast)",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
@@ -696,7 +696,7 @@ function HistoryPreviewPane({
                   key={i}
                   style={{
                     background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
-                    borderRadius: "2px",
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   {p.value}
@@ -710,7 +710,7 @@ function HistoryPreviewPane({
                   style={{
                     background: "color-mix(in srgb, var(--color-danger) 18%, transparent)",
                     textDecoration: "line-through",
-                    borderRadius: "2px",
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   {p.value}
@@ -895,9 +895,9 @@ function DocNavLeft() {
           textDecoration: "none",
           fontSize: "0.75rem",
           padding: "0.15rem 0.3rem",
-          borderRadius: "4px",
+          borderRadius: "var(--radius-xs)",
           flexShrink: 0,
-          transition: "background 120ms ease-out, color 120ms ease-out",
+          transition: "background var(--ease-fast), color var(--ease-fast)",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)";
@@ -933,7 +933,7 @@ function DocNavLeft() {
             color: "var(--fg)",
             outline: "none",
             padding: "0.1rem 0.25rem",
-            borderRadius: "4px",
+            borderRadius: "var(--radius-xs)",
           }}
         />
       ) : (
@@ -1138,7 +1138,7 @@ function TopbarIconBtn({
         gap: "6px",
         color: "color-mix(in srgb, var(--fg) 55%, transparent)",
         position: "relative",
-        transition: "background 120ms ease-out, color 120ms ease-out",
+        transition: "background var(--ease-fast), color var(--ease-fast)",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)";
@@ -1167,7 +1167,7 @@ function TopbarBadge({ count }: { count: number }) {
         padding: "0 4px",
         background: "var(--color-scarlet)",
         color: "var(--bg)",
-        borderRadius: "999px",
+        borderRadius: "var(--radius-pill)",
         fontFamily: "var(--font-mono)",
         fontSize: "9.5px",
         fontWeight: 700,

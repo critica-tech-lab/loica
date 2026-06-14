@@ -120,7 +120,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     border: "none",
                     borderRadius: "calc(var(--radius-lg) - 4px)",
                     cursor: "pointer",
-                    transition: "background 120ms ease-out, color 120ms ease-out",
+                    transition: "background var(--ease-fast), color var(--ease-fast)",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "var(--fg)"; e.currentTarget.style.color = "var(--bg)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 8%, transparent)"; e.currentTarget.style.color = "var(--fg)"; }}

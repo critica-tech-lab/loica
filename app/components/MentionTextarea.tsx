@@ -385,7 +385,7 @@ const submitBtnStyle: React.CSSProperties = {
   cursor: "pointer",
   padding: 0,
   opacity: 0.5,
-  transition: "opacity 150ms ease-out",
+  transition: "opacity var(--ease-out)",
 };
 
 const dropdownStyle: React.CSSProperties = {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useDocument } from "~/lib/DocumentContext";
 import type { TrackedChangeEntry } from "~/components/editor/types";
 import { authorTrackColor } from "~/components/editor/types";
+import { PencilIcon, CommentIcon, EyeIcon, CheckIcon, XIcon } from "~/components/icons";
 
 export function TrackChangesPanel() {
   const { trackChangesState, editorApi } = useDocument();
@@ -53,8 +54,8 @@ export function TrackChangesPanel() {
       {/* Mode switcher */}
       <div style={{ padding: "0.75rem 0.75rem 0.6rem", borderBottom: "1px solid color-mix(in srgb, var(--fg) 8%, transparent)", flexShrink: 0 }}>
         <div style={{ display: "flex", background: "color-mix(in srgb, var(--fg) 6%, transparent)", borderRadius: "8px", padding: "3px", gap: "2px", marginBottom: "0.5rem" }}>
-          <ModeBtn label="✏ Editing" active={!enabled} onClick={() => { if (enabled) toggle(); }} />
-          <ModeBtn label="📝 Suggesting" active={enabled} onClick={() => { if (!enabled) toggle(); }} />
+          <ModeBtn label={<><PencilIcon width={13} height={13} /> Editing</>} active={!enabled} onClick={() => { if (enabled) toggle(); }} />
+          <ModeBtn label={<><CommentIcon width={13} height={13} /> Suggesting</>} active={enabled} onClick={() => { if (!enabled) toggle(); }} />
         </div>
 
         {/* Show markup toggle */}
@@ -67,7 +68,7 @@ export function TrackChangesPanel() {
             gap: "0.4rem",
             padding: "0.25rem 0.4rem",
             border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
-            borderRadius: "6px",
+            borderRadius: "var(--radius-md)",
             background: showMarkup ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
             color: showMarkup ? "var(--accent)" : "color-mix(in srgb, var(--fg) 55%, transparent)",
             fontSize: "0.74rem",
@@ -77,7 +78,7 @@ export function TrackChangesPanel() {
             textAlign: "left",
           }}
         >
-          <span style={{ fontSize: "0.9rem" }}>{showMarkup ? "👁" : "👁‍🗨"}</span>
+          <EyeIcon width={14} height={14} style={{ opacity: showMarkup ? 1 : 0.5 }} />
           {showMarkup ? "Showing markup" : "Markup hidden (final view)"}
         </button>
 
@@ -100,8 +101,8 @@ export function TrackChangesPanel() {
               <NavBtn label="↓" title="Next change" onClick={() => scrollTo(activeIdx + 1)} disabled={activeIdx >= changes.length - 1} />
             </>
           )}
-          <button onClick={acceptAll} style={bulkBtn("var(--color-success)")} title="Accept all changes">✓ All</button>
-          <button onClick={rejectAll} style={bulkBtn("var(--color-danger)")} title="Reject all changes">✗ All</button>
+          <button onClick={acceptAll} style={bulkBtn("var(--color-success)")} title="Accept all changes"><CheckIcon width={12} height={12} /> All</button>
+          <button onClick={rejectAll} style={bulkBtn("var(--color-danger)")} title="Reject all changes"><XIcon width={12} height={12} /> All</button>
         </div>
       )}
 
@@ -109,7 +110,7 @@ export function TrackChangesPanel() {
       <div style={{ flex: 1, overflowY: "auto" }}>
         {changes.length === 0 ? (
           <div style={{ padding: "2.5rem 1rem", textAlign: "center" }}>
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>{enabled ? "✍" : "👁"}</div>
+            <div style={{ marginBottom: "0.5rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)" }}>{enabled ? <PencilIcon width={22} height={22} /> : <EyeIcon width={22} height={22} />}</div>
             <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--fg)", marginBottom: "0.25rem" }}>
               {enabled ? "Suggesting mode on" : "No pending changes"}
             </div>
@@ -182,7 +183,7 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
       {/* Diff preview */}
       <div style={{
         fontSize: "0.78rem", marginBottom: "0.4rem",
-        padding: "0.25rem 0.4rem", borderRadius: "4px",
+        padding: "0.25rem 0.4rem", borderRadius: "var(--radius-xs)",
         background: isInsert ? `color-mix(in srgb, ${color} 10%, transparent)` : isDelete ? "color-mix(in srgb, var(--color-danger) 8%, transparent)" : "color-mix(in srgb, var(--fg) 5%, transparent)",
         borderLeft: `2px solid ${color}`,
       }}>
@@ -201,24 +202,25 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
           style={cardActionBtn("var(--color-success)")}
           title="Accept and move to next"
         >
-          ✓ Accept
+          <CheckIcon width={12} height={12} /> Accept
         </button>
         <button
           onMouseDown={(e) => { e.stopPropagation(); onReject(change.id); }}
           style={cardActionBtn("var(--color-danger)")}
           title="Reject and move to next"
         >
-          ✗ Reject
+          <XIcon width={12} height={12} /> Reject
         </button>
       </div>
     </div>
   );
 }
 
-function ModeBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function ModeBtn({ label, active, onClick }: { label: React.ReactNode; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      flex: 1, padding: "0.3rem 0.5rem", border: "none", borderRadius: "6px",
+      flex: 1, padding: "0.3rem 0.5rem", border: "none", borderRadius: "var(--radius-md)",
+      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
       background: active ? "var(--bg)" : "transparent",
       boxShadow: active ? "var(--shadow-sm)" : "none",
       color: active ? "var(--fg)" : "color-mix(in srgb, var(--fg) 50%, transparent)",
@@ -232,7 +234,7 @@ function NavBtn({ label, title, onClick, disabled }: { label: string; title: str
   return (
     <button onClick={onClick} disabled={disabled} title={title} style={{
       width: 24, height: 24, border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
-      borderRadius: "4px", background: "none", cursor: disabled ? "default" : "pointer",
+      borderRadius: "var(--radius-xs)", background: "none", cursor: disabled ? "default" : "pointer",
       color: disabled ? "color-mix(in srgb, var(--fg) 25%, transparent)" : "var(--fg)",
       fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "var(--font-ui)",
@@ -241,9 +243,9 @@ function NavBtn({ label, title, onClick, disabled }: { label: string; title: str
 }
 
 function bulkBtn(color: string): React.CSSProperties {
-  return { padding: "0.2rem 0.5rem", border: `1px solid ${color}35`, borderRadius: "5px", background: `color-mix(in srgb, ${color} 8%, transparent)`, color, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-ui)" };
+  return { padding: "0.2rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 35%, transparent)`, borderRadius: "5px", background: `color-mix(in srgb, ${color} 8%, transparent)`, color, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-ui)" };
 }
 
 function cardActionBtn(color: string): React.CSSProperties {
-  return { padding: "0.18rem 0.55rem", border: `1px solid ${color}30`, borderRadius: "4px", background: `color-mix(in srgb, ${color} 7%, transparent)`, color, fontSize: "0.7rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-ui)" };
+  return { padding: "0.18rem 0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.25rem", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`, borderRadius: "var(--radius-xs)", background: `color-mix(in srgb, ${color} 7%, transparent)`, color, fontSize: "0.7rem", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-ui)" };
 }

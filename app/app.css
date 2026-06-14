@@ -67,9 +67,11 @@
   --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
 
   /* Radius scale */
+  --radius-xs: 4px;
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --radius-pill: 9999px;
 
   /* Shadow scale (plumage-tinted) */
   --shadow-sm: 0 2px 8px rgba(16,15,15,0.10);
@@ -78,6 +80,7 @@
 
   /* Timing */
   --ease-out: 150ms ease-out;
+  --ease-fast: 120ms ease-out;
 
   /* Z-index scale — one ladder so overlays can't collide by accident.
      preview(behind editor chrome) < sticky < panel < dropdown < popover < modal < toast */

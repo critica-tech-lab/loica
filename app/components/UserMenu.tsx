@@ -44,7 +44,7 @@ const itemStyle: React.CSSProperties = {
   textAlign: "left" as const,
   cursor: "pointer",
   opacity: 0.6,
-  transition: "opacity 150ms ease-out, background 150ms ease-out",
+  transition: "opacity var(--ease-out), background var(--ease-out)",
 };
 
 const separatorStyle: React.CSSProperties = {

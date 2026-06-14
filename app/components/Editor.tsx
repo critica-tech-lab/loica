@@ -326,7 +326,7 @@ export function Editor({
         ".cm-ySelectionInfo": { display: "none" },
         ".cm-highlight": {
           background: "color-mix(in srgb, var(--color-highlight) 25%, transparent)",
-          borderRadius: "2px",
+          borderRadius: "var(--radius-sm)",
           padding: "1px 0",
         },
         ".cm-highlight-marker": {
@@ -348,7 +348,7 @@ export function Editor({
         },
         ".cm-critic-highlight": {
           background: "color-mix(in srgb, var(--color-highlight) 18%, transparent)",
-          borderRadius: "2px",
+          borderRadius: "var(--radius-sm)",
           cursor: "pointer",
         },
         ".cm-comment-indicator": {
@@ -359,13 +359,13 @@ export function Editor({
         },
         ".cm-critic-addition": {
           background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
-          borderRadius: "2px",
+          borderRadius: "var(--radius-sm)",
         },
         ".cm-critic-deletion": {
           background: "color-mix(in srgb, var(--color-danger) 12%, transparent)",
           textDecoration: "line-through",
           opacity: "0.7",
-          borderRadius: "2px",
+          borderRadius: "var(--radius-sm)",
         },
         ".cm-critic-sub-old": {
           background: "color-mix(in srgb, var(--color-danger) 12%, transparent)",
@@ -376,7 +376,7 @@ export function Editor({
           background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
         },
         ".cm-thread-highlight": {
-          borderRadius: "2px",
+          borderRadius: "var(--radius-sm)",
           cursor: "pointer",
         },
       });

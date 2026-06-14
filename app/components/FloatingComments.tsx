@@ -319,7 +319,7 @@ function GButton({ variant, children, onClick, disabled, style }: {
       style={{
         padding: "5px 12px",
         border: "none",
-        borderRadius: "4px",
+        borderRadius: "var(--radius-xs)",
         fontSize: "0.75rem",
         fontWeight: 600,
         cursor: disabled ? "default" : "pointer",

@@ -364,7 +364,7 @@ function badgeStyle(type: "auto" | "manual" | "live" | "session"): React.CSSProp
     padding: "1px 5px",
     background: colors[type],
     color: "var(--fg)",
-    borderRadius: "2px",
+    borderRadius: "var(--radius-sm)",
     fontFamily: "var(--font-ui)",
     letterSpacing: "0.02em",
     flexShrink: 0,
