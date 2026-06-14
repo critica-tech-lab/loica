@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "~/components/Toast";
 import { timeAgo } from "~/lib/ui-utils";
 import { useDocument } from "~/lib/DocumentContext";
+import { menuItemHighlight } from "~/lib/popover-styles";
 import type { DocumentVersionSummary, DocumentVersion, UpdateSession } from "~/lib/document.server";
 
 interface VersionPanelProps {
@@ -205,8 +206,7 @@ export function VersionPanel({
                 onClick={() => handleSelect(rowId)}
                 style={{
                   ...rowStyle,
-                  background: isSelected ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
-                  borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                  ...menuItemHighlight(isSelected),
                   paddingLeft: "calc(0.75rem - 2px)",
                 }}
               >
@@ -236,8 +236,7 @@ export function VersionPanel({
                 onClick={() => handleSelect(rowId)}
                 style={{
                   ...rowStyle,
-                  background: isSelected ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
-                  borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                  ...menuItemHighlight(isSelected),
                   paddingLeft: "calc(0.75rem - 2px)",
                 }}
               >
