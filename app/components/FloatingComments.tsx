@@ -4,6 +4,7 @@ import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
 import { TrashIcon } from "~/components/icons";
+import { Avatar } from "./Avatar";
 
 const CARD_MIN_H = 80;
 const CARD_GAP = 8;
@@ -241,13 +242,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
     <div onClick={onClick} style={{ padding: "10px 12px 8px", position: "relative" }}>
       {/* Author row */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-        <span style={{
-          width: 28, height: 28, borderRadius: "50%", background: color, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: "0.7rem", fontWeight: 700, userSelect: "none",
-        }}>
-          {userName.slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar name={userName} color={color} size={28} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {userName}

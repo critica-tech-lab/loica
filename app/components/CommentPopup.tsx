@@ -6,6 +6,7 @@ import { timeAgo } from "~/lib/ui-utils";
 import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 import { TrashIcon } from "~/components/icons";
 import { popoverSurface } from "~/lib/popover-styles";
+import { Avatar } from "./Avatar";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -295,22 +296,6 @@ function CommentInput({
         )}
       </div>
     </div>
-  );
-}
-
-function Avatar({ name, color, size, style }: { name: string; color: string; size: number; style?: React.CSSProperties }) {
-  return (
-    <span style={{
-      width: size, height: size,
-      borderRadius: "50%",
-      background: color,
-      flexShrink: 0,
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontSize: size * 0.4, fontWeight: 700, userSelect: "none",
-      ...style,
-    }}>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
   );
 }
 

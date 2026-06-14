@@ -3,6 +3,7 @@ import type { TrackedChangeEntry } from "~/components/editor/types";
 import { authorTrackColor } from "~/components/editor/types";
 import { timeAgo } from "~/lib/ui-utils";
 import { popoverSurface } from "~/lib/popover-styles";
+import { Avatar } from "./Avatar";
 
 const POPUP_W = 240;
 const GAP = 8;
@@ -94,21 +95,6 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         <SmallBtn onClick={() => { onReject(change.id); onDismiss(); }}>Reject</SmallBtn>
       </div>
     </div>
-  );
-}
-
-function Avatar({ name, color, size }: { name: string; color: string; size: number }) {
-  return (
-    <span style={{
-      width: size, height: size,
-      borderRadius: "50%",
-      background: color,
-      flexShrink: 0,
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontSize: size * 0.4, fontWeight: 700, userSelect: "none",
-    }}>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
   );
 }
 
