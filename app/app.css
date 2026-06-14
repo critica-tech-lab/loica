@@ -78,18 +78,20 @@
   --shadow-md: 0 4px 16px rgba(16,15,15,0.15);
   --shadow-lg: 0 8px 32px rgba(16,15,15,0.20);
 
-  /* Type scale — anchored at the common existing sizes; near-duplicate values
-     snap to the nearest step (shifts ≤0.05rem). */
-  --fs-2xs:  0.65rem;
-  --fs-xs:   0.7rem;
-  --fs-sm:   0.75rem;
-  --fs-base: 0.8rem;
-  --fs-md:   0.85rem;
-  --fs-lg:   0.9rem;
-  --fs-xl:   1rem;
-  --fs-2xl:  1.1rem;
-  --fs-3xl:  1.5rem;
-  --fs-4xl:  3rem;
+  /* Type scale — ONE ladder shared with Tailwind's text-* utilities: the shared
+     steps (xs/sm/base/lg/xl/2xl/3xl/4xl) hold the same rem values as Tailwind,
+     so var(--fs-sm) === text-sm. 2xs and md are extra inline-only fine-grain
+     steps on the same ladder. */
+  --fs-2xs:  0.6875rem; /* 11px */
+  --fs-xs:   0.75rem;   /* 12px = text-xs */
+  --fs-sm:   0.875rem;  /* 14px = text-sm */
+  --fs-base: 1rem;      /* 16px = text-base */
+  --fs-md:   1.0625rem; /* 17px (inline-only) */
+  --fs-lg:   1.125rem;  /* 18px = text-lg */
+  --fs-xl:   1.25rem;   /* 20px = text-xl */
+  --fs-2xl:  1.5rem;    /* 24px = text-2xl */
+  --fs-3xl:  1.875rem;  /* 30px = text-3xl */
+  --fs-4xl:  2.25rem;   /* 36px = text-4xl */
 
   /* Timing */
   --ease-out: 150ms ease-out;
@@ -1730,7 +1732,7 @@ footnote.ProseMirror-selectednode::after {
   width: 100%;
   min-height: 100%;
   font-family: var(--font-editor);
-  font-size: var(--fs-2xl); /* document reading size — top of the type scale */
+  font-size: var(--fs-lg); /* 18px document reading size — on the shared scale */
   line-height: 1.6;
   color: var(--fg);
   outline: none;
