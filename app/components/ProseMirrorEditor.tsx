@@ -1175,7 +1175,7 @@ function TableContextMenu({ x, y, onClose, onAddRowBefore, onAddRowAfter, onDele
         position: "fixed", top, left, width: W, zIndex: "var(--z-modal)",
         ...popoverSurface,
         fontFamily: "var(--font-ui)",
-        fontSize: "var(--fs-base)",
+        fontSize: "var(--fs-sm)",
         color: "var(--fg)",
         userSelect: "none",
       }}
