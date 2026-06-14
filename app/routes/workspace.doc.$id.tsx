@@ -307,7 +307,7 @@ function WorkspaceFilePreview({ document, workspace, user, folderPath, starred }
 }) {
   const isTeamspace = workspace.type === "team";
   const baseUrl = isTeamspace ? `/t/${workspace.id}` : "/w";
-  const bcLinkStyle: React.CSSProperties = { opacity: 0.4, color: "var(--fg)", textDecoration: "none", fontSize: "0.8rem" };
+  const bcLinkStyle: React.CSSProperties = { opacity: 0.4, color: "var(--fg)", textDecoration: "none", fontSize: "var(--fs-xs)" };
 
   return (
     <FilePreview
@@ -317,7 +317,7 @@ function WorkspaceFilePreview({ document, workspace, user, folderPath, starred }
       breadcrumbs={folderPath.map((seg) => (
         <span key={seg.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <a href={`${baseUrl}/folder/${seg.id}`} style={bcLinkStyle}>{seg.name}</a>
-          <span style={{ opacity: 0.2, fontSize: "0.8rem", flexShrink: 0 }}>/</span>
+          <span style={{ opacity: 0.2, fontSize: "var(--fs-xs)", flexShrink: 0 }}>/</span>
         </span>
       ))}
     />

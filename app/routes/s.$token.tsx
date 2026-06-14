@@ -191,17 +191,17 @@ function PasswordGate({ docTitle, token }: { docTitle: string; token: string }) 
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "color-mix(in srgb, var(--fg) 3%, var(--bg))", justifyContent: "center", alignItems: "center", padding: "1rem" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: "24rem", width: "100%", padding: "2rem", borderRadius: "0.75rem", border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)", background: "var(--bg)" }}>
         <div>
-          <h1 style={{ margin: "0 0 0.5rem 0", fontSize: "1.125rem", fontWeight: 700 }}>
+          <h1 style={{ margin: "0 0 0.5rem 0", fontSize: "var(--fs-lg)", fontWeight: 700 }}>
             {docTitle}
           </h1>
-          <p style={{ margin: "0", fontSize: "0.875rem", opacity: 0.6 }}>
+          <p style={{ margin: "0", fontSize: "var(--fs-sm)", opacity: 0.6 }}>
             This document is password protected
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <label htmlFor="password" style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+            <label htmlFor="password" style={{ fontSize: "var(--fs-sm)", fontWeight: 500 }}>
               Password
             </label>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", borderRadius: "0.5rem", border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)", padding: "0 0.75rem", background: "color-mix(in srgb, var(--fg) 3%, transparent)" }}>
@@ -211,7 +211,7 @@ function PasswordGate({ docTitle, token }: { docTitle: string; token: string }) 
                 value={password}
                 onChange={(e) => setPassword(e.currentTarget.value)}
                 placeholder="Enter password…"
-                style={{ flex: 1, border: "none", background: "transparent", padding: "0.75rem 0", outline: "none", fontSize: "0.875rem" }}
+                style={{ flex: 1, border: "none", background: "transparent", padding: "0.75rem 0", outline: "none", fontSize: "var(--fs-sm)" }}
                 disabled={fetcher.state !== "idle"}
               />
               <button
@@ -223,7 +223,7 @@ function PasswordGate({ docTitle, token }: { docTitle: string; token: string }) 
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-            {error && <p style={{ margin: "0", fontSize: "0.8rem", color: "var(--color-error, #dc2626)" }}>{error}</p>}
+            {error && <p style={{ margin: "0", fontSize: "var(--fs-xs)", color: "var(--color-error, #dc2626)" }}>{error}</p>}
           </div>
 
           <button
@@ -289,8 +289,8 @@ export default function SharePage() {
           >
             <LogoIcon style={{ width: "auto", height: "1rem" }} />
           </a>
-          <span style={{ opacity: 0.2, fontSize: "0.8rem", flexShrink: 0 }}>/</span>
-          <span style={{ fontWeight: 600, fontSize: "0.8rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ opacity: 0.2, fontSize: "var(--fs-xs)", flexShrink: 0 }}>/</span>
+          <span style={{ fontWeight: 600, fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {document.title}
           </span>
         </div>
@@ -298,7 +298,7 @@ export default function SharePage() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
           <PresenceIndicator peers={peers} currentUser={guestIdentity} />
           {isEditable && (
-            <span style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+            <span style={{ fontSize: "var(--fs-2xs)", textTransform: "uppercase", letterSpacing: "0.03em", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
               {saving ? (
                 <span style={{ opacity: 0.35 }}>saving…</span>
               ) : (
@@ -313,7 +313,7 @@ export default function SharePage() {
           )}
           <span
             style={{
-              fontSize: "0.6rem",
+              fontSize: "var(--fs-2xs)",
               fontWeight: 500,
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -387,7 +387,7 @@ function LiveReadOnlyView({
             padding: "16px 48px",
             overflow: "auto",
             fontFamily: "var(--font-editor, ui-monospace, monospace)",
-            fontSize: "15px",
+            fontSize: "var(--fs-sm)",
             lineHeight: "1.6",
             whiteSpace: "pre-wrap",
             wordWrap: "break-word",
@@ -543,7 +543,7 @@ function EditableView({
               padding: "16px 48px",
               overflow: "auto",
               fontFamily: "var(--font-editor, ui-monospace, monospace)",
-              fontSize: "15px",
+              fontSize: "var(--fs-sm)",
               lineHeight: "1.6",
               whiteSpace: "pre-wrap",
               wordWrap: "break-word",

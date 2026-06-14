@@ -152,7 +152,7 @@ export default function Signup() {
         <p
           style={{
             margin: "0 0 1.5rem",
-            fontSize: "0.85rem",
+            fontSize: "var(--fs-sm)",
             opacity: 0.6,
             textAlign: "center",
             lineHeight: 1.6,
@@ -167,7 +167,7 @@ export default function Signup() {
             display: "block",
             width: "100%",
             padding: "0.5rem 1rem",
-            fontSize: "0.875rem",
+            fontSize: "var(--fs-sm)",
             fontWeight: 700,
             background: "var(--fg)",
             color: "var(--bg)",
@@ -181,7 +181,7 @@ export default function Signup() {
         >
           {provider.label}
         </a>
-        <p style={{ margin: "1rem 0 0", fontSize: "0.8rem", opacity: 0.5, textAlign: "center" }}>
+        <p style={{ margin: "1rem 0 0", fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
           <a href="/login" style={{ color: "var(--fg)" }}>
             Sign in
@@ -194,10 +194,10 @@ export default function Signup() {
   if (!registrationOpen) {
     return (
       <AuthForm title="Registration closed" error={undefined}>
-        <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.6, textAlign: "center", lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-sm)", opacity: 0.6, textAlign: "center", lineHeight: 1.6 }}>
           New account registration is currently closed. Contact an administrator for access.
         </p>
-        <p style={{ margin: 0, fontSize: "0.8rem", opacity: 0.5, textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
           <a href="/login" style={{ color: "var(--fg)" }}>
             Sign in
@@ -223,7 +223,7 @@ export default function Signup() {
           {busy ? "Creating account…" : "Create account"}
         </SubmitButton>
 
-        <p style={{ margin: 0, fontSize: "0.8rem", opacity: 0.5, textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
           <a href="/login" style={{ color: "var(--fg)" }}>
             Sign in

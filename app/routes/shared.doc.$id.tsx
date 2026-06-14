@@ -273,7 +273,7 @@ function SharedPdfPreview({ document, user, folderPath, starred }: {
   folderPath: BreadcrumbSegment[];
   starred: boolean;
 }) {
-  const bcLinkStyle: React.CSSProperties = { opacity: 0.4, color: "var(--fg)", textDecoration: "none", fontSize: "0.8rem" };
+  const bcLinkStyle: React.CSSProperties = { opacity: 0.4, color: "var(--fg)", textDecoration: "none", fontSize: "var(--fs-xs)" };
 
   return (
     <FilePreview
@@ -285,11 +285,11 @@ function SharedPdfPreview({ document, user, folderPath, starred }: {
           <a href="/shared" style={bcLinkStyle}>Shared</a>
           {folderPath.map((seg) => (
             <span key={seg.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ opacity: 0.2, fontSize: "0.8rem", flexShrink: 0 }}>/</span>
+              <span style={{ opacity: 0.2, fontSize: "var(--fs-xs)", flexShrink: 0 }}>/</span>
               <a href={`/shared/folder/${seg.id}`} style={bcLinkStyle}>{seg.name}</a>
             </span>
           ))}
-          <span style={{ opacity: 0.2, fontSize: "0.8rem", flexShrink: 0 }}>/</span>
+          <span style={{ opacity: 0.2, fontSize: "var(--fs-xs)", flexShrink: 0 }}>/</span>
         </>
       }
     />

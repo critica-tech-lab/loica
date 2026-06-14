@@ -58,7 +58,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             loica
           </h1>
         </div>
-        <p style={{ margin: 0, opacity: 0.5, fontSize: "0.9rem", textAlign: "center", maxWidth: "28rem" }}>
+        <p style={{ margin: 0, opacity: 0.5, fontSize: "var(--fs-sm)", textAlign: "center", maxWidth: "28rem" }}>
           Collaborative markdown editing.
         </p>
 
