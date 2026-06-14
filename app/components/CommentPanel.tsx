@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ResolvedThread } from "./comment-decorations";
-import { MentionTextarea } from "./MentionTextarea";
+import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 import { CommentIcon } from "~/components/icons";
 import { timeAgo } from "~/lib/ui-utils";
 
@@ -452,7 +452,7 @@ function CommentBody({
         </>
       ) : (
         <div style={{ fontSize: "0.82rem", lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}>
-          {body ? renderBodyWithMentions(body) : <span style={{ opacity: 0.3, fontStyle: "italic" }}>empty comment</span>}
+          {body ? renderMentions(body) : <span style={{ opacity: 0.3, fontStyle: "italic" }}>empty comment</span>}
         </div>
       )}
     </div>
@@ -478,30 +478,6 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────
-
-const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
-
-function hasMentions(text: string): boolean {
-  return /@\[.+?\]\(user:.+?\)/.test(text);
-}
-
-function renderBodyWithMentions(body: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  const re = new RegExp(mentionRegex.source, "g");
-  while ((match = re.exec(body)) !== null) {
-    if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
-    const name = match[1];
-    parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: "var(--color-star)" }}>@{name}</span>
-    );
-    lastIndex = re.lastIndex;
-  }
-  if (lastIndex < body.length) parts.push(body.slice(lastIndex));
-  return parts.length > 0 ? parts : body;
-}
 
 const textareaStyle: React.CSSProperties = {
   width: "100%",
