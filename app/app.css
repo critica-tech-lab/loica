@@ -1468,7 +1468,8 @@ footnote.ProseMirror-selectednode::after {
   border-bottom: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
   text-decoration: none;
   color: var(--fg);
-  font-size: 14px;
+  /* No explicit size — inherits the 1rem base; the title uses text-base and the
+     meta steps down via .archive-meta, so the row rides the proportional scale. */
   transition: background-color 100ms ease-out;
 }
 .archive-row:hover {
@@ -1504,7 +1505,7 @@ footnote.ProseMirror-selectednode::after {
 
 
 .archive-meta {
-  font-size: 13px;
+  font-size: 0.875rem; /* one step below the row's base, scales with root */
   color: color-mix(in srgb, var(--fg) 30%, transparent);
   text-align: right;
   padding: 0 0.5rem;
@@ -1729,7 +1730,7 @@ footnote.ProseMirror-selectednode::after {
   width: 100%;
   min-height: 100%;
   font-family: var(--font-editor);
-  font-size: 1.0625rem; /* 17px — slightly larger than the 16px base */
+  font-size: var(--text-2xl); /* document reading size — top of the type scale */
   line-height: 1.6;
   color: var(--fg);
   outline: none;
