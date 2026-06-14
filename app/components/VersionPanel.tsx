@@ -138,16 +138,6 @@ export function VersionPanel({
     setTimeout(() => versionsFetcher.load(`/api/doc-versions/${docId}`), 500);
   }
 
-  function getAvatarInitials(name: string | null): string {
-    if (!name) return "?";
-    return name
-      .split(/\s+/)
-      .map(w => w[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  }
-
   return (
     <div style={inline ? inlinePanelStyle : panelStyle}>
       {/* Header */}
