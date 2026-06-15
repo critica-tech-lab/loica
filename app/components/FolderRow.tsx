@@ -89,7 +89,7 @@ export function FolderRow({
                     name="name"
                     defaultValue={f.name}
                     autoFocus
-                    className="w-full border-b border-accent/40 bg-transparent px-0 py-0.5 text-sm text-fg outline-none"
+                    className="w-full border-b border-accent/40 bg-transparent px-0 py-0.5 text-base text-fg outline-none"
                     onBlur={() => onRenameCancel()}
                     onKeyDown={(e) => {
                       if (e.key === "Escape") onRenameCancel();
@@ -97,7 +97,7 @@ export function FolderRow({
                   />
                 </Form>
               ) : onClick ? (
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                <span className="min-w-0 flex-1 truncate text-base font-medium">
                   {f.name}
                   {isShared && <span className="ml-1.5 shrink-0 rounded-full bg-sage/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-sage/60">shared</span>}
                 </span>
@@ -106,7 +106,7 @@ export function FolderRow({
                   to={href}
                   prefetch="intent"
                   draggable={false}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm font-medium no-underline text-fg"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-base font-medium no-underline text-fg"
                 >
                   {f.name}
                   {isShared && <span className="shrink-0 rounded-full bg-sage/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-sage/60">shared</span>}

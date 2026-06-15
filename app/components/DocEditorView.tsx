@@ -192,14 +192,14 @@ export function DocEditorView(_props: DocumentProps) {
             </div>
           </div>
         )}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity 150ms ease-out", position: "relative" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", opacity: editorReady ? 1 : 0, transition: "opacity var(--ease-out)", position: "relative" }}>
         {/* Suggesting mode banner */}
         {editingMode === "suggesting" && (
           <div style={{
             padding: "0.3rem 1rem",
             background: "color-mix(in srgb, var(--color-success) 10%, transparent)",
             borderBottom: "1px solid color-mix(in srgb, var(--color-success) 25%, transparent)",
-            fontSize: "0.75rem",
+            fontSize: "var(--fs-sm)",
             color: "var(--color-success)",
             fontFamily: "var(--font-ui)",
             display: "flex",
@@ -207,7 +207,7 @@ export function DocEditorView(_props: DocumentProps) {
             gap: "0.4rem",
             flexShrink: 0,
           }}>
-            <span>💬</span>
+            <CommentIcon width={15} height={15} style={{ flexShrink: 0 }} />
             <span><strong>You&apos;re suggesting.</strong> Your edits will be tracked and can be accepted or rejected.</span>
           </div>
         )}
@@ -494,7 +494,7 @@ function PMHistoryPreviewPane({
           padding: "0.5rem 1rem",
           background: "color-mix(in srgb, var(--accent) 12%, transparent)",
           borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-          fontSize: "0.75rem",
+          fontSize: "var(--fs-sm)",
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
@@ -522,10 +522,10 @@ function PMHistoryPreviewPane({
                 border: "none",
                 cursor: "pointer",
                 padding: "0.3rem 0.6rem",
-                fontSize: "0.7rem",
+                fontSize: "var(--fs-xs)",
                 fontWeight: 600,
                 fontFamily: "var(--font-ui)",
-                transition: "opacity 120ms ease-out",
+                transition: "opacity var(--ease-fast)",
                 opacity: 0.9,
               }}
               onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
@@ -544,9 +544,9 @@ function PMHistoryPreviewPane({
               padding: "0 4px",
               color: "var(--fg)",
               opacity: 0.6,
-              fontSize: "1rem",
+              fontSize: "var(--fs-xl)",
               lineHeight: 1,
-              transition: "opacity 120ms ease-out",
+              transition: "opacity var(--ease-fast)",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
@@ -602,7 +602,7 @@ function HistoryPreviewPane({
           padding: "0.5rem 1rem",
           background: "color-mix(in srgb, var(--accent) 12%, transparent)",
           borderBottom: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-          fontSize: "0.75rem",
+          fontSize: "var(--fs-sm)",
           color: "var(--fg)",
           display: "flex",
           alignItems: "center",
@@ -615,10 +615,10 @@ function HistoryPreviewPane({
           <span style={{ color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>Viewing version:</span>
           <span style={{ opacity: 0.8 }}>{label}</span>
           {hasChanges && (
-            <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
-              <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+            <span style={{ opacity: 0.5, fontSize: "var(--fs-xs)", flexShrink: 0 }}>
+              <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px" }}>added</span>
               {" "}
-              <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+              <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "var(--radius-sm)", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
             </span>
           )}
         </div>
@@ -632,7 +632,7 @@ function HistoryPreviewPane({
                 border: "none",
                 cursor: "pointer",
                 padding: "0.25rem 0.6rem",
-                fontSize: "0.7rem",
+                fontSize: "var(--fs-xs)",
                 fontWeight: 600,
                 fontFamily: "var(--font-ui)",
               }}
@@ -650,9 +650,9 @@ function HistoryPreviewPane({
               padding: "0 4px",
               color: "var(--fg)",
               opacity: 0.6,
-              fontSize: "1rem",
+              fontSize: "var(--fs-xl)",
               lineHeight: 1,
-              transition: "opacity 120ms ease-out",
+              transition: "opacity var(--ease-fast)",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.6"; }}
@@ -668,24 +668,24 @@ function HistoryPreviewPane({
             maxWidth: "70ch",
             margin: "0 auto",
             fontFamily: "var(--font-editor)",
-            fontSize: "0.95rem",
+            fontSize: "var(--fs-lg)",
             lineHeight: 1.6,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
         >
           {title && hasChanges && (
-            <h1 style={{ marginTop: 0, fontSize: "1.5rem" }}>
+            <h1 style={{ marginTop: 0, fontSize: "var(--fs-3xl)" }}>
               {title}
             </h1>
           )}
           {!content && (
-            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--fs-md)" }}>
               Content unavailable — this version predates rich history storage.
             </p>
           )}
           {!hasChanges && content && (
-            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "0.85rem" }}>
+            <p style={{ opacity: 0.4, fontStyle: "italic", fontSize: "var(--fs-md)" }}>
               No changes compared to previous snapshot.
             </p>
           )}
@@ -696,7 +696,7 @@ function HistoryPreviewPane({
                   key={i}
                   style={{
                     background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
-                    borderRadius: "2px",
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   {p.value}
@@ -710,7 +710,7 @@ function HistoryPreviewPane({
                   style={{
                     background: "color-mix(in srgb, var(--color-danger) 18%, transparent)",
                     textDecoration: "line-through",
-                    borderRadius: "2px",
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   {p.value}
@@ -893,11 +893,11 @@ function DocNavLeft() {
           gap: "0.25rem",
           color: "color-mix(in srgb, var(--fg) 55%, transparent)",
           textDecoration: "none",
-          fontSize: "0.75rem",
+          fontSize: "var(--fs-sm)",
           padding: "0.15rem 0.3rem",
-          borderRadius: "4px",
+          borderRadius: "var(--radius-xs)",
           flexShrink: 0,
-          transition: "background 120ms ease-out, color 120ms ease-out",
+          transition: "background var(--ease-fast), color var(--ease-fast)",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)";
@@ -925,7 +925,7 @@ function DocNavLeft() {
             minWidth: 0,
             flex: "0 1 auto",
             fontFamily: "var(--font-ui)",
-            fontSize: "0.85rem",
+            fontSize: "var(--fs-md)",
             fontWeight: 500,
             letterSpacing: "-0.01em",
             background: "none",
@@ -933,7 +933,7 @@ function DocNavLeft() {
             color: "var(--fg)",
             outline: "none",
             padding: "0.1rem 0.25rem",
-            borderRadius: "4px",
+            borderRadius: "var(--radius-xs)",
           }}
         />
       ) : (
@@ -944,7 +944,7 @@ function DocNavLeft() {
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-ui)",
-            fontSize: "0.85rem",
+            fontSize: "var(--fs-md)",
             fontWeight: 500,
             letterSpacing: "-0.01em",
             color: "var(--fg)",
@@ -1138,7 +1138,7 @@ function TopbarIconBtn({
         gap: "6px",
         color: "color-mix(in srgb, var(--fg) 55%, transparent)",
         position: "relative",
-        transition: "background 120ms ease-out, color 120ms ease-out",
+        transition: "background var(--ease-fast), color var(--ease-fast)",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)";
@@ -1167,7 +1167,7 @@ function TopbarBadge({ count }: { count: number }) {
         padding: "0 4px",
         background: "var(--color-scarlet)",
         color: "var(--bg)",
-        borderRadius: "999px",
+        borderRadius: "var(--radius-pill)",
         fontFamily: "var(--font-mono)",
         fontSize: "9.5px",
         fontWeight: 700,

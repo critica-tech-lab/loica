@@ -125,7 +125,7 @@ export function AppShell({ children, navLeft, navActions, scrollable, footerLeft
           height: "2rem",
           padding: "0 0.75rem",
           fontFamily: "var(--font-mono)",
-          fontSize: "0.65rem",
+          fontSize: "var(--fs-2xs)",
           color: "color-mix(in srgb, var(--fg) 50%, transparent)",
           borderTop: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
           flexShrink: 0,

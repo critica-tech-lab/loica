@@ -6,6 +6,7 @@ import { timeAgo } from "~/lib/ui-utils";
 import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 import { TrashIcon } from "~/components/icons";
 import { popoverSurface } from "~/lib/popover-styles";
+import { Avatar } from "./Avatar";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -136,7 +137,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         ...popoverSurface,
         zIndex: "var(--z-popover)",
         fontFamily: "var(--font-ui)",
-        fontSize: "0.82rem",
+        fontSize: "var(--fs-base)",
         color: "var(--fg)",
       }}
     >
@@ -168,10 +169,10 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <Avatar name={thread.userName || "?"} color={color} size={26} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+            <div style={{ fontWeight: 700, fontSize: "var(--fs-base)", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
               {thread.userName || "Unknown"}
             </div>
-            <div style={{ fontSize: "0.66rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
               {timeAgo(thread.createdAt)}
             </div>
           </div>
@@ -224,10 +225,10 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
             <div key={r.id} style={{ padding: "9px 12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "4px" }}>
                 <Avatar name={r.userName || "?"} color={authorColorFromName(r.userName || "")} size={20} />
-                <span style={{ fontWeight: 700, fontSize: "0.74rem", color: "var(--fg)" }}>{r.userName || "Unknown"}</span>
-                <span style={{ fontSize: "0.64rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{timeAgo(r.createdAt)}</span>
+                <span style={{ fontWeight: 700, fontSize: "var(--fs-sm)", color: "var(--fg)" }}>{r.userName || "Unknown"}</span>
+                <span style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 40%, transparent)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{timeAgo(r.createdAt)}</span>
               </div>
-              <p style={{ margin: 0, lineHeight: 1.5, color: "var(--fg)", fontSize: "0.79rem" }}>{renderMentions(r.body)}</p>
+              <p style={{ margin: 0, lineHeight: 1.5, color: "var(--fg)", fontSize: "var(--fs-base)" }}>{renderMentions(r.body)}</p>
             </div>
           ))}
         </div>
@@ -298,22 +299,6 @@ function CommentInput({
   );
 }
 
-function Avatar({ name, color, size, style }: { name: string; color: string; size: number; style?: React.CSSProperties }) {
-  return (
-    <span style={{
-      width: size, height: size,
-      borderRadius: "50%",
-      background: color,
-      flexShrink: 0,
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontSize: size * 0.4, fontWeight: 700, userSelect: "none",
-      ...style,
-    }}>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
-
 function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
   return (
     <button onClick={onClick} style={{
@@ -322,7 +307,7 @@ function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary
         ? "1px solid var(--fg)"
         : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
       borderRadius: 0,
-      fontSize: "0.71rem",
+      fontSize: "var(--fs-xs)",
       fontWeight: 600,
       cursor: "pointer",
       background: primary ? "var(--fg)" : "transparent",
@@ -339,7 +324,7 @@ const resolveBtn: React.CSSProperties = {
   borderRadius: 0,
   background: "transparent",
   color: "var(--accent)",
-  fontSize: "0.68rem",
+  fontSize: "var(--fs-xs)",
   fontWeight: 700,
   cursor: "pointer",
   fontFamily: "var(--font-ui)",
@@ -365,7 +350,7 @@ const quoteStyle: React.CSSProperties = {
   margin: "10px 12px 0",
   padding: "3px 8px",
   borderLeft: "2px solid var(--accent)",
-  fontSize: "0.71rem",
+  fontSize: "var(--fs-xs)",
   color: "color-mix(in srgb, var(--fg) 55%, transparent)",
   fontStyle: "italic",
   whiteSpace: "pre-wrap",
@@ -378,6 +363,6 @@ const inlineTextarea: React.CSSProperties = {
   width: "100%", resize: "none", border: "none", outline: "none",
   borderBottom: "1.5px solid var(--fg)",
   padding: "2px 0",
-  fontSize: "0.79rem", fontFamily: "var(--font-ui)",
+  fontSize: "var(--fs-base)", fontFamily: "var(--font-ui)",
   background: "transparent", color: "var(--fg)", lineHeight: 1.5, boxSizing: "border-box",
 };

@@ -85,7 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.6rem",
-                fontSize: "0.8rem",
+                fontSize: "var(--fs-base)",
                 padding: t.action ? "0.35rem 0.35rem 0.35rem 0.85rem" : "0.5rem 1rem",
                 borderRadius: "var(--radius-lg)",
                 border: "1px solid",
@@ -111,7 +111,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     dismiss(t.id);
                   }}
                   style={{
-                    fontSize: "0.72rem",
+                    fontSize: "var(--fs-xs)",
                     fontWeight: 600,
                     letterSpacing: "-0.005em",
                     padding: "0.3rem 0.75rem",
@@ -120,7 +120,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     border: "none",
                     borderRadius: "calc(var(--radius-lg) - 4px)",
                     cursor: "pointer",
-                    transition: "background 120ms ease-out, color 120ms ease-out",
+                    transition: "background var(--ease-fast), color var(--ease-fast)",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "var(--fg)"; e.currentTarget.style.color = "var(--bg)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 8%, transparent)"; e.currentTarget.style.color = "var(--fg)"; }}

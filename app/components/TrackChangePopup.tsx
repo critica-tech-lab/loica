@@ -3,6 +3,7 @@ import type { TrackedChangeEntry } from "~/components/editor/types";
 import { authorTrackColor } from "~/components/editor/types";
 import { timeAgo } from "~/lib/ui-utils";
 import { popoverSurface } from "~/lib/popover-styles";
+import { Avatar } from "./Avatar";
 
 const POPUP_W = 240;
 const GAP = 8;
@@ -52,7 +53,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         zIndex: 400,
         ...popoverSurface,
         fontFamily: "var(--font-ui)",
-        fontSize: "0.82rem",
+        fontSize: "var(--fs-base)",
         color: "var(--fg)",
       }}
     >
@@ -61,10 +62,10 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: snippet ? "8px" : 0 }}>
           <Avatar name={change.authorName || "?"} color={authorColor} size={26} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: "0.78rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+            <div style={{ fontWeight: 700, fontSize: "var(--fs-base)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
               {change.authorName || "Unknown"}
             </div>
-            <div style={{ fontSize: "0.66rem", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 45%, transparent)", fontVariantNumeric: "tabular-nums" }}>
               {timeAgo(change.createdAt)}
             </div>
           </div>
@@ -74,7 +75,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
           <div style={{
             padding: "3px 8px",
             borderLeft: `2px solid ${authorColor}`,
-            fontSize: "0.71rem",
+            fontSize: "var(--fs-xs)",
             color: "color-mix(in srgb, var(--fg) 55%, transparent)",
             fontStyle: "italic",
             overflow: "hidden",
@@ -97,21 +98,6 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
   );
 }
 
-function Avatar({ name, color, size }: { name: string; color: string; size: number }) {
-  return (
-    <span style={{
-      width: size, height: size,
-      borderRadius: "50%",
-      background: color,
-      flexShrink: 0,
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontSize: size * 0.4, fontWeight: 700, userSelect: "none",
-    }}>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
-
 function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
   return (
     <button onClick={onClick} style={{
@@ -120,7 +106,7 @@ function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary
         ? "1px solid var(--fg)"
         : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
       borderRadius: 0,
-      fontSize: "0.71rem",
+      fontSize: "var(--fs-xs)",
       fontWeight: 600,
       cursor: "pointer",
       background: primary ? "var(--fg)" : "transparent",

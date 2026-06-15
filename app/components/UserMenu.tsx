@@ -36,7 +36,7 @@ const itemStyle: React.CSSProperties = {
   alignItems: "center",
   width: "100%",
   padding: "6px 12px",
-  fontSize: "0.7rem",
+  fontSize: "var(--fs-xs)",
   color: "var(--fg)",
   textDecoration: "none",
   background: "none",
@@ -44,7 +44,7 @@ const itemStyle: React.CSSProperties = {
   textAlign: "left" as const,
   cursor: "pointer",
   opacity: 0.6,
-  transition: "opacity 150ms ease-out, background 150ms ease-out",
+  transition: "opacity var(--ease-out), background var(--ease-out)",
 };
 
 const separatorStyle: React.CSSProperties = {
@@ -132,7 +132,7 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
           {/* Header with name */}
           <div style={{
             padding: "8px 12px 6px",
-            fontSize: "0.7rem",
+            fontSize: "var(--fs-xs)",
             fontWeight: 600,
             color: "var(--fg)",
             opacity: 0.5,

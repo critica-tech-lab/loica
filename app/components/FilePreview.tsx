@@ -48,18 +48,18 @@ export function FilePreviewContent({ file, title }: { file: string; title: strin
   const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem" }}>
-      <div style={{ fontSize: "3rem", opacity: 0.3 }}>
+      <div style={{ fontSize: "var(--fs-4xl)", opacity: 0.3 }}>
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
       </div>
-      <span style={{ fontSize: "0.85rem", opacity: 0.5 }}>{ext.slice(1).toUpperCase()} file</span>
+      <span style={{ fontSize: "var(--fs-md)", opacity: 0.5 }}>{ext.slice(1).toUpperCase()} file</span>
       <a
         href={url}
         download
         style={{
-          fontSize: "0.8rem", textDecoration: "none",
+          fontSize: "var(--fs-base)", textDecoration: "none",
           color: "var(--fg)", padding: "0.5rem 1.5rem",
           border: "1px solid color-mix(in srgb, var(--fg) 20%, transparent)",
           borderRadius: "0.375rem",
@@ -94,7 +94,7 @@ export function FilePreview({ document, user, starred, breadcrumbs }: FilePrevie
           saveFetcher.submit({ intent: "save", title: e.target.value }, { method: "post" });
         }}
         style={{
-          fontSize: "0.8rem", fontWeight: 600,
+          fontSize: "var(--fs-base)", fontWeight: 600,
           background: "none", border: "none", color: "var(--fg)", outline: "none",
           width: "min(20rem, 40vw)", padding: 0,
         }}
@@ -123,7 +123,7 @@ export function FilePreview({ document, user, starred, breadcrumbs }: FilePrevie
         href={`/api/uploads/${document.pdf_file}`}
         download
         style={{
-          fontSize: "0.7rem", opacity: 0.5, textDecoration: "none", color: "var(--fg)",
+          fontSize: "var(--fs-xs)", opacity: 0.5, textDecoration: "none", color: "var(--fg)",
           padding: "0.2rem 0.5rem", border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
           borderRadius: "0.25rem",
         }}

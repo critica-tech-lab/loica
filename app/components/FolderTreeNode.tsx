@@ -123,7 +123,7 @@ export function FolderTreeNode({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms ease-out" }}
+          style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform var(--ease-out)" }}
         >
           <polyline points="9 18 15 12 9 6" />
         </svg>

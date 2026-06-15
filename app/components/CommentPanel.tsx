@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ResolvedThread } from "./comment-decorations";
-import { MentionTextarea } from "./MentionTextarea";
+import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
+import { CommentIcon } from "~/components/icons";
 import { timeAgo } from "~/lib/ui-utils";
 
 interface CommentPanelProps {
@@ -81,11 +82,11 @@ export function CommentPanel({
         alignItems: "center",
         padding: "0.85rem 1rem 0",
       }}>
-        <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>Comments</span>
+        <span style={{ fontWeight: 600, fontSize: "var(--fs-lg)" }}>Comments</span>
         <button
           onClick={onClose}
           title="Close"
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", opacity: 0.4, padding: "0 0.2rem", color: "var(--fg)", lineHeight: 1 }}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "var(--fs-2xl)", opacity: 0.4, padding: "0 0.2rem", color: "var(--fg)", lineHeight: 1 }}
           onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}
           onMouseLeave={e => (e.currentTarget.style.opacity = "0.4")}
         >×</button>
@@ -98,10 +99,10 @@ export function CommentPanel({
             key={t}
             onClick={() => setTab(t)}
             style={{
-              fontSize: "0.78rem",
+              fontSize: "var(--fs-base)",
               fontFamily: "var(--font-ui)",
               padding: "0.2rem 0.65rem",
-              borderRadius: "999px",
+              borderRadius: "var(--radius-pill)",
               border: tab === t
                 ? "1px solid color-mix(in srgb, var(--fg) 25%, transparent)"
                 : "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
@@ -111,7 +112,7 @@ export function CommentPanel({
               color: "var(--fg)",
               cursor: "pointer",
               fontWeight: tab === t ? 600 : 400,
-              transition: "all 120ms ease-out",
+              transition: "all var(--ease-fast)",
             }}
           >
             {t === "open" ? `Open${openThreads.length > 0 ? ` (${openThreads.length})` : ""}` : `Resolved${resolvedThreads.length > 0 ? ` (${resolvedThreads.length})` : ""}`}
@@ -122,8 +123,8 @@ export function CommentPanel({
       {/* Thread list */}
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "0 0.75rem 1rem" }}>
         {mergedItems.length === 0 && (
-          <div style={{ textAlign: "center", padding: "2rem 1rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", fontSize: "0.8rem" }}>
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem", opacity: 0.4 }}>💬</div>
+          <div style={{ textAlign: "center", padding: "2rem 1rem", color: "color-mix(in srgb, var(--fg) 40%, transparent)", fontSize: "var(--fs-base)" }}>
+            <div style={{ marginBottom: "0.5rem", opacity: 0.4, display: "flex", justifyContent: "center" }}><CommentIcon width={22} height={22} /></div>
             {tab === "open" ? "No open comments. Select text to add one." : "No resolved comments."}
           </div>
         )}
@@ -253,7 +254,7 @@ function ThreadCard({
         if ((e.target as HTMLElement).tagName === "TEXTAREA") setIsWriting(false);
       }}
       style={{
-        borderRadius: "6px",
+        borderRadius: "var(--radius-md)",
         border: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         background: "var(--bg)",
         boxShadow: "var(--shadow-sm)",
@@ -265,7 +266,7 @@ function ThreadCard({
       {/* New empty comment — textarea to type */}
       {isNew ? (
         <div>
-          <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.35rem", color: "var(--fg)" }}>
+          <div style={{ fontSize: "var(--fs-base)", fontWeight: 600, marginBottom: "0.35rem", color: "var(--fg)" }}>
             {thread.userName}
           </div>
           <MentionTextarea
@@ -282,7 +283,7 @@ function ThreadCard({
             style={textareaStyle}
             rows={2}
           />
-          <div style={{ fontSize: "0.65rem", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.3rem" }}>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.3rem" }}>
             Enter to post · Esc to cancel
           </div>
         </div>
@@ -308,7 +309,7 @@ function ThreadCard({
                   color: thread.resolved ? "var(--accent)" : "color-mix(in srgb, var(--fg) 35%, transparent)",
                   padding: "0.1rem",
                   display: "flex", alignItems: "center",
-                  transition: "color 120ms ease-out",
+                  transition: "color var(--ease-fast)",
                   flexShrink: 0,
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = "var(--color-success)")}
@@ -404,12 +405,12 @@ function CommentBody({
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       {/* Header: name · time · actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: "0.25rem" }}>
-        <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--fg)" }}>{userName}</span>
-        <span style={{ fontSize: "0.7rem", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>·</span>
-        <span style={{ fontSize: "0.7rem", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>{timeAgo(createdAt)}</span>
+        <span style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "var(--fg)" }}>{userName}</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>·</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)" }}>{timeAgo(createdAt)}</span>
 
         {/* Actions — appear on hover */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.15rem", opacity: (hovered && !readOnly && isOwn && !editing) ? 1 : 0, transition: "opacity 120ms ease-out" }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.15rem", opacity: (hovered && !readOnly && isOwn && !editing) ? 1 : 0, transition: "opacity var(--ease-fast)" }}>
           <IconBtn title="Edit" onClick={() => setEditing(true)}>
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 2l3 3-9 9H2v-3L11 2z" />
@@ -425,7 +426,7 @@ function CommentBody({
 
         {/* Resolve button always shown when not hovering */}
         {resolveButton && (
-          <div style={{ marginLeft: hovered && !readOnly && isOwn ? "0" : "auto", opacity: (hovered && !readOnly && isOwn) ? 0 : 1, transition: "opacity 120ms ease-out", pointerEvents: (hovered && !readOnly && isOwn) ? "none" : "auto" }}>
+          <div style={{ marginLeft: hovered && !readOnly && isOwn ? "0" : "auto", opacity: (hovered && !readOnly && isOwn) ? 0 : 1, transition: "opacity var(--ease-fast)", pointerEvents: (hovered && !readOnly && isOwn) ? "none" : "auto" }}>
             {!isOwn && resolveButton}
           </div>
         )}
@@ -447,11 +448,11 @@ function CommentBody({
             style={textareaStyle}
             rows={1}
           />
-          <div style={{ fontSize: "0.65rem", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.2rem" }}>Enter to save · Esc to cancel</div>
+          <div style={{ fontSize: "var(--fs-2xs)", color: "color-mix(in srgb, var(--fg) 35%, transparent)", marginTop: "0.2rem" }}>Enter to save · Esc to cancel</div>
         </>
       ) : (
-        <div style={{ fontSize: "0.82rem", lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}>
-          {body ? renderBodyWithMentions(body) : <span style={{ opacity: 0.3, fontStyle: "italic" }}>empty comment</span>}
+        <div style={{ fontSize: "var(--fs-base)", lineHeight: 1.55, color: "var(--fg)", wordBreak: "break-word" }}>
+          {body ? renderMentions(body) : <span style={{ opacity: 0.3, fontStyle: "italic" }}>empty comment</span>}
         </div>
       )}
     </div>
@@ -466,7 +467,7 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
       style={{
         background: "none", border: "none", cursor: "pointer", padding: "0.2rem",
         color: danger ? "var(--color-danger)" : "color-mix(in srgb, var(--fg) 45%, transparent)",
-        display: "flex", alignItems: "center", borderRadius: "4px",
+        display: "flex", alignItems: "center", borderRadius: "var(--radius-xs)",
         transition: "background 100ms ease-out, color 100ms ease-out",
       }}
       onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 8%, transparent)"; e.currentTarget.style.color = danger ? "var(--color-danger)" : "var(--fg)"; }}
@@ -477,34 +478,10 @@ function IconBtn({ title, onClick, danger, children }: { title: string; onClick:
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────
-
-const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
-
-function hasMentions(text: string): boolean {
-  return /@\[.+?\]\(user:.+?\)/.test(text);
-}
-
-function renderBodyWithMentions(body: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  const re = new RegExp(mentionRegex.source, "g");
-  while ((match = re.exec(body)) !== null) {
-    if (match.index > lastIndex) parts.push(body.slice(lastIndex, match.index));
-    const name = match[1];
-    parts.push(
-      <span key={match.index} style={{ fontWeight: 700, color: "var(--color-star)" }}>@{name}</span>
-    );
-    lastIndex = re.lastIndex;
-  }
-  if (lastIndex < body.length) parts.push(body.slice(lastIndex));
-  return parts.length > 0 ? parts : body;
-}
 
 const textareaStyle: React.CSSProperties = {
   width: "100%",
-  fontSize: "0.82rem",
+  fontSize: "var(--fs-base)",
   lineHeight: "1.55",
   background: "none",
   border: "none",

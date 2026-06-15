@@ -67,17 +67,33 @@
   --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
 
   /* Radius scale */
+  --radius-xs: 4px;
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --radius-pill: 9999px;
 
   /* Shadow scale (plumage-tinted) */
   --shadow-sm: 0 2px 8px rgba(16,15,15,0.10);
   --shadow-md: 0 4px 16px rgba(16,15,15,0.15);
   --shadow-lg: 0 8px 32px rgba(16,15,15,0.20);
 
+  /* Type scale — anchored at the common existing sizes; near-duplicate values
+     snap to the nearest step (shifts ≤0.05rem). */
+  --fs-2xs:  0.65rem;
+  --fs-xs:   0.7rem;
+  --fs-sm:   0.75rem;
+  --fs-base: 0.8rem;
+  --fs-md:   0.85rem;
+  --fs-lg:   0.9rem;
+  --fs-xl:   1rem;
+  --fs-2xl:  1.1rem;
+  --fs-3xl:  1.5rem;
+  --fs-4xl:  3rem;
+
   /* Timing */
   --ease-out: 150ms ease-out;
+  --ease-fast: 120ms ease-out;
 
   /* Z-index scale — one ladder so overlays can't collide by accident.
      preview(behind editor chrome) < sticky < panel < dropdown < popover < modal < toast */
@@ -1452,7 +1468,8 @@ footnote.ProseMirror-selectednode::after {
   border-bottom: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
   text-decoration: none;
   color: var(--fg);
-  font-size: 14px;
+  /* No explicit size — inherits the 1rem base; the title uses text-base and the
+     meta steps down via .archive-meta, so the row rides the proportional scale. */
   transition: background-color 100ms ease-out;
 }
 .archive-row:hover {
@@ -1488,7 +1505,7 @@ footnote.ProseMirror-selectednode::after {
 
 
 .archive-meta {
-  font-size: 13px;
+  font-size: 0.875rem; /* one step below the row's base, scales with root */
   color: color-mix(in srgb, var(--fg) 30%, transparent);
   text-align: right;
   padding: 0 0.5rem;
@@ -1713,7 +1730,7 @@ footnote.ProseMirror-selectednode::after {
   width: 100%;
   min-height: 100%;
   font-family: var(--font-editor);
-  font-size: 1.0625rem; /* 17px — slightly larger than the 16px base */
+  font-size: var(--fs-2xl); /* document reading size — top of the type scale */
   line-height: 1.6;
   color: var(--fg);
   outline: none;

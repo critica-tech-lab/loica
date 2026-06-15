@@ -4,6 +4,7 @@ import type { ResolvedThread } from "~/components/comment-decorations";
 import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
 import { TrashIcon } from "~/components/icons";
+import { Avatar } from "./Avatar";
 
 const CARD_MIN_H = 80;
 const CARD_GAP = 8;
@@ -185,7 +186,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 style={{
                   width: "100%", resize: "none", border: "none", outline: "none",
                   borderBottom: "2px solid #1a73e8", padding: "2px 0",
-                  fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+                  fontSize: "var(--fs-base)", fontFamily: "var(--font-ui)",
                   background: "transparent", color: "#202124", lineHeight: 1.5,
                   boxSizing: "border-box",
                 }}
@@ -201,7 +202,7 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
                 onClick={() => setReplyOpen(true)}
                 style={{
                   flex: 1, textAlign: "left", background: "none", border: "none",
-                  color: "#80868b", fontSize: "0.78rem", cursor: "text",
+                  color: "#80868b", fontSize: "var(--fs-base)", cursor: "text",
                   fontFamily: "var(--font-ui)", padding: "2px 0",
                 }}
               >
@@ -241,19 +242,13 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
     <div onClick={onClick} style={{ padding: "10px 12px 8px", position: "relative" }}>
       {/* Author row */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-        <span style={{
-          width: 28, height: 28, borderRadius: "50%", background: color, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: "0.7rem", fontWeight: 700, userSelect: "none",
-        }}>
-          {userName.slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar name={userName} color={color} size={28} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "var(--fs-base)", fontWeight: 600, color: "#202124", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {userName}
           </div>
           {createdAt > 0 && (
-            <div style={{ fontSize: "0.68rem", color: "#80868b", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "var(--fs-xs)", color: "#80868b", lineHeight: 1.2 }}>
               {timeAgo(createdAt)}
             </div>
           )}
@@ -286,7 +281,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
             style={{
               width: "100%", resize: "none", border: "none", outline: "none",
               borderBottom: "2px solid #1a73e8", padding: "2px 0",
-              fontSize: "0.8rem", fontFamily: "var(--font-ui)",
+              fontSize: "var(--fs-base)", fontFamily: "var(--font-ui)",
               background: "transparent", color: "#202124", lineHeight: 1.5,
               boxSizing: "border-box",
             }}
@@ -297,7 +292,7 @@ function CommentEntry({ body, userName, color, createdAt, isOwn, editing, showAc
           </div>
         </>
       ) : (
-        <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
+        <p style={{ margin: 0, fontSize: "var(--fs-base)", lineHeight: 1.5, color: "#202124", wordBreak: "break-word" }}>
           {body || <em style={{ color: "#80868b" }}>Empty comment</em>}
         </p>
       )}
@@ -319,8 +314,8 @@ function GButton({ variant, children, onClick, disabled, style }: {
       style={{
         padding: "5px 12px",
         border: "none",
-        borderRadius: "4px",
-        fontSize: "0.75rem",
+        borderRadius: "var(--radius-xs)",
+        fontSize: "var(--fs-sm)",
         fontWeight: 600,
         cursor: disabled ? "default" : "pointer",
         fontFamily: "var(--font-ui)",

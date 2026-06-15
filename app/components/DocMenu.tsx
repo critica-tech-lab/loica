@@ -44,14 +44,14 @@ const itemStyle: React.CSSProperties = {
   width: "100%",
   gap: "8px",
   padding: "6px 12px",
-  fontSize: "0.72rem",
+  fontSize: "var(--fs-xs)",
   color: "var(--fg)",
   background: "none",
   border: "none",
   textAlign: "left",
   cursor: "pointer",
   opacity: 0.7,
-  transition: "opacity 150ms ease-out, background 150ms ease-out",
+  transition: "opacity var(--ease-out), background var(--ease-out)",
 };
 
 const iconSlotStyle: React.CSSProperties = {
@@ -80,14 +80,14 @@ const pillsRowStyle: React.CSSProperties = {
 const pillBtnStyle: React.CSSProperties = {
   flex: 1,
   padding: "5px 8px",
-  fontSize: "0.66rem",
+  fontSize: "var(--fs-2xs)",
   fontWeight: 500,
   letterSpacing: "0.01em",
   textTransform: "uppercase",
   color: "color-mix(in srgb, var(--fg) 65%, transparent)",
   background: "color-mix(in srgb, var(--fg) 5%, transparent)",
   border: "1px solid transparent",
-  borderRadius: "4px",
+  borderRadius: "var(--radius-xs)",
   cursor: "pointer",
   transition: "background 120ms, color 120ms",
 };
@@ -95,7 +95,7 @@ const pillBtnStyle: React.CSSProperties = {
 const pillsHeadingStyle: React.CSSProperties = {
   display: "block",
   padding: "4px 12px 2px",
-  fontSize: "0.62rem",
+  fontSize: "var(--fs-2xs)",
   fontWeight: 500,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
@@ -168,7 +168,7 @@ export function DocMenu({ items, label = "Document actions" }: DocMenuProps) {
           alignItems: "center",
           justifyContent: "center",
           color: open ? "var(--fg)" : "color-mix(in srgb, var(--fg) 55%, transparent)",
-          transition: "background 120ms ease-out, color 120ms ease-out",
+          transition: "background var(--ease-fast), color var(--ease-fast)",
         }}
         onMouseEnter={(e) => {
           if (!open) {

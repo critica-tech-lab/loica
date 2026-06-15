@@ -38,17 +38,17 @@ const ITEMS: Item[] = [
   { kind: "inline", label: "Link",  title: "Link (Ctrl+K)",          before: "__link__",    after: "" },
   { kind: "sep" },
   // Headings
-  { kind: "line",   label: "H1",    title: "Heading 1",              prefix: "# ",   style: { fontWeight: 700, fontSize: "0.95rem" } },
-  { kind: "line",   label: "H2",    title: "Heading 2",              prefix: "## ",  style: { fontWeight: 700, fontSize: "0.88rem" } },
-  { kind: "line",   label: "H3",    title: "Heading 3",              prefix: "### ", style: { fontWeight: 700, fontSize: "0.8rem" } },
-  { kind: "line",   label: "H4",    title: "Heading 4",              prefix: "#### ", style: { fontWeight: 700, fontSize: "0.75rem" } },
+  { kind: "line",   label: "H1",    title: "Heading 1",              prefix: "# ",   style: { fontWeight: 700, fontSize: "var(--fs-lg)" } },
+  { kind: "line",   label: "H2",    title: "Heading 2",              prefix: "## ",  style: { fontWeight: 700, fontSize: "var(--fs-lg)" } },
+  { kind: "line",   label: "H3",    title: "Heading 3",              prefix: "### ", style: { fontWeight: 700, fontSize: "var(--fs-base)" } },
+  { kind: "line",   label: "H4",    title: "Heading 4",              prefix: "#### ", style: { fontWeight: 700, fontSize: "var(--fs-sm)" } },
   { kind: "sep" },
   // Lists
   { kind: "line",   label: "",      title: "Unordered list",         prefix: "- ",   icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="9" y1="6" x2="21" y2="6" /><line x1="9" y1="12" x2="21" y2="12" /><line x1="9" y1="18" x2="21" y2="18" /><circle cx="4" cy="6" r="2" fill="currentColor" stroke="none" /><circle cx="4" cy="12" r="2" fill="currentColor" stroke="none" /><circle cx="4" cy="18" r="2" fill="currentColor" stroke="none" /></svg> },
   { kind: "line",   label: "",      title: "Ordered list",           prefix: "1. ",  icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="11" y1="6" x2="21" y2="6" /><line x1="11" y1="12" x2="21" y2="12" /><line x1="11" y1="18" x2="21" y2="18" /><text x="2" y="8" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">1</text><text x="2" y="14.5" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">2</text><text x="2" y="21" fontSize="8" fontWeight="800" fill="currentColor" stroke="none" fontFamily="system-ui">3</text></svg> },
   { kind: "sep" },
   // Block
-  { kind: "line",   label: "\u201C\u201D", title: "Blockquote",             prefix: "> ",   style: { fontSize: "1rem", fontWeight: 700, lineHeight: 1, opacity: 0.6 } },
+  { kind: "line",   label: "\u201C\u201D", title: "Blockquote",             prefix: "> ",   style: { fontSize: "var(--fs-xl)", fontWeight: 700, lineHeight: 1, opacity: 0.6 } },
   { kind: "sep" },
   // Table
   { kind: "inline", label: "",     title: "Insert table",           before: "\n| Header 1 | Header 2 | Header 3 |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n", after: "", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="12" y1="3" x2="12" y2="21" /></svg> },
@@ -84,7 +84,7 @@ export function Toolbar(props: ToolbarProps = {}) {
         margin: "0.75rem auto 0.25rem",
         background: "var(--bg)",
         border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
-        borderRadius: "999px",
+        borderRadius: "var(--radius-pill)",
         boxShadow: "0 2px 8px rgba(16,15,15,0.04), 0 1px 2px rgba(16,15,15,0.02)",
         flexShrink: 0,
         flexWrap: "nowrap",
