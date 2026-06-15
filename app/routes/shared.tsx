@@ -116,7 +116,7 @@ export default function SharedWithMe() {
         {(pendingShares.length > 0 || pendingDocShares.length > 0) && (
           <section className="archive-list">
             <div className="archive-header">
-              <span className="flex-1 font-bold text-tawny" style={{ fontSize: "11px" }}>
+              <span className="flex-1 font-bold text-tawny" style={{ fontSize: "var(--fs-2xs)" }}>
                 {pendingShares.length + pendingDocShares.length} pending invitation{pendingShares.length + pendingDocShares.length > 1 ? "s" : ""}
               </span>
             </div>

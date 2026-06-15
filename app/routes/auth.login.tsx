@@ -91,7 +91,7 @@ export default function Login() {
                 display: "block",
                 width: "100%",
                 padding: "0.5rem 1rem",
-                fontSize: "0.875rem",
+                fontSize: "var(--fs-sm)",
                 fontWeight: 700,
                 background: "var(--fg)",
                 color: "var(--bg)",
@@ -116,7 +116,7 @@ export default function Login() {
             alignItems: "center",
             gap: "0.75rem",
             marginBottom: "1rem",
-            fontSize: "0.75rem",
+            fontSize: "var(--fs-xs)",
             opacity: 0.4,
           }}
         >
@@ -136,7 +136,7 @@ export default function Login() {
           </SubmitButton>
 
           {registrationOpen && (
-            <p style={{ margin: 0, fontSize: "0.8rem", opacity: 0.5, textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
               No account?{" "}
               <a href="/signup" style={{ color: "var(--fg)" }}>
                 Sign up
