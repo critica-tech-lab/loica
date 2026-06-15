@@ -613,7 +613,7 @@ export function ProseMirrorEditor({
           },
         },
         dispatchTransaction(tr: any) {
-          if (!view) return;
+          if (!view || destroyed) return;
           const newState = view.state.apply(tr);
           view.updateState(newState);
           if (tr.docChanged) {
