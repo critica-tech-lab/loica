@@ -28,7 +28,7 @@ const menuStyle: React.CSSProperties = {
   borderRadius: "var(--radius-lg)",
   padding: "4px 0",
   boxShadow: "var(--shadow-md)",
-  zIndex: 50,
+  zIndex: "var(--z-panel)",
 };
 
 const itemStyle: React.CSSProperties = {

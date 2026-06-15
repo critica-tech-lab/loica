@@ -1172,7 +1172,7 @@ function TableContextMenu({ x, y, onClose, onAddRowBefore, onAddRowAfter, onDele
     <div
       ref={ref}
       style={{
-        position: "fixed", top, left, width: W, zIndex: 500,
+        position: "fixed", top, left, width: W, zIndex: "var(--z-modal)",
         ...popoverSurface,
         fontFamily: "var(--font-ui)",
         fontSize: "0.8rem",
@@ -1253,7 +1253,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
     <div
       ref={ref}
       style={{
-        position: "fixed", top, left, zIndex: 500,
+        position: "fixed", top, left, zIndex: "var(--z-modal)",
         display: "inline-flex", alignItems: "center", gap: "0.5rem",
         ...popoverSurface,
         padding: "0.3rem 0.6rem",

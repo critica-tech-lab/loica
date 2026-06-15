@@ -289,7 +289,7 @@ const panelStyle: React.CSSProperties = {
   borderLeft: "1.5px solid color-mix(in srgb, var(--fg) 12%, transparent)",
   display: "flex",
   flexDirection: "column",
-  zIndex: 50,
+  zIndex: "var(--z-panel)",
   boxShadow: "-4px 0 16px color-mix(in srgb, var(--fg) 6%, transparent)",
 };
 

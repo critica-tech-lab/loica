@@ -197,10 +197,10 @@ export function DocEditorView(_props: DocumentProps) {
         {editingMode === "suggesting" && (
           <div style={{
             padding: "0.3rem 1rem",
-            background: "color-mix(in srgb, #16a34a 10%, transparent)",
-            borderBottom: "1px solid color-mix(in srgb, #16a34a 25%, transparent)",
+            background: "color-mix(in srgb, var(--color-success) 10%, transparent)",
+            borderBottom: "1px solid color-mix(in srgb, var(--color-success) 25%, transparent)",
             fontSize: "0.75rem",
-            color: "#15803d",
+            color: "var(--color-success)",
             fontFamily: "var(--font-ui)",
             display: "flex",
             alignItems: "center",
@@ -482,7 +482,7 @@ function PMHistoryPreviewPane({
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: 5,
+        zIndex: "var(--z-preview)",
         background: "var(--bg)",
         display: "flex",
         flexDirection: "column",
@@ -590,7 +590,7 @@ function HistoryPreviewPane({
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: 5,
+        zIndex: "var(--z-preview)",
         background: "var(--bg)",
         display: "flex",
         flexDirection: "column",
@@ -616,9 +616,9 @@ function HistoryPreviewPane({
           <span style={{ opacity: 0.8 }}>{label}</span>
           {hasChanges && (
             <span style={{ opacity: 0.5, fontSize: "0.68rem", flexShrink: 0 }}>
-              <span style={{ background: "color-mix(in srgb, #22c55e 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
+              <span style={{ background: "color-mix(in srgb, var(--color-success) 30%, transparent)", borderRadius: "2px", padding: "0 3px" }}>added</span>
               {" "}
-              <span style={{ background: "color-mix(in srgb, #ef4444 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
+              <span style={{ background: "color-mix(in srgb, var(--color-danger) 25%, transparent)", borderRadius: "2px", padding: "0 3px", textDecoration: "line-through" }}>removed</span>
             </span>
           )}
         </div>
@@ -695,7 +695,7 @@ function HistoryPreviewPane({
                 <span
                   key={i}
                   style={{
-                    background: "color-mix(in srgb, #22c55e 18%, transparent)",
+                    background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
                     borderRadius: "2px",
                   }}
                 >
@@ -708,7 +708,7 @@ function HistoryPreviewPane({
                 <span
                   key={i}
                   style={{
-                    background: "color-mix(in srgb, #ef4444 18%, transparent)",
+                    background: "color-mix(in srgb, var(--color-danger) 18%, transparent)",
                     textDecoration: "line-through",
                     borderRadius: "2px",
                   }}

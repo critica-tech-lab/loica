@@ -92,7 +92,7 @@ export function PresenceIndicator(props?: { peers?: Peer[]; currentUser?: Peer }
             borderRadius: "8px",
             boxShadow: "0 4px 12px color-mix(in srgb, var(--fg) 8%, transparent)",
             padding: "0.375rem 0",
-            zIndex: 50,
+            zIndex: "var(--z-panel)",
           }}
         >
           <div

@@ -325,7 +325,7 @@ export function Editor({
         },
         ".cm-ySelectionInfo": { display: "none" },
         ".cm-highlight": {
-          background: "color-mix(in srgb, #facc15 25%, transparent)",
+          background: "color-mix(in srgb, var(--color-highlight) 25%, transparent)",
           borderRadius: "2px",
           padding: "1px 0",
         },
@@ -347,7 +347,7 @@ export function Editor({
           color: "#E8392A",
         },
         ".cm-critic-highlight": {
-          background: "color-mix(in srgb, #facc15 18%, transparent)",
+          background: "color-mix(in srgb, var(--color-highlight) 18%, transparent)",
           borderRadius: "2px",
           cursor: "pointer",
         },
@@ -358,22 +358,22 @@ export function Editor({
           padding: "0 1px",
         },
         ".cm-critic-addition": {
-          background: "color-mix(in srgb, #22c55e 18%, transparent)",
+          background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
           borderRadius: "2px",
         },
         ".cm-critic-deletion": {
-          background: "color-mix(in srgb, #ef4444 12%, transparent)",
+          background: "color-mix(in srgb, var(--color-danger) 12%, transparent)",
           textDecoration: "line-through",
           opacity: "0.7",
           borderRadius: "2px",
         },
         ".cm-critic-sub-old": {
-          background: "color-mix(in srgb, #ef4444 12%, transparent)",
+          background: "color-mix(in srgb, var(--color-danger) 12%, transparent)",
           textDecoration: "line-through",
           opacity: "0.7",
         },
         ".cm-critic-sub-new": {
-          background: "color-mix(in srgb, #22c55e 18%, transparent)",
+          background: "color-mix(in srgb, var(--color-success) 18%, transparent)",
         },
         ".cm-thread-highlight": {
           borderRadius: "2px",

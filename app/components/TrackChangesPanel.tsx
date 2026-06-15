@@ -100,8 +100,8 @@ export function TrackChangesPanel() {
               <NavBtn label="↓" title="Next change" onClick={() => scrollTo(activeIdx + 1)} disabled={activeIdx >= changes.length - 1} />
             </>
           )}
-          <button onClick={acceptAll} style={bulkBtn("#16a34a")} title="Accept all changes">✓ All</button>
-          <button onClick={rejectAll} style={bulkBtn("#dc2626")} title="Reject all changes">✗ All</button>
+          <button onClick={acceptAll} style={bulkBtn("var(--color-success)")} title="Accept all changes">✓ All</button>
+          <button onClick={rejectAll} style={bulkBtn("var(--color-danger)")} title="Reject all changes">✗ All</button>
         </div>
       )}
 
@@ -183,7 +183,7 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
       <div style={{
         fontSize: "0.78rem", marginBottom: "0.4rem",
         padding: "0.25rem 0.4rem", borderRadius: "4px",
-        background: isInsert ? `color-mix(in srgb, ${color} 10%, transparent)` : isDelete ? "color-mix(in srgb, #dc2626 8%, transparent)" : "color-mix(in srgb, var(--fg) 5%, transparent)",
+        background: isInsert ? `color-mix(in srgb, ${color} 10%, transparent)` : isDelete ? "color-mix(in srgb, var(--color-danger) 8%, transparent)" : "color-mix(in srgb, var(--fg) 5%, transparent)",
         borderLeft: `2px solid ${color}`,
       }}>
         <span style={{ fontSize: "0.65rem", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "0.35rem" }}>
@@ -198,14 +198,14 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
       <div style={{ display: "flex", gap: "0.35rem" }}>
         <button
           onMouseDown={(e) => { e.stopPropagation(); onAccept(change.id); }}
-          style={cardActionBtn("#16a34a")}
+          style={cardActionBtn("var(--color-success)")}
           title="Accept and move to next"
         >
           ✓ Accept
         </button>
         <button
           onMouseDown={(e) => { e.stopPropagation(); onReject(change.id); }}
-          style={cardActionBtn("#dc2626")}
+          style={cardActionBtn("var(--color-danger)")}
           title="Reject and move to next"
         >
           ✗ Reject

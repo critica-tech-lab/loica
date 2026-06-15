@@ -239,7 +239,7 @@ function Btn({
 
 const MODE_META: Record<EditingMode, { label: string; icon: string; color?: string }> = {
   editing:    { label: "Editing",    icon: "✏" },
-  suggesting: { label: "Suggesting", icon: "💬", color: "#16a34a" },
+  suggesting: { label: "Suggesting", icon: "💬", color: "var(--color-success)" },
   viewing:    { label: "Viewing",    icon: "👁" },
 };
 
@@ -306,7 +306,7 @@ function ModeDropdown({ mode, onModeChange, onOpenChangesPanel }: {
             border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-md)",
-            zIndex: 100,
+            zIndex: "var(--z-dropdown)",
             overflow: "hidden",
             fontFamily: "var(--font-ui)",
           }}

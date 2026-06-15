@@ -20,7 +20,7 @@ export function Navbar({ left, actions }: NavbarProps) {
         borderBottom: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         position: "sticky",
         top: 0,
-        zIndex: 10,
+        zIndex: "var(--z-sticky)",
         background: "var(--bg)",
         flexShrink: 0,
         fontFamily: "var(--font-mono)",

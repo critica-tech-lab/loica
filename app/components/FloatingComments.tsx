@@ -61,7 +61,7 @@ export function FloatingComments({ threads, focusedId, onFocus, mountRef, editor
   if (visible.length === 0) return null;
 
   return (
-    <div style={{ position: "absolute", top: 0, right: 0, width: CARD_W, pointerEvents: "none", zIndex: 10 }}>
+    <div style={{ position: "absolute", top: 0, right: 0, width: CARD_W, pointerEvents: "none", zIndex: "var(--z-sticky)" }}>
       {visible.map(({ thread, top }) => (
         <FloatingCard
           key={thread.id}
