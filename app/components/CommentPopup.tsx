@@ -5,6 +5,7 @@ import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
 import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 import { TrashIcon } from "~/components/icons";
+import { popoverSurface } from "~/lib/popover-styles";
 
 const POPUP_W = 300;
 const POPUP_MAX_H = 480;
@@ -132,9 +133,7 @@ export function CommentPopup({ thread, pos, currentUserId, editorApiRef, editorR
         position: "fixed",
         ...layout,
         overflowY: "auto",
-        background: "var(--bg)",
-        border: "1.5px solid var(--fg)",
-        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        ...popoverSurface,
         zIndex: 300,
         fontFamily: "var(--font-ui)",
         fontSize: "0.82rem",

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { TrackedChangeEntry } from "~/components/editor/types";
 import { authorTrackColor } from "~/components/editor/types";
 import { timeAgo } from "~/lib/ui-utils";
+import { popoverSurface } from "~/lib/popover-styles";
 
 const POPUP_W = 240;
 const GAP = 8;
@@ -49,9 +50,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
         left,
         width: POPUP_W,
         zIndex: 400,
-        background: "var(--bg)",
-        border: "1.5px solid var(--fg)",
-        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        ...popoverSurface,
         fontFamily: "var(--font-ui)",
         fontSize: "0.82rem",
         color: "var(--fg)",

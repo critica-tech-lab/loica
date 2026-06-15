@@ -6,6 +6,7 @@ import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
 import { serializeWithFootnotes, parseMarkdownWithFootnotes } from "~/components/editor/pm-markdown";
 import { Slice } from "prosemirror-model";
+import { popoverSurface } from "~/lib/popover-styles";
 import {
   addRowBefore, addRowAfter, deleteRow,
   addColumnBefore, addColumnAfter, deleteColumn,
@@ -1172,9 +1173,7 @@ function TableContextMenu({ x, y, onClose, onAddRowBefore, onAddRowAfter, onDele
       ref={ref}
       style={{
         position: "fixed", top, left, width: W, zIndex: 500,
-        background: "var(--bg)",
-        border: "1.5px solid var(--fg)",
-        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        ...popoverSurface,
         fontFamily: "var(--font-ui)",
         fontSize: "0.8rem",
         color: "var(--fg)",
@@ -1256,9 +1255,7 @@ function LinkBubble({ url, x, y, onClose, onEdit, onRemove }: { url: string; x: 
       style={{
         position: "fixed", top, left, zIndex: 500,
         display: "inline-flex", alignItems: "center", gap: "0.5rem",
-        background: "var(--bg)",
-        border: "1.5px solid var(--fg)",
-        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        ...popoverSurface,
         padding: "0.3rem 0.6rem",
         fontFamily: "var(--font-ui)",
         fontSize: "0.75rem",

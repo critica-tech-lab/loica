@@ -117,12 +117,12 @@ function FloatingCard({ thread, top, focused, onFocus, editorApiRef, currentUser
         top,
         right: 10,
         width: CARD_W - 20,
-        background: "#fff",
-        borderRadius: "4px",
-        boxShadow: focused
-          ? "0 1px 8px rgba(0,0,0,0.20), 0 2px 4px rgba(0,0,0,0.12)"
-          : "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
-        border: focused ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+        background: "var(--bg)",
+        borderRadius: "var(--radius-sm)",
+        boxShadow: focused ? "var(--shadow-md)" : "var(--shadow-sm)",
+        border: focused
+          ? "1px solid color-mix(in srgb, var(--fg) 16%, transparent)"
+          : "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
         pointerEvents: "all",
         cursor: focused ? "default" : "pointer",
         transition: "box-shadow 120ms, border-color 120ms",

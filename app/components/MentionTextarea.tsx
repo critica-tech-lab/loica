@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { menuItemHighlight } from "~/lib/popover-styles";
 
 type UserResult = { id: string; name: string; email: string };
 
@@ -351,9 +352,9 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, MentionTextareaPr
                   display: "flex",
                   flexDirection: "column",
                   width: "100%",
-                  padding: "0.4rem 0.6rem",
+                  padding: "0.4rem 0.6rem 0.4rem calc(0.6rem - 2px)",
                   border: "none",
-                  background: i === activeIdx ? "color-mix(in srgb, var(--fg) 8%, transparent)" : "transparent",
+                  ...menuItemHighlight(i === activeIdx),
                   color: "var(--fg)",
                   cursor: "pointer",
                   textAlign: "left",
