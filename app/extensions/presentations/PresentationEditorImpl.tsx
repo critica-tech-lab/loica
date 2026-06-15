@@ -110,8 +110,10 @@ export function PresentationEditorImpl({
             autoFocus={!readOnly}
             onReady={(api) => {
               apiRef.current = api;
-              onReady?.();
               refresh();
+              // Seed the host with the synced markdown so the "N slides" banner is
+              // correct on load (host `content` is otherwise empty until first edit).
+              onReady?.(api.getMarkdown?.() ?? "");
             }}
             onChange={() => {
               onChange(apiRef.current?.getMarkdown?.() ?? "");

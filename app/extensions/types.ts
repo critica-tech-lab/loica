@@ -84,8 +84,10 @@ export interface ExtensionEditorViewProps {
   initialContent: string;
   /** Called whenever the user edits — the host persists with debounce. */
   onChange: (content: string) => void;
-  /** Called once the editor finishes its initial sync. */
-  onReady?: () => void;
+  /** Called once the editor finishes its initial sync. Receives the editor's
+   *  current markdown so the host can seed display-only state (e.g. the
+   *  "N slides" banner) — for PM docs `content` is empty until the first edit. */
+  onReady?: (content?: string) => void;
   /** When true, the editor must hide write affordances. */
   readOnly?: boolean;
   /** Document id (also the Yjs room name). */

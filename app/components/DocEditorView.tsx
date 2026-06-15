@@ -275,7 +275,12 @@ export function DocEditorView(_props: DocumentProps) {
               ctx.setContent(val);
               scheduleSave(title, val);
             }}
-            onReady={() => { ctx.setEditorReady(true); }}
+            onReady={(initial) => {
+              ctx.setEditorReady(true);
+              // Seed content from the synced editor (display-only, e.g. the slide
+              // banner) without scheduling a save — the ws-server owns PM content.
+              if (initial) ctx.setContent(initial);
+            }}
             readOnly={!canEdit}
             docId={document.id}
             wsUrl={wsUrl}
