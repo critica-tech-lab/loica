@@ -185,7 +185,9 @@ you care about.
 | Field | Type | When to use |
 |---|---|---|
 | `id` | `string` | Always. Stable identifier (matches the toggle in admin UI). |
-| `apiVersion` | `number` | Always. Set to `LOICA_EXTENSION_API_VERSION`; warns on mismatch. |
+| `apiVersion` | `number` | Always. Set to `LOICA_EXTENSION_API_VERSION`; warns on mismatch. Host-compat — distinct from `version`. |
+| `version` | `string` | Recommended. The extension's OWN semver (e.g. `"1.2.0"`). Shown in admin UI; basis for update detection. |
+| `homepage` / `repository` | `string` | Recommended. Linked from admin UI; `repository` is the basis for remote install/update. |
 | `description` | `string` | Recommended. Shown in admin UI. |
 | `docType` | `string` | When the extension owns a frontmatter `type:` value (Reports, Spreadsheets). |
 | `template` | `ExtensionTemplate` | When the extension should appear in "New" / "Insert" menus. |
@@ -200,6 +202,24 @@ you care about.
 | `previewHtml` | function | Server hook for `api/doc-preview/:id`. Return a `Response` to take over the print/share preview, or `null` to use core's markdown render. |
 
 See `app/extensions/types.ts` for the full type definitions.
+
+### Manifest (`package.json`) for drop-in plugins
+
+A drop-in plugin (`plugins/<id>/`) is just a node module, so its **`package.json`
+is the manifest** — no bespoke format. The loader fills any metadata the
+extension didn't set inline from it:
+
+| package.json | → extension field |
+|---|---|
+| `version` | `version` |
+| `description` | `description` |
+| `homepage` | `homepage` |
+| `repository` (string or `{url}`) | `repository` |
+| `engines.loica` (e.g. `"1"` / `"^1"`) | `apiVersion` (host-compat, VSCode-style) |
+
+Built-ins declare these inline instead. The admin panel shows each extension's
+`version`, source (Built-in vs Plugin), and an API-compat warning when
+`apiVersion` doesn't match the host's `LOICA_EXTENSION_API_VERSION`.
 
 ---
 
