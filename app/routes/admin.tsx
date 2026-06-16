@@ -22,6 +22,7 @@ import {
 import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds } from "~/lib/db.server";
 import { extensions } from "~/extensions";
 import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds, getCoreExtensionIdSet } from "~/extensions/index.server";
+import { installExtensionFromRepo, uninstallExtension, isInstallEnabled, getAllowedSources, listInstalledPlugins } from "~/extensions/install.server";
 import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
 import type { LoicaExtension } from "~/extensions/types";
 import { deleteTeamspace, renameTeamspace } from "~/lib/teamspace.server";
@@ -162,7 +163,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     apiCompatible: e.apiVersion === null || e.apiVersion === LOICA_EXTENSION_API_VERSION,
   }));
   const currentApiVersion = LOICA_EXTENSION_API_VERSION;
-  return { users: listAllUsers(), registrationOpen: isRegistrationOpen(), loginEnabled: isLocalLoginEnabled(), stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion };
+  // On-disk drop-in plugins (the install/uninstall surface) + whether a plugin
+  // is already active (loaded into the registry). A plugin on disk but not
+  // loaded is pending a restart.
+  const loadedExtIds = new Set(serverExtensions.map((e) => e.id));
+  const installedPlugins = listInstalledPlugins().map((p) => ({
+    ...p,
+    active: loadedExtIds.has(p.dir) || loadedExtIds.has(p.name) || loadedExtIds.has(p.name.replace(/^@[^/]+\//, "").replace(/^loica-/, "")),
+  }));
+  return { users: listAllUsers(), registrationOpen: isRegistrationOpen(), loginEnabled: isLocalLoginEnabled(), stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion, installEnabled: isInstallEnabled(), allowedSources: getAllowedSources(), installedPlugins };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -275,6 +284,28 @@ export async function action({ request }: Route.ActionArgs) {
     else current.delete(extensionId);
     setEnabledExtensionIds(Array.from(current));
     return { success: enable ? `Extension "${extensionId}" enabled.` : `Extension "${extensionId}" disabled.` };
+  }
+
+  if (intent === "install-extension") {
+    const url = String(form.get("repoUrl") || "").trim();
+    try {
+      const r = await installExtensionFromRepo(url);
+      console.log(`[admin] ${admin.email} installed extension '${r.dir}' from ${url}`);
+      return { success: `Installed "${r.name}"${r.version ? ` v${r.version}` : ""}. Restart Loica to activate it.` };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Install failed." };
+    }
+  }
+
+  if (intent === "uninstall-extension") {
+    const dir = String(form.get("pluginDir") || "");
+    try {
+      uninstallExtension(dir);
+      console.log(`[admin] ${admin.email} uninstalled extension '${dir}'`);
+      return { success: `Uninstalled "${dir}". Restart Loica to deactivate it.` };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Uninstall failed." };
+    }
   }
 
   if (intent === "wal-checkpoint") {
@@ -454,7 +485,7 @@ function UserRowMenu({
 }
 
 export default function AdminPanel() {
-  const { users, registrationOpen, loginEnabled, stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion } = useLoaderData<typeof loader>();
+  const { users, registrationOpen, loginEnabled, stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion, installEnabled, allowedSources, installedPlugins } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -886,6 +917,66 @@ export default function AdminPanel() {
                 </Form>
               </div>
             ))
+          )}
+
+          {/* Install from repository (B) */}
+          <div className="mt-4 rounded-xl border border-fg/[0.08] bg-fg/[0.02] px-4 py-3">
+            <div className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-fg/40">
+              Install from repository
+            </div>
+            {installEnabled ? (
+              <>
+                <Form method="post" className="flex items-center gap-2">
+                  <input type="hidden" name="intent" value="install-extension" />
+                  <input
+                    name="repoUrl"
+                    type="url"
+                    required
+                    placeholder="https://github.com/org/loica-ext-foo"
+                    className="flex-1 rounded-lg border border-fg/[0.12] bg-bg px-3 py-1.5 text-sm"
+                  />
+                  <button type="submit" disabled={busy} className="rounded-lg bg-fg px-3 py-1.5 text-sm text-bg disabled:opacity-40">
+                    Install
+                  </button>
+                </Form>
+                <div className="mt-2 text-[0.7rem] text-fg/40">
+                  Allowed sources: {allowedSources.map((s) => <code key={s} className="mr-2">{s}</code>)} · activates on next restart.
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-fg/40">
+                Disabled. Set <code>LOICA_EXTENSION_SOURCES</code> (comma-separated allowed repo-URL prefixes) to enable installing extensions.
+              </div>
+            )}
+          </div>
+
+          {/* Installed drop-in plugins (on disk) */}
+          {installedPlugins.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-fg/40">
+                Installed plugins (on disk)
+              </div>
+              {installedPlugins.map((p) => (
+                <div key={p.dir} className="mt-2 flex items-center justify-between rounded-xl border border-fg/[0.08] bg-fg/[0.02] px-4 py-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">{p.name}</span>
+                    {p.version && <span className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] text-fg/50">v{p.version}</span>}
+                    {!p.active && (
+                      <span className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-fg/40" title="On disk but not loaded yet.">
+                        restart to activate
+                      </span>
+                    )}
+                  </div>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="uninstall-extension" />
+                    <input type="hidden" name="pluginDir" value={p.dir} />
+                    <button type="submit" disabled={busy} className="rounded-lg border border-fg/[0.12] px-2 py-1 text-xs text-fg/60 disabled:opacity-40">
+                      Uninstall
+                    </button>
+                  </Form>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 
