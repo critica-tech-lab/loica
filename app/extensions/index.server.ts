@@ -126,12 +126,19 @@ function mergePackageManifest(ext: LoicaExtension, dir: string): void {
  */
 export function getEnabledExtensionIdSet(): Set<string> {
   const stored = getEnabledExtensionIds();
+  // Core features are compiled in and always on, regardless of the saved list.
+  const coreIds = serverExtensions.filter((e) => e.core).map((e) => e.id);
   if (stored === null) {
     return new Set(
       serverExtensions.filter((e) => e.defaultEnabled !== false).map((e) => e.id),
     );
   }
-  return new Set(stored);
+  return new Set([...stored, ...coreIds]);
+}
+
+/** Ids of compiled-in core features — always on, hidden from the admin toggle list. */
+export function getCoreExtensionIdSet(): Set<string> {
+  return new Set(serverExtensions.filter((e) => e.core).map((e) => e.id));
 }
 
 /** Look up a server extension by the frontmatter `type:` value. */
