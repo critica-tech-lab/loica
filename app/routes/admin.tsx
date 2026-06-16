@@ -835,7 +835,12 @@ export default function AdminPanel() {
                         v{p.version}
                       </span>
                     )}
-                    <span className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-fg/40">
+                    <span
+                      className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-fg/40"
+                      title={p.source === "plugin"
+                        ? "Drop-in extension, loaded from the plugins/ folder. Can be added or removed without changing Loica's code."
+                        : "Ships with Loica — compiled into the app. Always present unless disabled below."}
+                    >
                       {p.source === "plugin" ? "Plugin" : "Built-in"}
                     </span>
                     {!p.apiCompatible && (
