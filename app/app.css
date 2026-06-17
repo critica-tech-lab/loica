@@ -1725,7 +1725,12 @@ footnote.ProseMirror-selectednode::after {
 }
 
 .pm-editor-mount .ProseMirror {
-  flex: 1;
+  /* Fill the scroll container when the doc is short (via `min-height: 100%`, so
+     tapping the empty area still places the caret at the end) — but size to
+     CONTENT otherwise. Do NOT flex-grow the editable box: a flex-stretched
+     `contenteditable` (taller than its content) confuses iOS WebKit hit-testing
+     — the tap→caret-position mapping — so taps near the bottom can fail to place
+     the caret. `min-height` does the filling; `flex: 1` only added the stretch. */
   max-width: 65ch;
   margin: 0 auto;
   padding: 2rem 1rem 4rem;
