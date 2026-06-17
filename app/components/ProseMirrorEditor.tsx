@@ -65,6 +65,7 @@ function loadDeps() {
       import("yjs"),
       import("y-websocket"),
       import("y-prosemirror"),
+      import("y-indexeddb"),
     ]) as any;
   }
   return Promise.all([pmDeps, yjsDeps]);
@@ -97,6 +98,7 @@ export function ProseMirrorEditor({
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
   const providerRef = useRef<any>(null);
+  const idbRef = useRef<any>(null);
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
   const userInfoRef = useRef(userInfo);
@@ -174,7 +176,7 @@ export function ProseMirrorEditor({
         ySyncPluginKey,
         absolutePositionToRelativePosition,
         relativePositionToAbsolutePosition,
-      }] = yjsMods as any[];
+      }, { IndexeddbPersistence }] = yjsMods as any[];
 
       // Import ProseMirror CSS once
       await Promise.all([
@@ -190,6 +192,13 @@ export function ProseMirrorEditor({
       const yXmlFragment = ydoc.getXmlFragment("prosemirror");
       const commentsMap = ydoc.getMap("comments");
       const metaMap = ydoc.getMap("meta");
+
+      // Offline-first: persist the Yjs doc in IndexedDB on the SAME ydoc. Edits
+      // survive reloads and work with no network; on reconnect the websocket
+      // provider syncs the accumulated updates and Yjs merges them conflict-free.
+      // Keyed by docId, so each doc you open is cached locally.
+      const idb = new IndexeddbPersistence(docId, ydoc);
+      idbRef.current = idb;
 
       const provider = new WebsocketProvider(wsUrl, docId, ydoc, {
         connect: true,
@@ -1034,8 +1043,18 @@ export function ProseMirrorEditor({
         }
       });
 
-      // Safety fallback: if the websocket never connects (offline, bad URL),
-      // still surface the editor so the user can type locally.
+      // Local IndexedDB cache loaded → the doc is editable with no network at
+      // all. Surface the editor as soon as the local state is restored (don't
+      // wait on the websocket), and emit frontmatter from the cached state.
+      idb.whenSynced.then(() => {
+        if (!destroyed && viewRef.current) {
+          onReady?.(api);
+          emitFrontmatter();
+        }
+      });
+
+      // Safety fallback: if neither the websocket nor the cache resolves
+      // quickly, still surface the editor so the user can type locally.
       setTimeout(() => {
         if (!destroyed && viewRef.current) onReady?.(api);
       }, 3000);
@@ -1048,8 +1067,10 @@ export function ProseMirrorEditor({
       viewRef.current?.destroy();
       providerRef.current?.disconnect();
       providerRef.current?.destroy();
+      idbRef.current?.destroy();
       viewRef.current = null;
       providerRef.current = null;
+      idbRef.current = null;
     };
     // docId / wsUrl change → full remount handled by `key` prop from parent
     // eslint-disable-next-line react-hooks/exhaustive-deps
