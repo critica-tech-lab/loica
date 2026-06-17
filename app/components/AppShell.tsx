@@ -59,13 +59,37 @@ export function AppShell({ children, navLeft, navActions, scrollable, footerLeft
     };
   }, [safeRevalidate]);
 
+  // iOS soft keyboard: `100dvh` does NOT shrink for the on-screen keyboard, so
+  // the bottom of a full-height editor (later paragraphs) ends up *under* the
+  // keyboard — unreachable, since iOS WebKit won't reliably scroll a nested
+  // overflow container. Track the visual viewport and expose its height as
+  // `--app-vh` so the shell shrinks to the area above the keyboard. No-op where
+  // `visualViewport` is absent (falls back to 100dvh).
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const root = document.documentElement;
+    const apply = () => root.style.setProperty("--app-vh", `${Math.round(vv.height)}px`);
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      root.style.removeProperty("--app-vh");
+    };
+  }, []);
+
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        minHeight: "100dvh",
-        ...(scrollable ? {} : { height: "100dvh" }),
+        // Non-scrolling pages (the editor) bind to the visual viewport so the
+        // shell shrinks above the iOS keyboard; scrolling pages keep min-height.
+        ...(scrollable
+          ? { minHeight: "100dvh" }
+          : { height: "var(--app-vh, 100dvh)" }),
       }}
     >
       <Navbar left={navLeft} actions={navActions} />
