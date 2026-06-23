@@ -4,7 +4,9 @@ import {
   toggleMark,
   setBlockType,
   wrapIn,
+  chainCommands,
 } from "prosemirror-commands";
+import { MAX_INDENT } from "./schema.ts";
 import {
   splitListItem,
   liftListItem,
@@ -104,6 +106,30 @@ function buildInputRules(schema: Schema): Plugin {
   return inputRules({ rules });
 }
 
+// Step the indent attr on paragraphs/headings in the selection. Consumes the
+// key whenever the selection sits in an indentable block (so Tab never blurs
+// the editor), even when already clamped at the bound.
+function changeIndent(schema: Schema, delta: number): Command {
+  return (state, dispatch) => {
+    const { from, to } = state.selection;
+    const tr = state.tr;
+    let inIndentable = false;
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type === schema.nodes.paragraph || node.type === schema.nodes.heading) {
+        inIndentable = true;
+        const cur = node.attrs.indent || 0;
+        const next = Math.min(MAX_INDENT, Math.max(0, cur + delta));
+        if (next !== cur) tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: next });
+        return false;
+      }
+      return true;
+    });
+    if (!inIndentable) return false;
+    if (dispatch && tr.docChanged) dispatch(tr);
+    return true;
+  };
+}
+
 export function buildPlugins(schema: Schema, readOnly: boolean): Plugin[] {
   if (readOnly) {
     return [gapCursor()];
@@ -119,8 +145,8 @@ export function buildPlugins(schema: Schema, readOnly: boolean): Plugin[] {
       "Mod-u": toggleMark(schema.marks.underline),
       "Mod-`": toggleMark(schema.marks.code),
       "Mod-Shift-x": toggleMark(schema.marks.strikethrough),
-      "Tab": goToNextCell(1),
-      "Shift-Tab": goToNextCell(-1),
+      "Tab": chainCommands(goToNextCell(1), sinkListItem(schema.nodes.list_item), changeIndent(schema, 1)),
+      "Shift-Tab": chainCommands(goToNextCell(-1), liftListItem(schema.nodes.list_item), changeIndent(schema, -1)),
       "Enter": splitListItem(schema.nodes.list_item),
       "Mod-[": liftListItem(schema.nodes.list_item),
       "Mod-]": sinkListItem(schema.nodes.list_item),
