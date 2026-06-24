@@ -1,13 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, unlinkSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { marked } from "marked";
 import { stripFrontmatter } from "~/extensions/sdk.server";
 
 const fontsDir = resolve(process.cwd(), "assets/fonts");
-const loicaTmpDir = join(homedir(), "loica-tmp");
+// Scratch dir for PDF rendering. Use the system temp dir (honors TMPDIR) so it
+// works on a read-only-rootfs deployment where $HOME may not be writable.
+const loicaTmpDir = join(tmpdir(), "loica-tmp");
 
 // Reveal-theme palette mirrors. Keys match reveal.js theme filenames so the
 // PDF reads with the same colors as the on-screen deck. Fonts are mapped to

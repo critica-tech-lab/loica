@@ -2,7 +2,7 @@ import type { Route } from "./+types/api.doc-pdf.$id";
 import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, unlinkSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import sharp from "sharp";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { join, extname, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { getSessionUser } from "~/lib/auth.server";
@@ -24,9 +24,11 @@ const newcssPrint = join(newcssDir, "print.css");
 // serializer) as a real width attribute, for both HTML and LaTeX output.
 const imageWidthFilter = resolve(process.cwd(), "assets/image-width.lua");
 
-// Snap-confined tectonic can only access non-hidden dirs under $HOME.
-// Using $HOME/loica-tmp instead of /tmp or a dot-prefixed project dir.
-const loicaTmpDir = join(homedir(), "loica-tmp");
+// Scratch dir for PDF rendering. Use the system temp dir (honors TMPDIR) so it
+// works on a read-only-rootfs deployment where $HOME may not be writable. If
+// tectonic is snap-confined (can only read non-hidden dirs under $HOME), point
+// TMPDIR at a dir under $HOME.
+const loicaTmpDir = join(tmpdir(), "loica-tmp");
 
 // WeasyPrint is the engine for the default new.css PDF. It may be absent on a
 // given host; detect once and fall back to plain pandoc/LaTeX so export never
