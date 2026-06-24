@@ -31,6 +31,7 @@ export default [
   route("admin", "routes/admin.tsx"),
   route("settings", "routes/settings.tsx"),
   route("api/health", "routes/api.health.ts"),
+  route("api/healthz", "routes/api.healthz.ts"),
   route("api/notifications", "routes/api.notifications.ts"),
   route("api/doc-download/:id", "routes/api.doc-download.$id.ts"),
   route("api/doc-preview/:id", "routes/api.doc-preview.$id.ts"),
