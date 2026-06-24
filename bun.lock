@@ -28,6 +28,7 @@
         "marked": "^17.0.2",
         "marked-footnote": "^1.4.0",
         "nanoid": "^5.1.6",
+        "nodemailer": "^9.0.1",
         "prosemirror-commands": "^1.7.1",
         "prosemirror-docx": "^0.6.1",
         "prosemirror-dropcursor": "^1.8.2",
@@ -62,6 +63,7 @@
         "@react-router/dev": "^7",
         "@tailwindcss/vite": "^4",
         "@types/better-sqlite3": "^7.6.13",
+        "@types/nodemailer": "^8.0.1",
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "@types/turndown": "^5.0.6",
@@ -571,6 +573,8 @@
 
     "@types/node": ["@types/node@25.2.3", "https://registry.npmmirror.com/@types/node/-/node-25.2.3.tgz", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-m0jEgYlYz+mDJZ2+F4v8D1AyQb+QzsNqRuI7xg1VQX/KlKS0qT9r1Mo16yo5F/MtifXFgaofIFsdFMox2SxIbQ=="],
 
+    "@types/nodemailer": ["@types/nodemailer@8.0.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw=="],
+
     "@types/object.omit": ["@types/object.omit@3.0.3", "", {}, "sha512-xrq4bQTBGYY2cw+gV4PzoG2Lv3L0pjZ1uXStRRDQoATOYW1lCsFQHhQ+OkPhIcQoqLjAq7gYif7D14Qaa6Zbew=="],
 
     "@types/object.pick": ["@types/object.pick@1.3.4", "", {}, "sha512-5PjwB0uP2XDp3nt5u5NJAG2DORHIRClPzWT/TTZhJ2Ekwe8M5bA9tvPdi9NO/n2uvu2/ictat8kgqvLfcIE1SA=="],
@@ -1018,6 +1022,8 @@
     "node-abi": ["node-abi@3.87.0", "https://registry.npmmirror.com/node-abi/-/node-abi-3.87.0.tgz", { "dependencies": { "semver": "^7.3.5" } }, "sha512-+CGM1L1CgmtheLcBuleyYOn7NWPVu0s0EJH2C4puxgEZb9h8QpR9G2dBfZJOAUhi7VQxuBPMd0hiISWcTyiYyQ=="],
 
     "node-releases": ["node-releases@2.0.27", "https://registry.npmmirror.com/node-releases/-/node-releases-2.0.27.tgz", {}, "sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA=="],
+
+    "nodemailer": ["nodemailer@9.0.1", "", {}, "sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw=="],
 
     "object-inspect": ["object-inspect@1.13.4", "https://registry.npmmirror.com/object-inspect/-/object-inspect-1.13.4.tgz", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
 
