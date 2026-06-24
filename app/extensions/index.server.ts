@@ -15,10 +15,12 @@ import { pathToFileURL } from "node:url";
 import type { LoicaExtension, PdfStyle } from "./types";
 import { getEnabledExtensionIds } from "~/lib/db.server";
 import { presentationsServerExtension } from "./presentations/index.server";
+import { oidcServerExtension } from "./oidc/index.server";
 
 /** Built-in extensions compiled into the bare repo. Empty by default. */
 const builtinExtensions: LoicaExtension[] = [
   presentationsServerExtension,
+  oidcServerExtension,
 ];
 
 /** Live registry: built-ins + any runtime-discovered drop-in plugins. */

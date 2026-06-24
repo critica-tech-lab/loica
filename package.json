@@ -42,6 +42,7 @@
     "geist": "^1.7.0",
     "isbot": "^5",
     "isomorphic-dompurify": "^2.36.0",
+    "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "marked": "^17.0.2",
     "marked-footnote": "^1.4.0",
