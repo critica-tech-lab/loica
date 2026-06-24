@@ -29,17 +29,11 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-After setup, edit `.env` with your domain:
+The script is interactive and walks you through the setup. Afterwards, edit `.env` with your domain:
 
 ```env
 NODE_ENV=production
 WS_URL=wss://your-domain.com/ws
-```
-
-Or use the interactive deployment script for a guided setup:
-
-```bash
-./deploy.sh
 ```
 
 ## Step-by-Step Deployment (Linux)
@@ -166,6 +160,9 @@ cp .env.example .env
 | `WS_HOST` | No | `127.0.0.1` (prod) / `0.0.0.0` (dev) | WebSocket bind address |
 | `SECURE_COOKIE` | No | `true` in prod | Set `false` for local HTTP |
 | `ALLOWED_ORIGINS` | No | Derived from `WS_URL` | Comma-separated allowed origins |
+| `SITE_URL` | No | Auto-detect | Public base URL, used to build links in outbound email |
+| `DISABLE_LOCAL_LOGIN` | No | `false` | `true` for an SSO-only install: hides the password login form and signup |
+| `REGISTRATION_OPEN` | No | `true` | `false` closes signups while keeping password login enabled |
 | `MAILGUN_API_KEY` | No | — | Mailgun API key (emails are logged without this) |
 | `MAILGUN_DOMAIN` | No | — | Mailgun sending domain |
 | `MAILGUN_FROM` | No | — | From address for emails |
@@ -174,6 +171,8 @@ cp .env.example .env
 ## SSO / Auth providers
 
 Loica ships with email + password auth only. To add OIDC, OAuth, SAML, or any other provider, write an extension under `app/extensions/<name>/` that declares an `authProvider`. See [`app/extensions/README.md`](https://github.com/critica-tech-lab/loica/blob/main/app/extensions/README.md) for the full contract.
+
+Once an SSO provider is in place, set `DISABLE_LOCAL_LOGIN=true` to run an SSO-only install: the password login form and signup are hidden, leaving the provider as the only way in. To keep password login but stop new self-service signups, set `REGISTRATION_OPEN=false` instead.
 
 ## Reverse Proxy (nginx alternative)
 
