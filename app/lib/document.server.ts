@@ -5,6 +5,7 @@ import { hash, verify } from "@node-rs/argon2";
 import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
+import { uploadsDir } from "./paths.server";
 
 export type Document = {
   id: string;
@@ -328,7 +329,7 @@ export function permanentlyDeleteDocument(id: string): void {
     "SELECT pdf_file FROM documents WHERE id = ?"
   ).get(id);
   if (doc?.pdf_file) {
-    try { unlinkSync(join(process.cwd(), "uploads", doc.pdf_file)); } catch { /* file may not exist */ }
+    try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
   db.prepare("DELETE FROM documents WHERE id = ?").run(id);
 }
@@ -378,7 +379,7 @@ export function purgeExpiredTrash(): void {
     "SELECT pdf_file FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ? AND pdf_file IS NOT NULL"
   ).all(cutoff);
   for (const doc of pdfDocs) {
-    try { unlinkSync(join(process.cwd(), "uploads", doc.pdf_file)); } catch { /* file may not exist */ }
+    try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
   db.prepare("DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
   db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);

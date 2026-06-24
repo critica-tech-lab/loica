@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, extname } from "node:path";
-
-const UPLOAD_DIR = join(process.cwd(), "uploads");
+import { uploadsDir as UPLOAD_DIR } from "~/lib/paths.server";
 
 const MIME_TYPES: Record<string, string> = {
   ".png": "image/png",

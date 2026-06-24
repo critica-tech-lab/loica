@@ -19,8 +19,8 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import Database from "better-sqlite3";
-import { join } from "node:path";
 import { nanoid } from "nanoid";
+import { dbPath } from "./app/lib/paths.server.ts";
 
 // ─── Import modular components ────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ import {
 
 // ─── DB ───────────────────────────────────────────────────────────────────────
 
-const db = new Database(join(process.cwd(), "app.db"));
+const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 5000");
 

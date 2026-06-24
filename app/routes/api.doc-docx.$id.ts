@@ -10,6 +10,7 @@ import { getMembership } from "~/lib/workspace.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
 import { fixListIndentation, parseFrontmatter } from "~/lib/templates";
 import { getServerExtensionForDocType } from "~/extensions/index.server";
+import { uploadsDir } from "~/lib/paths.server";
 
 const fontsDir = resolve(process.cwd(), "assets/fonts");
 
@@ -37,7 +38,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   // Core fallback — markdown via pandoc. Requires `pandoc` on PATH.
-  const uploadsDir = join(process.cwd(), "uploads");
 
   // Rewrite image paths to absolute for pandoc
   const content = (doc.content || "").replace(

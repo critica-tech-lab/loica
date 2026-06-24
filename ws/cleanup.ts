@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { join } from "node:path";
 import { readdirSync, unlinkSync } from "node:fs";
 import { STALE_AGE_SECS, MIN_CONTENT_LEN, RING_BUFFER_SIZE } from "./types.ts";
+import { uploadsDir } from "../app/lib/paths.server.ts";
 
 /**
  * Initialize cleanup statements.
@@ -70,7 +71,7 @@ export function cleanupStaleDocs(
  * Also checks workspace icons.
  */
 export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatements): void {
-  const uploadDir = join(process.cwd(), "uploads");
+  const uploadDir = uploadsDir;
 
   let files: string[];
   try {

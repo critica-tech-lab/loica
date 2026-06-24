@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { join, extname, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { getSessionUser } from "~/lib/auth.server";
+import { uploadsDir } from "~/lib/paths.server";
 import { getDocument } from "~/lib/document.server";
 import { getMembership } from "~/lib/workspace.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
@@ -70,7 +71,6 @@ async function generatePdf(
 ): Promise<Response> {
   mkdirSync(loicaTmpDir, { recursive: true });
 
-  const uploadsDir = join(process.cwd(), "uploads");
   const id = nanoid(8);
   const tmpImgDir = join(loicaTmpDir, `loica-img-${id}`);
   const tmpFiles: string[] = [];
