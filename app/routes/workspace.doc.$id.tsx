@@ -3,7 +3,7 @@ import type { MetaFunction, ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/workspace.doc.$id";
 import { getSessionUser } from "~/lib/auth.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
-import { getPublicOrigin } from "~/lib/url.server";
+import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
 import {
   getDocument,
   updateDocument,
@@ -95,10 +95,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         ? { name: userNames[document.updated_by] ?? null }
         : null;
 
-  const wsUrl = process.env.WS_URL ?? (() => {
-    const u = new URL(request.url);
-    return `${u.protocol === "https:" ? "wss:" : "ws:"}//${u.hostname}:4001`;
-  })();
+  const wsUrl = getWebSocketUrl(request);
 
   return {
     workspace,

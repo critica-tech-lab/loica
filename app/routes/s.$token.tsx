@@ -2,6 +2,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
+import { getWebSocketUrl } from "~/lib/url.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -109,9 +110,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     shareToken: params.token,
     trackChanges,
     externalEmail: result.externalEmail ?? null,
-    wsUrl: process.env.WS_URL ?? (() => {
-      return `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.hostname}:4001`;
-    })(),
+    wsUrl: getWebSocketUrl(request),
   };
 }
 

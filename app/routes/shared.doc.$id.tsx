@@ -16,7 +16,7 @@ import {
 import { getFolderPath } from "~/lib/folder.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
-import { getPublicOrigin } from "~/lib/url.server";
+import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
@@ -99,10 +99,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     starred,
     creatorName: creator?.name ?? null,
     modifierName: modifier?.name ?? null,
-    wsUrl: process.env.WS_URL ?? (() => {
-      const u = new URL(request.url);
-      return `${u.protocol === "https:" ? "wss:" : "ws:"}//${u.hostname}:4001`;
-    })(),
+    wsUrl: getWebSocketUrl(request),
   };
 }
 
