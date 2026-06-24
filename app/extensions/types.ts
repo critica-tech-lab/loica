@@ -52,25 +52,13 @@ export interface ExtensionExporter {
   (
     doc: ExtensionDocument,
     frontmatter: Record<string, string> | null,
+    /**
+     * Live document body to export. The PM editor POSTs freshly-serialized
+     * markdown here; when omitted the exporter should fall back to
+     * `doc.content` (the DB copy). Lets a global exporter honour unsaved edits.
+     */
+    content?: string,
   ): Promise<Response> | Response;
-}
-
-/**
- * Install-wide PDF styling contributed by an extension. Unlike `exporters.pdf`
- * (which replaces the whole pipeline for one doc type), a `pdfStyle` layers
- * onto the core pandoc/tectonic pipeline for ALL docs — preamble, Lua filters,
- * fonts, and extra pandoc args. The core resolves the first enabled extension
- * that declares one; when none do, PDFs render as bare default LaTeX.
- */
-export interface PdfStyle {
-  /** Absolute path to a LaTeX preamble, included via pandoc `-H`. */
-  preamblePath?: string;
-  /** Absolute paths to pandoc Lua filters (`--lua-filter`). */
-  luaFilters?: string[];
-  /** Font directory exposed to XeTeX/tectonic via `OSFONTDIR`. */
-  fontsDir?: string;
-  /** Extra raw pandoc args, e.g. `["-V", "mainfont=IBM Plex Sans"]`. */
-  extraPandocArgs?: string[];
 }
 
 /**
@@ -205,10 +193,10 @@ export interface LoicaExtension {
   /** ── Export extension point ────────────────────────────────────────── */
 
   /**
-   * Custom exporters. The dispatcher calls these from `api/doc-pdf/:id` and
-   * `api/doc-docx/:id` when this extension owns the doc's `type`. When
-   * absent, the core falls back to a generic markdown→PDF/DOCX pipeline.
-   * Adding new formats (epub, html) is non-breaking.
+   * Per-doc-type exporters. The dispatcher calls these from `api/doc-pdf/:id`
+   * and `api/doc-docx/:id` when this extension owns the doc's `type`. When
+   * absent, the core falls back to the built-in pure-JS markdown→PDF/DOCX
+   * renderers. Adding new formats (epub, html) is non-breaking.
    */
   exporters?: {
     pdf?: ExtensionExporter;
@@ -216,11 +204,17 @@ export interface LoicaExtension {
   };
 
   /**
-   * Install-wide PDF styling layered onto the core pandoc pipeline for all
-   * docs. See `PdfStyle`. The core uses the first enabled extension that
-   * declares one; none → bare default LaTeX.
+   * Install-wide exporters that replace the core pure-JS renderers for ALL
+   * docs (any type without its own `exporters` override). This is the escape
+   * hatch for an opinionated install: a drop-in plugin can run its own
+   * pipeline — pandoc/tectonic/LaTeX, a remote service, anything — fully
+   * self-contained, so the bare core stays binary-free. The core resolves the
+   * first enabled extension that declares one; none → built-in renderers.
    */
-  pdfStyle?: PdfStyle;
+  globalExporters?: {
+    pdf?: ExtensionExporter;
+    docx?: ExtensionExporter;
+  };
 
   /**
    * Server hook that returns the HTML preview body for `api/doc-preview/:id`

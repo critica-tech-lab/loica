@@ -1006,27 +1006,6 @@ export function ProseMirrorEditor({
         replaceContent: () => {},
 
         getMarkdown: () => serializeWithFootnotes(view.state.doc),
-
-        exportDocx: async (filename = "document.docx") => {
-          try {
-            const { defaultDocxSerializer } = await import("prosemirror-docx");
-            const { Packer } = await import("docx");
-            const doc = defaultDocxSerializer.serialize(view.state.doc, {
-              getImageBuffer: (_src: string) => new Uint8Array(0),
-            });
-            // Packer.toBlob is the browser-compatible path; toBuffer uses
-            // JSZip "nodebuffer" which is Node.js-only and returns null in browsers.
-            const blob = await Packer.toBlob(doc);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            console.error("[exportDocx]", err);
-          }
-        },
       };
 
       // Signal ready after the Yjs provider has completed its first sync.

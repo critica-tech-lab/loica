@@ -67,7 +67,6 @@ export default defineConfig({
       "prosemirror-schema-basic", "prosemirror-schema-list",
       "prosemirror-dropcursor", "prosemirror-tables", "prosemirror-markdown",
       "prosemirror-trailing-node", "prosemirror-resizable-view",
-      "prosemirror-docx", "docx",
       "y-prosemirror",
       "orderedmap",
       "@manuscripts/track-changes-plugin", "@manuscripts/transform",

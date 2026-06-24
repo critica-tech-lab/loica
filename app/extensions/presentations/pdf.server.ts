@@ -184,6 +184,16 @@ export function generatePresentationPdf(
       },
     });
   } catch (err: any) {
+    // WeasyPrint is an optional, presentations-only system dependency — the
+    // core install no longer ships it. Surface a clear, actionable message
+    // when it's absent instead of an opaque 500.
+    if (err?.code === "ENOENT") {
+      console.error("Presentation PDF export needs WeasyPrint, which is not installed.");
+      throw new Response(
+        "Presentation PDF export requires WeasyPrint. Install it (e.g. `pip install weasyprint`) on the server and retry.",
+        { status: 503 },
+      );
+    }
     console.error("Presentation PDF failed:", err.stderr?.toString() || err.message);
     throw new Response("PDF generation failed", { status: 500 });
   } finally {

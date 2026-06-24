@@ -988,11 +988,7 @@ function DocNavActions() {
   const { editorApi, title } = useDocument();
   const download = async (kind: "md" | "pdf" | "docx") => {
     const slug = (title || "document").replace(/[^a-zA-Z0-9_\-. ]/g, "_");
-    if (USE_PM && kind === "docx") {
-      editorApi.current?.exportDocx?.(`${slug}.docx`);
-      return;
-    }
-    if (USE_PM && (kind === "md" || kind === "pdf")) {
+    if (USE_PM) {
       const md = editorApi.current?.getMarkdown?.() ?? "";
       if (kind === "md") {
         const blob = new Blob([md], { type: "text/markdown; charset=utf-8" });
@@ -1002,21 +998,22 @@ function DocNavActions() {
         URL.revokeObjectURL(url);
         return;
       }
-      // PDF: POST markdown to server, receive PDF blob
+      // PDF/DOCX: POST live markdown to the server, receive the rendered blob.
+      const endpoint = kind === "pdf" ? "doc-pdf" : "doc-docx";
       try {
-        const resp = await fetch(`/api/doc-pdf/${document.id}`, {
+        const resp = await fetch(`/api/${endpoint}/${document.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: md }),
         });
-        if (!resp.ok) throw new Error("PDF failed");
+        if (!resp.ok) throw new Error(`${kind} export failed`);
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
         const a = window.document.createElement("a");
-        a.href = url; a.download = `${slug}.pdf`; a.click();
+        a.href = url; a.download = `${slug}.${kind}`; a.click();
         URL.revokeObjectURL(url);
       } catch {
-        window.open(`/api/doc-pdf/${document.id}`, "_blank");
+        window.open(`/api/${endpoint}/${document.id}`, "_blank");
       }
       return;
     }

@@ -35,40 +35,10 @@ if [[ "$OS" == "Linux" ]]; then
     esac
   fi
 
-  # PDF generation dependencies (pandoc, tectonic, imagemagick)
-  for tool in pandoc tectonic magick; do
-    if command -v "$tool" &>/dev/null; then
-      echo "[ok] $tool already installed"
-    else
-      echo "[..] Installing $tool..."
-      case "$PKG_MGR" in
-        apt)
-          case "$tool" in
-            pandoc)   sudo apt-get install -y pandoc ;;
-            tectonic) sudo apt-get install -y tectonic 2>/dev/null || {
-                        curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh
-                        sudo mv tectonic /usr/local/bin/
-                      } ;;
-            magick)   sudo apt-get install -y imagemagick ;;
-          esac ;;
-        dnf)
-          case "$tool" in
-            pandoc)   sudo dnf install -y pandoc ;;
-            tectonic) sudo dnf install -y tectonic 2>/dev/null || {
-                        curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh
-                        sudo mv tectonic /usr/local/bin/
-                      } ;;
-            magick)   sudo dnf install -y ImageMagick ;;
-          esac ;;
-        pacman)
-          case "$tool" in
-            pandoc)   sudo pacman -S --noconfirm pandoc-cli ;;
-            tectonic) sudo pacman -S --noconfirm tectonic ;;
-            magick)   sudo pacman -S --noconfirm imagemagick ;;
-          esac ;;
-      esac
-    fi
-  done
+  # PDF/DOCX export needs no system binaries — the core renders both with
+  # pure-JS (pdfmake + docx, image handling via sharp), all installed by
+  # `bun install`. Opinionated export pipelines (e.g. pandoc/LaTeX house
+  # styles) are drop-in plugins that bring their own dependencies.
 
   # curl + unzip (needed for Bun installer)
   for tool in curl unzip; do
