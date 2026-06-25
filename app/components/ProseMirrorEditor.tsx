@@ -13,6 +13,7 @@ import {
   addColumnBefore, addColumnAfter, deleteColumn,
   deleteTable,
 } from "prosemirror-tables";
+import { TableHandles } from "./editor/TableHandles";
 
 interface Props {
   docId: string;
@@ -108,6 +109,9 @@ export function ProseMirrorEditor({
   currentUserIdRef.current = currentUserId;
   const [tableMenu, setTableMenu] = useState<{ x: number; y: number; inHeaderRow: boolean } | null>(null);
   const [linkBubble, setLinkBubble] = useState<{ url: string; x: number; y: number; from: number; to: number } | null>(null);
+  // Table whose edit handles are shown — the one containing the caret.
+  const [activeTableEl, setActiveTableEl] = useState<HTMLTableElement | null>(null);
+  const activeTableElRef = useRef<HTMLTableElement | null>(null);
   // Stable ref to current threads — lets addComment() append without going through the plugin
   const threadsRef = useRef<ResolvedThread[]>([]);
   const onThreadsChangeRef = useRef(onThreadsChange);
@@ -660,6 +664,17 @@ export function ProseMirrorEditor({
               onSelectionChangeRef.current({ from, to: from, top: 0, left: 0 });
             }
           }
+          // Track the table containing the caret → drives the edit handles.
+          let tEl: HTMLTableElement | null = null;
+          try {
+            const dom = view.domAtPos(from);
+            let n = (dom.node?.nodeType === 3 ? dom.node.parentElement : dom.node) as HTMLElement | null;
+            tEl = (n?.closest?.("table") as HTMLTableElement) ?? null;
+          } catch { /* position not in DOM yet */ }
+          if (tEl !== activeTableElRef.current) {
+            activeTableElRef.current = tEl;
+            setActiveTableEl(tEl);
+          }
         },
       });
       viewRef.current = view;
@@ -1133,6 +1148,7 @@ export function ProseMirrorEditor({
           }
         }}
       />
+      <TableHandles tableEl={activeTableEl} view={viewRef.current} readOnly={readOnly} />
       {tableMenu && (
         <TableContextMenu
           x={tableMenu.x}
