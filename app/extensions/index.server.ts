@@ -16,10 +16,12 @@ import type { LoicaExtension, ExtensionExporter } from "./types";
 import { getEnabledExtensionIds } from "~/lib/db.server";
 import { pluginsDir } from "~/lib/paths.server";
 import { presentationsServerExtension } from "./presentations/index.server";
+import { oidcServerExtension } from "./oidc/index.server";
 
 /** Built-in extensions compiled into the bare repo. Empty by default. */
 const builtinExtensions: LoicaExtension[] = [
   presentationsServerExtension,
+  oidcServerExtension,
 ];
 
 /** Ids compiled into the bare repo — everything else is a runtime drop-in. */
