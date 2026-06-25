@@ -12,7 +12,7 @@
 import { readdirSync, existsSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { LoicaExtension, PdfStyle } from "./types";
+import type { LoicaExtension, ExtensionExporter } from "./types";
 import { getEnabledExtensionIds } from "~/lib/db.server";
 import { presentationsServerExtension } from "./presentations/index.server";
 
@@ -149,12 +149,14 @@ export function getServerExtensionForDocType(type: string | null | undefined): L
 }
 
 /**
- * The active install-wide PDF style: the first enabled extension that declares
- * a `pdfStyle`. Null when none do → the core renders bare default LaTeX.
+ * The active install-wide exporter for a format: the first enabled extension
+ * that declares a `globalExporters[format]`. Null when none do → the core
+ * uses its built-in pure-JS renderer.
  */
-export function getActivePdfStyle(): PdfStyle | null {
+export function getActiveGlobalExporter(format: "pdf" | "docx"): ExtensionExporter | null {
   const enabled = getEnabledExtensionIdSet();
-  return serverExtensions.find((e) => e.pdfStyle && enabled.has(e.id))?.pdfStyle ?? null;
+  return serverExtensions.find((e) => e.globalExporters?.[format] && enabled.has(e.id))
+    ?.globalExporters?.[format] ?? null;
 }
 
 /**
