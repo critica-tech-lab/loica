@@ -166,6 +166,23 @@ export interface LoicaExtension {
    */
   apiVersion?: number;
 
+  /**
+   * The extension's OWN version (semver, e.g. "1.2.0") — distinct from
+   * `apiVersion` (host-compat). Surfaced in the admin panel and used to detect
+   * upgrades against a remote manifest. Built-ins declare it inline; drop-in
+   * plugins should also expose it in `plugins/<id>/extension.json`.
+   */
+  version?: string;
+
+  /** Project/marketing homepage, linked from the admin panel. */
+  homepage?: string;
+
+  /**
+   * Source repository (e.g. a git URL). Display + the basis for update checks
+   * and remote install in later phases.
+   */
+  repository?: string;
+
   /** ── Doc-type extension point ──────────────────────────────────────── */
 
   /**

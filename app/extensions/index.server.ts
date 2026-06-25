@@ -9,7 +9,7 @@
  * handlers, PDF styles) and must be excluded from the client bundle.
  */
 
-import { readdirSync, existsSync, statSync } from "node:fs";
+import { readdirSync, existsSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { LoicaExtension, PdfStyle } from "./types";
@@ -20,6 +20,9 @@ import { presentationsServerExtension } from "./presentations/index.server";
 const builtinExtensions: LoicaExtension[] = [
   presentationsServerExtension,
 ];
+
+/** Ids compiled into the bare repo — everything else is a runtime drop-in. */
+export const builtinExtensionIds = new Set(builtinExtensions.map((e) => e.id));
 
 /** Live registry: built-ins + any runtime-discovered drop-in plugins. */
 export const serverExtensions: LoicaExtension[] = [...builtinExtensions];
@@ -70,11 +73,45 @@ async function loadPlugins(): Promise<void> {
         console.error(`[extensions] plugin '${name}' id '${ext.id}' already registered — skipping`);
         continue;
       }
+      // Standard manifest: a plugin's package.json is the single source of truth
+      // for version/repo/host-compat. Fields the extension didn't set inline are
+      // filled from it (engines.loica → apiVersion, VSCode-style).
+      mergePackageManifest(ext, join(PLUGINS_DIR, name));
       serverExtensions.push(ext);
-      console.log(`[extensions] loaded plugin '${ext.id}' from plugins/${name}`);
+      console.log(`[extensions] loaded plugin '${ext.id}'${ext.version ? ` v${ext.version}` : ""} from plugins/${name}`);
     } catch (err) {
       console.error(`[extensions] failed to load plugin '${name}':`, err);
     }
+  }
+}
+
+/**
+ * Fill an extension's metadata from its `package.json` (the standard manifest)
+ * when not declared inline. `engines.loica` carries the host API version the
+ * plugin targets (e.g. "1" or "^1"), mirroring VSCode's `engines.vscode`.
+ */
+function mergePackageManifest(ext: LoicaExtension, dir: string): void {
+  const pkgPath = join(dir, "package.json");
+  if (!existsSync(pkgPath)) return;
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  } catch (err) {
+    console.error(`[extensions] plugin '${ext.id}' has an unreadable package.json:`, err);
+    return;
+  }
+  if (ext.version === undefined && typeof pkg.version === "string") ext.version = pkg.version;
+  if (ext.description === undefined && typeof pkg.description === "string") ext.description = pkg.description;
+  if (ext.homepage === undefined && typeof pkg.homepage === "string") ext.homepage = pkg.homepage;
+  if (ext.repository === undefined) {
+    const repo = pkg.repository as string | { url?: string } | undefined;
+    const url = typeof repo === "string" ? repo : repo?.url;
+    if (url) ext.repository = url;
+  }
+  if (ext.apiVersion === undefined) {
+    const loica = (pkg.engines as Record<string, string> | undefined)?.loica;
+    const n = loica ? parseInt(String(loica).replace(/[^0-9]/g, ""), 10) : NaN;
+    if (Number.isFinite(n)) ext.apiVersion = n;
   }
 }
 

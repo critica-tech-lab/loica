@@ -21,7 +21,9 @@ import {
 } from "~/lib/admin.server";
 import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds } from "~/lib/db.server";
 import { extensions } from "~/extensions";
-import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions } from "~/extensions/index.server";
+import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds } from "~/extensions/index.server";
+import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
+import type { LoicaExtension } from "~/extensions/types";
 import { deleteTeamspace, renameTeamspace } from "~/lib/teamspace.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
@@ -134,16 +136,29 @@ export async function loader({ request }: Route.LoaderArgs) {
   // client `extensions` registry) so admins can toggle them too.
   await ensurePluginsLoaded();
   const enabledExtensionSet = getEnabledExtensionIdSet();
-  const extById = new Map<string, { id: string; description: string }>();
-  for (const e of extensions) extById.set(e.id, { id: e.id, description: e.description ?? "" });
-  for (const e of serverExtensions) {
-    if (!extById.has(e.id)) extById.set(e.id, { id: e.id, description: e.description ?? "" });
-  }
+  type ExtMeta = { id: string; description: string; version: string | null; apiVersion: number | null };
+  const extById = new Map<string, ExtMeta>();
+  const collect = (e: LoicaExtension) => {
+    const prev = extById.get(e.id);
+    extById.set(e.id, {
+      id: e.id,
+      description: e.description ?? prev?.description ?? "",
+      version: e.version ?? prev?.version ?? null,
+      apiVersion: e.apiVersion ?? prev?.apiVersion ?? null,
+    });
+  };
+  // Client registry first, then server (drop-ins are server-only).
+  for (const e of extensions) collect(e);
+  for (const e of serverExtensions) collect(e);
   const extensionInfo = Array.from(extById.values()).map((e) => ({
     ...e,
     enabled: enabledExtensionSet.has(e.id),
+    source: builtinExtensionIds.has(e.id) ? ("built-in" as const) : ("plugin" as const),
+    // null apiVersion = extension didn't declare one → treated as compatible.
+    apiCompatible: e.apiVersion === null || e.apiVersion === LOICA_EXTENSION_API_VERSION,
   }));
-  return { users: listAllUsers(), registrationOpen: isRegistrationOpen(), loginEnabled: isLocalLoginEnabled(), stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo };
+  const currentApiVersion = LOICA_EXTENSION_API_VERSION;
+  return { users: listAllUsers(), registrationOpen: isRegistrationOpen(), loginEnabled: isLocalLoginEnabled(), stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -435,7 +450,7 @@ function UserRowMenu({
 }
 
 export default function AdminPanel() {
-  const { users, registrationOpen, loginEnabled, stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo } = useLoaderData<typeof loader>();
+  const { users, registrationOpen, loginEnabled, stats, activeRooms, teamspaces, clientErrors, errorCount, serverErrors, serverErrorCount, extensionInfo, currentApiVersion } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -813,7 +828,31 @@ export default function AdminPanel() {
                 className={`${i > 0 ? "mt-2 " : ""}flex items-center justify-between rounded-xl border border-fg/[0.08] bg-fg/[0.02] px-4 py-3`}
               >
                 <div>
-                  <div className="text-sm font-medium">{p.id}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{p.id}</span>
+                    {p.version && (
+                      <span className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] font-medium text-fg/50">
+                        v{p.version}
+                      </span>
+                    )}
+                    <span
+                      className="rounded-full bg-fg/[0.06] px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-fg/40"
+                      title={p.source === "plugin"
+                        ? "Drop-in extension, loaded from the plugins/ folder. Can be added or removed without changing Loica's code."
+                        : "Ships with Loica — compiled into the app. Always present unless disabled below."}
+                    >
+                      {p.source === "plugin" ? "Plugin" : "Built-in"}
+                    </span>
+                    {!p.apiCompatible && (
+                      <span
+                        className="rounded-full px-1.5 py-0.5 text-[0.65rem] font-medium"
+                        style={{ backgroundColor: "color-mix(in srgb, var(--color-danger) 15%, transparent)", color: "var(--color-danger)" }}
+                        title={`Targets API v${p.apiVersion}; host is v${currentApiVersion}`}
+                      >
+                        API v{p.apiVersion} · host v{currentApiVersion}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-fg/40">
                     {p.description || "No description"}
                   </div>
