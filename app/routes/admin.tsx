@@ -21,7 +21,7 @@ import {
 } from "~/lib/admin.server";
 import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds } from "~/lib/db.server";
 import { extensions } from "~/extensions";
-import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds } from "~/extensions/index.server";
+import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds, getCoreExtensionIdSet } from "~/extensions/index.server";
 import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
 import type { LoicaExtension } from "~/extensions/types";
 import { deleteTeamspace, renameTeamspace } from "~/lib/teamspace.server";
@@ -150,7 +150,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Client registry first, then server (drop-ins are server-only).
   for (const e of extensions) collect(e);
   for (const e of serverExtensions) collect(e);
-  const extensionInfo = Array.from(extById.values()).map((e) => ({
+  // Core features (compiled-in, always-on) are NOT admin-toggleable extensions.
+  const coreIds = getCoreExtensionIdSet();
+  const extensionInfo = Array.from(extById.values())
+    .filter((e) => !coreIds.has(e.id))
+    .map((e) => ({
     ...e,
     enabled: enabledExtensionSet.has(e.id),
     source: builtinExtensionIds.has(e.id) ? ("built-in" as const) : ("plugin" as const),

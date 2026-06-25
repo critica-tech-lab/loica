@@ -159,6 +159,15 @@ export interface LoicaExtension {
   defaultEnabled?: boolean;
 
   /**
+   * Marks a CORE feature that is compiled into Loica and uses host internals
+   * (custom editors, etc.) — so it can't be a runtime drop-in. Core extensions
+   * are ALWAYS on (can't be disabled) and are hidden from the admin "Extensions"
+   * toggle list, which is reserved for true, installable drop-in extensions.
+   * Presentations is the canonical example.
+   */
+  core?: boolean;
+
+  /**
    * The `LOICA_EXTENSION_API_VERSION` the extension was written against.
    * When set and it doesn't match the current API version, the registry
    * emits a console warning at startup so the maintainer notices the

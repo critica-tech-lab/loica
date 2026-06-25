@@ -13,6 +13,10 @@ import { PresentationEditor } from "./PresentationEditor";
 export const presentationsExtension: LoicaExtension = {
   id: "presentations",
   apiVersion: LOICA_EXTENSION_API_VERSION,
+  // Core feature: the slide editor imports host internals (ProseMirrorEditor,
+  // DocumentContext, …) so it's compiled into Loica, not a runtime drop-in.
+  // Always on; hidden from the admin extension toggle list.
+  core: true,
   description: "Slide decks rendered with reveal.js. Adds the Present mode and slide-PDF export.",
   docType: "presentation",
   template: {

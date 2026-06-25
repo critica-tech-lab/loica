@@ -11,36 +11,82 @@ write your first extension.
 
 ## Extension or core? The heuristic
 
-Ask yourself:
+A feature is an **extension** only if **both** are true:
 
-> *Could a reasonable self-hosted team want to ship Loica without this feature?*
+1. **Optional** — a self-hosted team could ship Loica without it
+   (Reports, a custom exporter, an auth provider, future Mindmaps).
+2. **Drop-in-capable** — it runs *without being compiled into the host*: it
+   imports **only** `~/extensions/sdk` / `~/extensions/sdk.server`, never host
+   internals (`~/components/*`, `~/lib/*`), and needs no new routes.
 
-- **Yes** → it's an extension (Reports, Comments, AI assistant, future Mindmaps)
-- **No** → it's core (auth, folders, sharing model, the markdown editor itself)
+If either is false, it's **core**:
 
-The core is what defines Loica. Removing it breaks the product. Extensions are
-features that extend Loica for some users without being required for everyone.
+- **Required** (auth, folders, sharing, the markdown editor itself) → core.
+- **Optional but compile-bound** — needs a custom editor UI, host internals,
+  or new routes → core. **Presentations** is the canonical example: its slide
+  editor imports `ProseMirrorEditor` and `DocumentContext`, so it must build
+  with Loica. It's flagged `core: true` and is *not* an admin-toggleable
+  extension.
 
-When in doubt, prefer extension. It's easier to promote an extension to core
-later than to extract a core feature into an extension.
+**The quick test is the import list.** SDK-only → extension. Reaches into
+`~/components` or `~/lib` → core.
+
+### The procedure (for any feature idea)
+
+1. **List the touchpoints** — every thing the feature must do that touches Loica.
+2. **Match each to the SDK menu** — this is the whole menu:
+
+| The feature needs to… | SDK point | Drop-in? |
+|---|---|---|
+| own a doc `type:` (frontmatter) | `docType` | ✅ |
+| appear in New/Insert + starter content | `template` | ✅ |
+| a row icon in lists | `rowIcon` | ✅ |
+| an item in the doc ⋯ menu | `getDocMenuItems` | ✅ |
+| override PDF / DOCX export | `exporters.pdf` / `.docx` | ✅ |
+| take over print/share preview | `previewHtml` | ✅ |
+| install-wide PDF styling | `pdfStyle` | ✅ |
+| add a sign-in method | `authProvider` | ✅ |
+| a **custom editor UI** for the type | `EditorView` / `EditorBanner` | ❌ → core |
+| a **new route / UI surface / DB access / a hook the SDK lacks** | — none — | ❌ → core |
+
+3. **Verdict:** every touchpoint in a ✅ row → **extension**. Any touchpoint in a
+   ❌ row, or with *no row at all* → **core** — build it in core, or first add a
+   new extension point to the SDK (a core change), then the feature consumes it.
+
+**Blunt version:** try to write it importing only `~/extensions/sdk`. If you
+can, it's an extension. The moment you need `~/components/*`, `~/lib/*`, a route,
+or a hook the SDK doesn't expose — that's the core change.
+
+### Worked examples
+
+| Feature | Verdict | Why |
+|---|---|---|
+| Google login | extension | `authProvider` |
+| Mermaid doc type, read-only render | extension | `docType` + `previewHtml` |
+| Mermaid with a live interactive editor | core | needs `EditorView` (host editor internals) — like presentations |
+| EPUB export | core first | no `exporters.epub` hook exists — add it, then trivial |
+| Word-count button in the editor toolbar | core first | no toolbar-button extension point today — add it, then extensionable |
 
 ---
 
-## What extensions are *not*
+## Trust & isolation
 
-Extensions in Loica are **convention, not isolation**. A few things they
-explicitly are not:
+Extensions are **convention, not isolation**:
 
-- **Not sandboxed.** Extensions are first-class TypeScript that can `import`
-  from anywhere in the app. No iframe, no separate process, no permissions.
-- **Not third-party installable.** Extensions live in this repo and are
-  reviewed like any other code change. There is no "upload a ZIP" flow.
-- **Not hot-reloadable.** Adding an extension requires a build. Toggling an
-  existing extension on/off is the only runtime operation.
+- **Not sandboxed.** A drop-in runs first-class server code — it imports the
+  SDK and can do anything node can. No iframe, no separate process, no
+  permissions.
+- **Installable, but trusted.** Drop-in extensions load at runtime from
+  `plugins/<id>/` and the planned admin flow installs them straight from a
+  repo. Because they run unsandboxed, install is **admin-only and limited to
+  allowlisted sources** — there is no untrusted community-upload flow. A public
+  marketplace would require sandboxing designed in *first*; it can't be
+  retrofitted.
+- **Restart, not rebuild.** A drop-in is picked up on process restart (the
+  plugin scan is memoized per process) — no app rebuild. Compile-bound features
+  *do* need a build, which is exactly why they're core, not extensions.
 
 This trust model is deliberate (Discourse and Strapi work the same way).
-If we ever ship a marketplace of community-uploaded extensions, sandboxing
-must be designed in *before* that — it cannot be retrofitted.
 
 ---
 
