@@ -7,7 +7,7 @@ title: Development
 ## Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.0 (runtime + package manager)
-- [Node.js](https://nodejs.org/) >= 22 (WebSocket server uses `--experimental-strip-types`)
+- [Node.js](https://nodejs.org/) >= 24 (runs `ws-server.ts` directly via native TypeScript support)
 
 ## Quick Start
 
@@ -41,7 +41,7 @@ Both `dev` and `ws` must be running for real-time collaboration to work.
 |--------|------------|------------|
 | App server port | 4000 (Vite dev server) | 3000 (react-router-serve) |
 | WebSocket port | 4001 | 4001 (behind reverse proxy at `/ws`) |
-| Start command | `bun run dev:all` | `bun run start` + `node --experimental-strip-types ws-server.ts` |
+| Start command | `bun run dev:all` | `bun run start` + `node ws-server.ts` |
 | Hot reload | Yes (Vite HMR) | No (restart required) |
 | Cookie `Secure` flag | Off | On (`NODE_ENV=production`) |
 | WebSocket URL | Auto-detected (`ws://hostname:4001`) | `WS_URL` env var (`wss://domain/ws`) |

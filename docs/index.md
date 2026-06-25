@@ -39,7 +39,7 @@ features:
 | Runtime | Bun |
 | Framework | React Router 7 (SSR) |
 | UI | React 19 + Tailwind CSS 4 |
-| Editor | CodeMirror 6 + Markdown |
+| Editor | ProseMirror + Markdown |
 | Real-time sync | Yjs (CRDT) + WebSocket |
 | Database | SQLite (WAL mode) via better-sqlite3 |
 | Auth | Argon2 hashing, cookie-based sessions |

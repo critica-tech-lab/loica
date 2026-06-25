@@ -31,7 +31,7 @@ A detailed overview of everything you can do as a user in Loica.
 ## The Editor
 
 ### Writing
-- Full Markdown editor with syntax highlighting
+- Full Markdown editor that formats your text inline as you write
 - Auto-save — your changes are saved automatically as you type (600ms after you stop)
 - Editable document title — click the title in the navbar to rename it
 - Word count and character count shown in the footer

@@ -9,7 +9,7 @@ title: Getting Started
 | Dependency | Version | Notes |
 |-----------|---------|-------|
 | [Bun](https://bun.sh/) | >= 1.0 | Runtime + package manager |
-| [Node.js](https://nodejs.org/) | >= 22 | Required for the WebSocket server (`--experimental-strip-types`) |
+| [Node.js](https://nodejs.org/) | >= 24 | Runs the WebSocket server (executes `ws-server.ts` directly via native TypeScript support) |
 
 SQLite3, PM2, and Litestream are only needed for production — see the [Deployment guide](/deployment).
 
