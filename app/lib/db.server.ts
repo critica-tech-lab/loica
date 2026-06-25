@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
+import { dbPath } from "./paths.server.ts";
 
 // Load .env into process.env (for SSR where Vite doesn't auto-load non-VITE_ vars)
 try {
@@ -17,8 +18,6 @@ try {
     if (!process.env[key]) process.env[key] = value;
   }
 } catch { /* .env not found — that's fine */ }
-
-const dbPath = join(process.cwd(), "app.db");
 
 export const db = new Database(dbPath);
 

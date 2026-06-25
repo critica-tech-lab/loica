@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { LoicaExtension, ExtensionExporter } from "./types";
 import { getEnabledExtensionIds } from "~/lib/db.server";
+import { pluginsDir } from "~/lib/paths.server";
 import { presentationsServerExtension } from "./presentations/index.server";
 
 /** Built-in extensions compiled into the bare repo. Empty by default. */
@@ -29,7 +30,7 @@ export const serverExtensions: LoicaExtension[] = [...builtinExtensions];
 
 // ─── Drop-in plugin discovery ────────────────────────────────────────────────
 
-const PLUGINS_DIR = join(process.cwd(), "plugins");
+const PLUGINS_DIR = pluginsDir;
 // .js/.mjs work under production node; .ts only resolves under bun (dev).
 const ENTRY_NAMES = ["index.server.js", "index.server.mjs", "index.server.ts"];
 

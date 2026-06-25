@@ -3,14 +3,14 @@ import { getSessionUser } from "~/lib/auth.server";
 import { getDocument } from "~/lib/document.server";
 import { getMembership } from "~/lib/workspace.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
-import { parseFrontmatter, stripFrontmatter } from "~/lib/templates";
-import { ensurePluginsLoaded, getServerExtensionForDocType, getActiveGlobalExporter } from "~/extensions/index.server";
-import { renderDocx } from "~/lib/export/docx.server";
-import { safeFilename } from "~/lib/export/shared.server";
-import { getDocumentThreads } from "~/lib/comments.server";
+import { fixListIndentation, parseFrontmatter } from "~/lib/templates";
+import { getServerExtensionForDocType } from "~/extensions/index.server";
+import { uploadsDir } from "~/lib/paths.server";
 
-async function authorizeDoc(request: Request, params: { id?: string }) {
-  const doc = getDocument(params.id!);
+const fontsDir = resolve(process.cwd(), "assets/fonts");
+
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const doc = getDocument(params.id);
   if (!doc) throw new Response("Not found", { status: 404 });
 
   const isPublic = !!(doc.public_token || doc.edit_token);
@@ -28,38 +28,53 @@ async function authorizeDoc(request: Request, params: { id?: string }) {
 async function exportDocx(doc: any, content: string): Promise<Response> {
   const frontmatter = parseFrontmatter(doc.content || "");
 
-  const typeExporter = getServerExtensionForDocType(frontmatter?.type)?.exporters?.docx;
-  if (typeExporter) return typeExporter(doc, frontmatter, content);
+  // Extension-provided exporters take precedence over core markdown→DOCX.
+  const ext = getServerExtensionForDocType(frontmatter?.type);
+  if (ext?.exporters?.docx) {
+    return ext.exporters.docx(doc, frontmatter);
+  }
 
-  // Global exporter mirrors the core renderer's input (stripped body);
-  // per-doc-type exporters above get raw content.
-  const body = stripFrontmatter(content);
+  // Core fallback — markdown via pandoc. Requires `pandoc` on PATH.
 
-  const globalExporter = getActiveGlobalExporter("docx");
-  if (globalExporter) return globalExporter(doc, frontmatter, body);
+  // Rewrite image paths to absolute for pandoc
+  const content = (doc.content || "").replace(
+    /!\[([^\]]*)\]\(\/api\/uploads\/([^)]+)\)/g,
+    (_match, alt: string, file: string) => {
+      const srcPath = join(uploadsDir, file);
+      if (!existsSync(srcPath)) return `![${alt}]()`;
+      return `![${alt}](${srcPath})`;
+    }
+  );
 
-  // Unresolved comment threads → native Word comments, anchored by text match.
-  const threads = getDocumentThreads(doc.id).filter((th) => !th.root.resolved);
-  const docx = await renderDocx(body, doc.title || "Untitled", threads);
-  return new Response(new Uint8Array(docx), {
-    headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": `attachment; filename="${safeFilename(doc.title)}.docx"`,
-    },
-  });
-}
+  const id = nanoid(8);
+  const mdPath = join(tmpdir(), `loica-${id}.md`);
+  const docxPath = join(tmpdir(), `loica-${id}.docx`);
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  await ensurePluginsLoaded();
-  const doc = await authorizeDoc(request, params);
-  return exportDocx(doc, doc.content || "");
-}
+  try {
+    writeFileSync(mdPath, fixListIndentation(content), "utf-8");
 
-// POST: accepts { content: string } — the PM editor sends serialized markdown
-// so the export reflects unsaved edits.
-export async function action({ request, params }: Route.ActionArgs) {
-  await ensurePluginsLoaded();
-  const doc = await authorizeDoc(request, params);
-  const { content = "" } = (await request.json()) as { content?: string };
-  return exportDocx(doc, content || doc.content || "");
+    const env = { ...process.env, OSFONTDIR: fontsDir };
+
+    execFileSync("pandoc", [
+      mdPath,
+      "-o", docxPath,
+      "--metadata", `title=${title}`,
+    ], { timeout: 60000, stdio: "pipe", env });
+
+    const docx = readFileSync(docxPath);
+    const filename = title.replace(/[^a-zA-Z0-9_\-. ]/g, "_") + ".docx";
+
+    return new Response(docx, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err: any) {
+    console.error("DOCX generation failed:", err.stderr?.toString() || err.message);
+    throw new Response("DOCX generation failed", { status: 500 });
+  } finally {
+    try { unlinkSync(mdPath); } catch {}
+    try { unlinkSync(docxPath); } catch {}
+  }
 }

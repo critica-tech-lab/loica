@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { db, prep } from "./db.server";
+import { dbPath } from "./paths.server";
 import { invalidateOtherSessions } from "./auth.server";
 import { sendWelcomeEmail, sendPasswordChangedNotification } from "./email.server";
 import { createWorkspace, getUserWorkspaces } from "./workspace.server";
@@ -54,8 +55,6 @@ function formatBytes(bytes: number): string {
 
 /** Instant stats — safe to run on every page load / revalidation */
 export function getCheapStats(): CheapStats {
-  const dbPath = path.resolve("app.db");
-
   const documentCount = (prep<{ cnt: number }>("SELECT COUNT(*) as cnt FROM documents").get())!.cnt;
   const userCount = (prep<{ cnt: number }>("SELECT COUNT(*) as cnt FROM users").get())!.cnt;
 
@@ -112,7 +111,6 @@ export function refreshExpensiveStats(): ExpensiveStats {
   let diskUsedGB = 0;
   let diskFreeGB = 0;
   try {
-    const dbPath = path.resolve("app.db");
     const dfOutput = execSync("df -k .", { cwd: path.dirname(dbPath), encoding: "utf-8" });
     const lines = dfOutput.trim().split("\n");
     if (lines.length >= 2) {

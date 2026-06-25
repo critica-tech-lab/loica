@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { redirect } from "react-router";
+import { uploadsDir } from "~/lib/paths.server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -448,7 +449,7 @@ export function handleDuplicateDoc(
 
 // ── File Upload ──────────────────────────────────────────────
 
-const UPLOAD_DIR = join(process.cwd(), "uploads");
+const UPLOAD_DIR = uploadsDir;
 const UPLOAD_MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const ALLOWED_UPLOAD_EXTENSIONS = new Set([

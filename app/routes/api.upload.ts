@@ -2,8 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { getSessionUser } from "~/lib/auth.server";
-
-const UPLOAD_DIR = join(process.cwd(), "uploads");
+import { uploadsDir as UPLOAD_DIR } from "~/lib/paths.server";
 const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES: Record<string, string> = {
   "image/png": ".png",

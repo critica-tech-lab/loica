@@ -1,10 +1,9 @@
 import fs from "node:fs";
-import path from "node:path";
 import { execSync } from "node:child_process";
 import { db } from "~/lib/db.server";
+import { dbPath as DB_PATH } from "~/lib/paths.server";
 
 const startTime = Date.now();
-const DB_PATH = path.resolve("app.db");
 
 function getFileSize(filePath: string): number | null {
   try {
