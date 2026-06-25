@@ -67,7 +67,13 @@ export function SidePanel() {
           docId={doc.id}
           content={content}
           onClose={closePanel}
-          onInsertTemplate={!isShared ? (text) => editorApi.current?.insertAt(0, text) : undefined}
+          onInsertTemplate={!isShared ? (text) => {
+            const api = editorApi.current;
+            // PM editor: parse markdown + route frontmatter (insertAt would escape
+            // it and corrupt the doc). CodeMirror is markdown-native, so raw insert.
+            if (api?.insertTemplate) api.insertTemplate(text);
+            else api?.insertAt(0, text);
+          } : undefined}
           creatorName={creatorName}
           modifierName={modifierName}
           createdAt={doc.created_at ? Number(doc.created_at) : null}

@@ -5,6 +5,7 @@ import type { PMActiveState, TrackChangesActiveState, TrackedChangeEntry } from 
 import type { ResolvedThread } from "~/components/comment-decorations";
 import { nanoid } from "nanoid";
 import { serializeWithFootnotes, parseMarkdownWithFootnotes } from "~/components/editor/pm-markdown";
+import { splitFrontmatter } from "~/lib/markdown";
 import { Slice } from "prosemirror-model";
 import { popoverSurface } from "~/lib/popover-styles";
 import {
@@ -995,6 +996,35 @@ export function ProseMirrorEditor({
 
         insertAt: (pos: number, text: string) => {
           view.dispatch(view.state.tr.insertText(text, pos));
+        },
+
+        // Insert a markdown TEMPLATE (e.g. the Presentation deck). Unlike
+        // `insertAt`, the text is parsed as markdown — `insertText` would escape
+        // every `#`/`**`/`---` and corrupt the doc. Leading YAML frontmatter is
+        // routed to the shared meta map (the PM body can't hold it: `---` becomes
+        // an <hr>), so e.g. `type: presentation` actually converts the doc.
+        insertTemplate: (markdown: string) => {
+          const { frontmatter, body } = splitFrontmatter(markdown);
+          const docHasContent = view.state.doc.textContent.trim() !== "";
+          if (frontmatter) {
+            const prev = metaMap.get("frontmatter");
+            // Don't clobber a doc that already declares frontmatter.
+            if (!(typeof prev === "string" && prev.trim())) {
+              metaMap.set("frontmatter", frontmatter);
+            }
+          }
+          // Converting a doc that already has content to a frontmatter-typed doc
+          // (e.g. presentation): keep the user's content AS the deck — never lose
+          // their work and don't bury it under boilerplate slides. Only inject the
+          // template body into an empty doc, or for plain inserts (no frontmatter,
+          // e.g. a table of contents).
+          const skipBody = frontmatter && docHasContent;
+          if (body.trim() && !skipBody) {
+            const parsed = parseMarkdownWithFootnotes(body, schema);
+            if (parsed) {
+              view.dispatch(view.state.tr.replace(0, 0, new Slice(parsed.content, 0, 0)));
+            }
+          }
         },
 
         replaceContent: () => {},

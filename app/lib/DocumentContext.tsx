@@ -72,6 +72,9 @@ export interface EditorApi {
   getThreadPositions?: () => Array<{ id: string; top: number }>;
   uploadImage: (file: File) => void;
   insertAt: (pos: number, text: string) => void;
+  /** Insert a markdown template (parsed, not escaped); leading frontmatter is
+   *  routed to the doc's meta so it can change the doc type. PM editor only. */
+  insertTemplate?: (markdown: string) => void;
   replaceContent: (newContent: string, cursorPos?: number) => void;
   // ProseMirror-only (optional — undefined in CodeMirror editor)
   exportDocx?: (filename?: string) => Promise<void>;
