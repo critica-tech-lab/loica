@@ -26,7 +26,6 @@ import {
   ellipsis,
 } from "prosemirror-inputrules";
 import { trailingNode } from "prosemirror-trailing-node";
-import { slashMenuPlugin } from "./slash-menu";
 import type { Schema } from "prosemirror-model";
 import type { Plugin, Command } from "prosemirror-state";
 
@@ -166,6 +165,5 @@ export function buildPlugins(schema: Schema, readOnly: boolean): Plugin[] {
     tableEditing(),
     buildInputRules(schema),
     trailingNode({ nodeName: "paragraph", ignoredNodes: ["paragraph"] }),
-    slashMenuPlugin(schema),
   ];
 }
