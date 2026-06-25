@@ -31,6 +31,16 @@
   font-style: normal;
   font-display: swap;
 }
+/* Digit-only alias of Geist Mono — used by --font-editor so document numbers
+   render in mono while the rest of the text stays Geist Sans. */
+@font-face {
+  font-family: "Geist Numerals";
+  src: url("/node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+}
 @font-face {
   font-family: "Geist Mono";
   src: url("/node_modules/geist/dist/fonts/geist-mono/GeistMono-Italic[wght].woff2") format("woff2");
@@ -111,7 +121,9 @@
 /* ─── Design tokens ─────────────────────────────────────── */
 :root {
   --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
-  --font-editor: var(--font-ui);
+  /* Editor body: Geist Sans for text, Geist Mono for digits only (see the
+     "Geist Numerals" @font-face — unicode-range scopes it to U+0030–0039). */
+  --font-editor: "Geist Numerals", var(--font-ui);
   --font-ui: "Geist Sans", system-ui, sans-serif;
 
   --bg: #FFFCF0;
@@ -1826,6 +1838,14 @@ footnote.ProseMirror-selectednode::after {
 .pm-editor-mount .ProseMirror ol { list-style-type: decimal; }
 .pm-editor-mount .ProseMirror ul ul { list-style-type: circle; }
 .pm-editor-mount .ProseMirror ul ul ul { list-style-type: square; }
+
+/* List markers are ::marker pseudo-elements, which browsers render with a
+   UA-default font that overrides normal inheritance — so ordered-list numbers
+   render in the wrong typeface. Force them to inherit the body font so they
+   always match the surrounding text, whatever it is. */
+.pm-editor-mount .ProseMirror ::marker {
+  font: inherit;
+}
 
 .pm-editor-mount .ProseMirror li + li { margin-top: 0.35em; }
 

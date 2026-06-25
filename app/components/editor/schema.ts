@@ -31,14 +31,37 @@ function withDT(spec: any): any {
   };
 }
 
+// Indent: paragraphs and headings carry an integer indent level rendered as
+// left margin. Tab/Shift-Tab step it (see plugins.ts). Default 0 = no indent.
+export const INDENT_STEP_EM = 2;
+export const MAX_INDENT = 8;
+function withIndent(spec: any): any {
+  const origToDOM = spec.toDOM;
+  return {
+    ...spec,
+    attrs: { ...spec.attrs, indent: { default: 0 } },
+    toDOM(node: any) {
+      const base: any[] = origToDOM ? origToDOM.call(this, node) : ["div", 0];
+      const indent = node.attrs?.indent || 0;
+      if (!indent) return base;
+      const [tag, ...rest] = base;
+      const hasAttrs = rest.length > 0 && rest[0] !== null && typeof rest[0] === "object" && !Array.isArray(rest[0]);
+      const existing = hasAttrs ? rest[0] : {};
+      const tail = hasAttrs ? rest.slice(1) : rest;
+      const style = `margin-left: ${indent * INDENT_STEP_EM}em${existing.style ? "; " + existing.style : ""}`;
+      return [tag, { ...existing, style }, ...tail];
+    },
+  };
+}
+
 // Extend block nodes from prosemirror-schema-basic with dataTracked attr
 const extendedBasicNodes = {
   ...basicNodes,
   doc:        withDT(basicNodes.doc),
-  paragraph:  withDT(basicNodes.paragraph),
+  paragraph:  withIndent(withDT(basicNodes.paragraph)),
   blockquote: withDT(basicNodes.blockquote),
   horizontal_rule: withDT(basicNodes.horizontal_rule),
-  heading:    withDT(basicNodes.heading),
+  heading:    withIndent(withDT(basicNodes.heading)),
   code_block: withDT(basicNodes.code_block),
   // image extended below for width/height
   hard_break: withDT(basicNodes.hard_break),
