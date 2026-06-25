@@ -1,11 +1,54 @@
-// ─── Mailgun Email via REST API ──────────────────────────
+// ─── Email transport ─────────────────────────────────────
+//
+// Loica is mail-provider agnostic. A transport is selected once, in order of
+// precedence:
+//
+//   1. SMTP — any standard server. Set SMTP_HOST (+ optional SMTP_PORT / _USER /
+//      _PASS / _SECURE). Works with Mailgun SMTP, Postfix, Gmail, Mailpit, a
+//      platform mail addon, etc. This is the recommended, opinion-free path.
+//   2. Mailgun REST API — set MAILGUN_API_KEY + MAILGUN_DOMAIN.
+//   3. Console stub — neither configured (development default).
+//
+// The "from" address is EMAIL_FROM (preferred), falling back to SMTP_FROM, then
+// MAILGUN_FROM for backward compatibility.
 
+// SMTP config
+const SMTP_HOST = process.env.SMTP_HOST ?? "";
+const SMTP_PORT = Number(process.env.SMTP_PORT ?? 587);
+const SMTP_USER = process.env.SMTP_USER ?? "";
+const SMTP_PASS = process.env.SMTP_PASS ?? "";
+// Implicit TLS (typically port 465). Otherwise STARTTLS is negotiated (587/25).
+const SMTP_SECURE = process.env.SMTP_SECURE === "true" || SMTP_PORT === 465;
+
+// Mailgun REST API config
 const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? "";
 const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN ?? "";
 const MAILGUN_FROM = process.env.MAILGUN_FROM ?? "noreply@example.com";
 const MAILGUN_REGION = process.env.MAILGUN_REGION ?? "eu"; // "eu" or "us"
 
-const isConfigured = MAILGUN_API_KEY !== "" && MAILGUN_DOMAIN !== "";
+const EMAIL_FROM = process.env.EMAIL_FROM ?? process.env.SMTP_FROM ?? MAILGUN_FROM;
+
+const transport: "smtp" | "mailgun" | "stub" =
+  SMTP_HOST !== ""
+    ? "smtp"
+    : MAILGUN_API_KEY !== "" && MAILGUN_DOMAIN !== ""
+      ? "mailgun"
+      : "stub";
+
+// Lazily constructed nodemailer transporter (only when SMTP is the transport),
+// so nodemailer is never loaded when another transport is in use.
+let _transporter: import("nodemailer").Transporter | null = null;
+async function getTransporter(): Promise<import("nodemailer").Transporter> {
+  if (_transporter) return _transporter;
+  const nodemailer = await import("nodemailer");
+  _transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+  });
+  return _transporter;
+}
 
 // ─── Core sender (fire-and-forget) ──────────────────────
 
@@ -16,15 +59,28 @@ async function sendEmail(
   html: string,
   text: string
 ): Promise<void> {
-  if (!isConfigured) {
+  if (transport === "stub") {
     console.log(`[email stub] To: ${to} (${toName}) — Subject: ${subject}`);
     return;
   }
 
   try {
-    console.log(`[email] Sending to ${to}, from: "${MAILGUN_FROM}", domain: ${MAILGUN_DOMAIN}`);
+    if (transport === "smtp") {
+      const t = await getTransporter();
+      await t.sendMail({
+        from: EMAIL_FROM,
+        to: { name: toName, address: to },
+        subject,
+        html,
+        text,
+      });
+      return;
+    }
+
+    // Mailgun REST API
+    console.log(`[email] Sending to ${to}, from: "${EMAIL_FROM}", domain: ${MAILGUN_DOMAIN}`);
     const params = new URLSearchParams();
-    params.append("from", MAILGUN_FROM);
+    params.append("from", EMAIL_FROM);
     params.append("to", to);
     params.append("subject", subject);
     params.append("html", html);
