@@ -179,11 +179,19 @@ export function setSetting(key: string, value: string): void {
   ).run(key, value);
 }
 
+// Environment overrides act as a hard floor: when an operator disables local
+// login / registration via env, an admin cannot re-open it from the settings
+// UI. Use DISABLE_LOCAL_LOGIN=true for an SSO-only install (no password login,
+// no signup), or REGISTRATION_OPEN=false to close signups while keeping local
+// login working.
 export function isRegistrationOpen(): boolean {
+  if (process.env.DISABLE_LOCAL_LOGIN === "true") return false;
+  if (process.env.REGISTRATION_OPEN === "false") return false;
   return getSetting("registration_open") !== "false";
 }
 
 export function isLocalLoginEnabled(): boolean {
+  if (process.env.DISABLE_LOCAL_LOGIN === "true") return false;
   return getSetting("local_login_enabled") !== "false";
 }
 
