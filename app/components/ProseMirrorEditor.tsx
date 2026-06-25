@@ -126,6 +126,12 @@ export function ProseMirrorEditor({
   onEditLinkRef.current = onEditLink;
   const onTitleRef = useRef(onTitle);
   onTitleRef.current = onTitle;
+  // Keep onChange fresh: the view is built once (deps [docId, wsUrl]), so a raw
+  // `onChange` prop would stay pinned to its mount-time closure. handleContentChange
+  // closes over `title` and re-saves it on every edit, so a stale closure would
+  // revert a top-bar rename the moment the user types in the body (issue #42).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // Sync focused-comment CSS class imperatively — no plugin change needed
   useEffect(() => {
@@ -628,7 +634,7 @@ export function ProseMirrorEditor({
           view.updateState(newState);
           if (tr.docChanged) {
             const fullText = view.state.doc.textContent;
-            onChange?.(fullText);
+            onChangeRef.current?.(fullText);
             const first = view.state.doc.firstChild;
             const headingText =
               first && first.type === schema.nodes.heading ? first.textContent.trim() : "";
