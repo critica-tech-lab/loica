@@ -1,26 +1,8 @@
-const fs = require("fs");
-const path = require("path");
-
-function loadEnvFile() {
-  const envPath = path.join(__dirname, ".env");
-  if (!fs.existsSync(envPath)) return {};
-  const env = {};
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let val = trimmed.slice(eq + 1).trim();
-    if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
-      val = val.slice(1, -1);
-    }
-    env[key] = val;
-  }
-  return env;
-}
-
-const dotenv = loadEnvFile();
+// pm2 process config. The app loads `.env` itself at startup (see
+// app/lib/paths.server.ts `loadDotEnv`), so this file no longer parses `.env`.
+// The values below are explicit production defaults; everything else (WS_URL,
+// MAILGUN_*/SMTP_*, OIDC_*, DATA_DIR, …) comes from `.env`. Precedence is the
+// standard one: these explicit values win, `.env` fills the rest.
 
 module.exports = {
   apps: [
@@ -34,7 +16,6 @@ module.exports = {
         PORT: "3000",
         HOST: "0.0.0.0",
         SECURE_COOKIE: "true",
-        ...dotenv,
       },
       restart_delay: 1000,
       max_restarts: 10,
@@ -47,7 +28,6 @@ module.exports = {
       cwd: __dirname,
       env: {
         NODE_ENV: "production",
-        ...dotenv,
       },
       restart_delay: 1000,
       max_restarts: 10,

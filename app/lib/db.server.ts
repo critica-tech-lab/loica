@@ -1,23 +1,8 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
+// Importing paths.server first also loads `.env` into process.env (its
+// loadDotEnv runs at module load), so env-derived config below is populated.
 import { dbPath } from "./paths.server.ts";
-
-// Load .env into process.env (for SSR where Vite doesn't auto-load non-VITE_ vars)
-try {
-  const envPath = join(process.cwd(), ".env");
-  const envContent = readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (!process.env[key]) process.env[key] = value;
-  }
-} catch { /* .env not found — that's fine */ }
 
 export const db = new Database(dbPath);
 
