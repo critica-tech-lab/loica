@@ -1742,6 +1742,9 @@ footnote.ProseMirror-selectednode::after {
 }
 
 .pm-editor-mount .ProseMirror > * + * { margin-top: 0.9em; }
+/* First block (often an H1) sits flush to the editor's top padding — the
+   heading rule below sets margin-top, which would otherwise gap the first line. */
+.pm-editor-mount .ProseMirror > :first-child { margin-top: 0; }
 
 .pm-editor-mount .ProseMirror h1,
 .pm-editor-mount .ProseMirror h2,
