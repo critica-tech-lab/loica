@@ -5,6 +5,7 @@ import {
   addRowBefore, addRowAfter, deleteRow,
   deleteTable, toggleHeaderRow, toggleHeaderColumn,
 } from "prosemirror-tables";
+import { popoverSurface } from "~/lib/popover-styles";
 
 // Notion/Docs-style table editing affordances. When the caret sits inside a
 // table we overlay clickable grips along its top (one per column) and left
@@ -215,9 +216,7 @@ function TableActionMenu({ x, y, kind, onClose, onInsertBefore, onInsertAfter, o
       ref={ref}
       style={{
         position: "fixed", top, left, width: W, zIndex: 500,
-        background: "var(--bg)",
-        border: "1.5px solid var(--fg)",
-        boxShadow: "4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent)",
+        ...popoverSurface,
         fontFamily: "var(--font-ui)",
         fontSize: "0.8rem",
         color: "var(--fg)",
