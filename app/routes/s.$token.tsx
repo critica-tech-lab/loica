@@ -54,9 +54,22 @@ const PALETTE = [
   "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
 ];
 
+function secureRandomInt(maxExclusive: number): number {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    throw new Error("maxExclusive must be a positive integer");
+  }
+  const maxUint32 = 0x1_0000_0000;
+  const limit = maxUint32 - (maxUint32 % maxExclusive);
+  const buf = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return buf[0] % maxExclusive;
+}
+
 function randomGuestIdentity() {
-  const name = BIRDS[Math.floor(Math.random() * BIRDS.length)];
-  const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  const name = BIRDS[secureRandomInt(BIRDS.length)];
+  const color = PALETTE[secureRandomInt(PALETTE.length)];
   return { name, color };
 }
 
