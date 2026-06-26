@@ -593,7 +593,10 @@ function EditableView({
                 } else {
                   setSelectionBubble(null);
                   setFocusedThreadId(null);
-                  setCommentPopup(null);
+                  // Do NOT close commentPopup here — Y.js awareness transactions
+                  // fire cursor-position selection changes after every click, which
+                  // would close the popup before the guest can reply. Matches the
+                  // authenticated editor path (DocEditorView).
                 }
               }}
               autoFocus
