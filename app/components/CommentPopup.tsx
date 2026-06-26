@@ -25,8 +25,15 @@ function computeLayout(
   if (window.innerWidth < MOBILE_BP) {
     return { left: 0, right: 0, top: "auto", bottom: 0, width: "100%", maxHeight: "70vh", borderRadius: 0 };
   }
-  const editorRight = editorRef?.current?.getBoundingClientRect().right ?? pos.x;
-  const left = Math.min(editorRight + GAP, window.innerWidth - POPUP_W - GAP);
+  // Anchor to the right edge of the text column, not the editor mount: the mount
+  // spans the full pane, so its right edge throws the popup into the far window
+  // margin (issue #68). The `.ProseMirror` element is the (often max-width-capped)
+  // content column, so its right edge sits the popup in the paragraph's gutter.
+  const colEl = editorRef?.current?.querySelector(".ProseMirror") as HTMLElement | null;
+  const anchorRight = colEl?.getBoundingClientRect().right
+    ?? editorRef?.current?.getBoundingClientRect().right
+    ?? pos.x;
+  const left = Math.min(anchorRight + GAP, window.innerWidth - POPUP_W - GAP);
   const top = Math.min(Math.max(pos.y - 20, GAP), window.innerHeight - 200 - GAP);
   return { left, top, width: POPUP_W, maxHeight: POPUP_MAX_H, borderRadius: 0 };
 }
