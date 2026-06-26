@@ -2,7 +2,11 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
-import { getWebSocketUrl } from "~/lib/url.server";
+import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
+import { getSessionUser } from "~/lib/auth.server";
+import { sendMentionNotification } from "~/lib/email.server";
+import { prep } from "~/lib/db.server";
+import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -18,6 +22,7 @@ import { LinkModal } from "~/components/LinkModal";
 const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
 import { CommentPopup } from "~/components/CommentPopup";
+import { TrackChangePopup } from "~/components/TrackChangePopup";
 import { DocActionBar, floatingBubbleBtnStyle } from "~/components/DocActionBar";
 import type { ConnectionStatus } from "~/components/DocActionBar";
 import type { ResolvedThread } from "~/components/comment-decorations";
@@ -49,9 +54,22 @@ const PALETTE = [
   "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
 ];
 
+function secureRandomInt(maxExclusive: number): number {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    throw new Error("maxExclusive must be a positive integer");
+  }
+  const maxUint32 = 0x1_0000_0000;
+  const limit = maxUint32 - (maxUint32 % maxExclusive);
+  const buf = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return buf[0] % maxExclusive;
+}
+
 function randomGuestIdentity() {
-  const name = BIRDS[Math.floor(Math.random() * BIRDS.length)];
-  const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  const name = BIRDS[secureRandomInt(BIRDS.length)];
+  const color = PALETTE[secureRandomInt(PALETTE.length)];
   return { name, color };
 }
 
@@ -104,12 +122,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     };
   }
 
+  // A logged-in user who opens a share link they don't own should still be
+  // identified by their real account, not as an anonymous guest.
+  const sessionUser = getSessionUser(request);
+
   return {
     document: result.document,
     mode: result.mode,
     shareToken: params.token,
     trackChanges,
     externalEmail: result.externalEmail ?? null,
+    sessionUser: sessionUser ? { id: sessionUser.id, name: sessionUser.name } : null,
     wsUrl: getWebSocketUrl(request),
   };
 }
@@ -153,9 +176,44 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw new Response("Forbidden", { status: 403 });
   }
 
+  // A logged-in user editing via a share link is still that user — attribute
+  // saves and @mention notifications to them, not to an anonymous "guest".
+  const sessionUser = getSessionUser(request);
+
+  // Send @mention notification emails. Only logged-in users can resolve a
+  // mention to a real user id (the picker requires a session), so anonymous
+  // guests never reach this branch with a valid mention.
+  if (intent === "send-mentions") {
+    if (!sessionUser) return { ok: false };
+    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    if (!rl.allowed) return { ok: false };
+    const body = String(form.get("body") || "");
+    const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
+    const docUrl = `${getPublicOrigin(request)}/s/${params.token}`;
+    let match: RegExpExecArray | null;
+    while ((match = mentionRegex.exec(body)) !== null) {
+      const mentionedUserId = match[2];
+      if (mentionedUserId === sessionUser.id) continue;
+      const mentioned = prep<{ email: string; name: string }, [string]>(
+        "SELECT email, name FROM users WHERE id = ?"
+      ).get(mentionedUserId);
+      if (mentioned) {
+        sendMentionNotification(
+          mentioned.email,
+          mentioned.name,
+          sessionUser.name,
+          result.document.title,
+          body,
+          docUrl
+        );
+      }
+    }
+    return { ok: true };
+  }
+
   const content = form.get("content");
   if (content != null) {
-    updateDocument(result.document.id, { content: String(content) }, "guest");
+    updateDocument(result.document.id, { content: String(content) }, sessionUser?.id ?? "guest");
   }
   return { ok: true };
 }
@@ -249,6 +307,7 @@ export default function SharePage() {
   const wsUrl = !needsPassword ? (data as any).wsUrl : null;
   const trackChanges: boolean = !needsPassword ? Boolean((data as any).trackChanges) : false;
   const externalEmail: string | null = !needsPassword ? (data as any).externalEmail : null;
+  const sessionUser: { id: string; name: string } | null = !needsPassword ? (data as any).sessionUser : null;
   const isEditable = mode === "public_edit";
 
   // All hooks must be called unconditionally (rules of hooks)
@@ -257,11 +316,21 @@ export default function SharePage() {
   const [saving, setSaving] = useState(false);
   const randomIdentity = useMemo(() => randomGuestIdentity(), []);
   const guestIdentity = useMemo(() => {
+    // A logged-in user keeps their real name/color, even on a share link that
+    // wasn't shared with them directly.
+    if (sessionUser) {
+      return { name: sessionUser.name, color: PALETTE[Math.abs(hashCode(sessionUser.id)) % PALETTE.length] };
+    }
     if (externalEmail) {
       return { name: externalEmail, color: PALETTE[Math.abs(hashCode(externalEmail)) % PALETTE.length] };
     }
     return randomIdentity;
-  }, [externalEmail, randomIdentity]);
+  }, [sessionUser, externalEmail, randomIdentity]);
+
+  // Stable id used for comment authorship / isOwn checks. A logged-in user gets
+  // their real account id; an anonymous guest falls back to their display name
+  // (the only stable handle they have).
+  const currentUserId = sessionUser?.id ?? guestIdentity.name;
 
   if (needsPassword) {
     return <PasswordGate docTitle={docTitle || "Document"} token={shareToken || ""} />;
@@ -334,6 +403,7 @@ export default function SharePage() {
           wsUrl={wsUrl}
           shareToken={shareToken ?? ""}
           guestIdentity={guestIdentity}
+          currentUserId={currentUserId}
           onPresenceChange={setPeers}
           onConnectionStatus={setConnectionStatus}
           onSavingChange={setSaving}
@@ -448,6 +518,7 @@ function EditableView({
   wsUrl,
   shareToken,
   guestIdentity,
+  currentUserId,
   onPresenceChange,
   onConnectionStatus,
   onSavingChange,
@@ -456,11 +527,17 @@ function EditableView({
   wsUrl: string;
   shareToken: string;
   guestIdentity: { name: string; color: string };
+  currentUserId: string;
   onPresenceChange: (peers: Peer[]) => void;
   onConnectionStatus: (status: ConnectionStatus) => void;
   onSavingChange: (saving: boolean) => void;
 }) {
   const fetcher = useFetcher();
+  const mentionFetcher = useFetcher();
+  const sendMention = useCallback(
+    (body: string) => { mentionFetcher.submit({ intent: "send-mentions", body }, { method: "post" }); },
+    [mentionFetcher]
+  );
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSaving = fetcher.state !== "idle";
 
@@ -489,6 +566,7 @@ function EditableView({
   const [threads, setThreads] = useState<ResolvedThread[]>([]);
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [commentPopup, setCommentPopup] = useState<{ threadId: string; pos: { x: number; y: number } } | null>(null);
+  const [trackPopup, setTrackPopup] = useState<{ changeId: string; pos: { x: number; y: number } } | null>(null);
   const editorMountRef = useRef<HTMLDivElement | null>(null);
   const [focusedSuggestionId, setFocusedSuggestionId] = useState<string | null>(null);
   const [pmActiveState, setPmActiveState] = useState<PMActiveState | null>(null);
@@ -510,6 +588,8 @@ function EditableView({
     deleteComment: (commentId: string) => void;
     resolveThread: (threadId: string) => void;
     unresolveThread: (threadId: string) => void;
+    acceptChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
+    rejectChangeById?: (id: string, allIds?: string[], changeType?: string) => void;
     scrollToPos: (pos: number) => void;
     focus: () => void;
   } | null>(null);
@@ -576,6 +656,7 @@ function EditableView({
               wsUrl={wsUrl}
               wsParams={{ token: shareToken }}
               userInfo={guestIdentity}
+              currentUserId={currentUserId}
               mountRefOut={editorMountRef}
               onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
               onPresenceChange={onPresenceChange}
@@ -583,6 +664,7 @@ function EditableView({
               onChange={(val) => { setContent(val); scheduleSave(val); }}
               onStateChange={setPmActiveState}
               onTrackChangesStateChange={setTrackChangesState}
+              onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}
               onThreadsChange={setThreads}
               onThreadClick={(thread, pos) => { setFocusedThreadId(thread.id); setFocusedSuggestionId(null); setCommentPopup({ threadId: thread.id, pos }); }}
               focusedCommentId={focusedThreadId}
@@ -607,10 +689,24 @@ function EditableView({
                 <CommentPopup
                   thread={thread}
                   pos={commentPopup.pos}
-                  currentUserId={guestIdentity.name}
+                  currentUserId={currentUserId}
                   editorApiRef={editorApi as any}
                   editorRef={editorMountRef}
                   onDismiss={() => { setCommentPopup(null); setFocusedThreadId(null); }}
+                  onMention={sendMention}
+                />
+              ) : null;
+            })()}
+            {trackPopup && (() => {
+              const change = trackChangesState?.changes.find(c => c.ids.includes(trackPopup.changeId));
+              return change ? (
+                <TrackChangePopup
+                  change={change}
+                  pos={trackPopup.pos}
+                  editorRef={editorMountRef}
+                  onAccept={(id) => { editorApi.current?.acceptChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
+                  onReject={(id) => { editorApi.current?.rejectChangeById?.(id, change.ids, change.type); setTrackPopup(null); }}
+                  onDismiss={() => setTrackPopup(null)}
                 />
               ) : null;
             })()}
