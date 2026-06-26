@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import DOMPurify from "dompurify";
 import { useFocusTrap } from "~/components/hooks/useFocusTrap";
+import { popoverSurface } from "~/lib/popover-styles";
 
 type SearchResult = {
   id: string;
@@ -96,10 +97,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
         aria-label="Search documents"
         style={{
           width: "min(36rem, 90vw)",
-          background: "var(--bg)",
-          borderRadius: "var(--radius-lg)",
-          border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
-          boxShadow: "var(--shadow-lg)",
+          ...popoverSurface,
           overflow: "hidden",
         }}
       >

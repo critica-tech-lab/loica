@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { TrackedChangeEntry } from "~/components/editor/types";
 import { authorTrackColor } from "~/components/editor/types";
 import { timeAgo } from "~/lib/ui-utils";
-import { popoverSurface } from "~/lib/popover-styles";
+import { popoverSurface, lisaButton } from "~/lib/popover-styles";
 import { Avatar } from "./Avatar";
 
 const POPUP_W = 240;
@@ -100,20 +100,7 @@ export function TrackChangePopup({ change, pos, onAccept, onReject, onDismiss, e
 
 function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} style={{
-      padding: "3px 10px",
-      border: primary
-        ? "1px solid var(--fg)"
-        : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
-      borderRadius: 0,
-      fontSize: "var(--fs-xs)",
-      fontWeight: 600,
-      cursor: "pointer",
-      background: primary ? "var(--fg)" : "transparent",
-      color: primary ? "var(--bg)" : "var(--fg)",
-      fontFamily: "var(--font-ui)",
-      letterSpacing: "0.02em",
-    }}>
+    <button onClick={onClick} style={lisaButton(primary)}>
       {children}
     </button>
   );

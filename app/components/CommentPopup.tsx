@@ -5,7 +5,7 @@ import { authorColorFromName } from "~/components/comment-decorations";
 import { timeAgo } from "~/lib/ui-utils";
 import { MentionTextarea, renderMentions, hasMentions } from "./MentionTextarea";
 import { TrashIcon } from "~/components/icons";
-import { popoverSurface } from "~/lib/popover-styles";
+import { popoverSurface, lisaButton, lisaInput } from "~/lib/popover-styles";
 import { Avatar } from "./Avatar";
 
 const POPUP_W = 300;
@@ -308,20 +308,7 @@ function CommentInput({
 
 function SmallBtn({ onClick, primary, children }: { onClick: () => void; primary?: boolean; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} style={{
-      padding: "3px 10px",
-      border: primary
-        ? "1px solid var(--fg)"
-        : "1px solid color-mix(in srgb, var(--fg) 30%, transparent)",
-      borderRadius: 0,
-      fontSize: "var(--fs-xs)",
-      fontWeight: 600,
-      cursor: "pointer",
-      background: primary ? "var(--fg)" : "transparent",
-      color: primary ? "var(--bg)" : "var(--fg)",
-      fontFamily: "var(--font-ui)",
-      letterSpacing: "0.02em",
-    }}>{children}</button>
+    <button onClick={onClick} style={lisaButton(primary)}>{children}</button>
   );
 }
 
@@ -366,10 +353,5 @@ const quoteStyle: React.CSSProperties = {
   overflowY: "auto",
 };
 
-const inlineTextarea: React.CSSProperties = {
-  width: "100%", resize: "none", border: "none", outline: "none",
-  borderBottom: "1.5px solid var(--fg)",
-  padding: "2px 0",
-  fontSize: "var(--fs-base)", fontFamily: "var(--font-ui)",
-  background: "transparent", color: "var(--fg)", lineHeight: 1.5, boxSizing: "border-box",
-};
+// Shared minimal-Lisa underline field (see popover-styles).
+const inlineTextarea: React.CSSProperties = lisaInput;
