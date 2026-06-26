@@ -3,6 +3,7 @@ import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
 import { getWebSocketUrl } from "~/lib/url.server";
+import { getSessionUser } from "~/lib/auth.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -104,12 +105,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     };
   }
 
+  // A logged-in user who opens a share link they don't own should still be
+  // identified by their real account, not as an anonymous guest.
+  const sessionUser = getSessionUser(request);
+
   return {
     document: result.document,
     mode: result.mode,
     shareToken: params.token,
     trackChanges,
     externalEmail: result.externalEmail ?? null,
+    sessionUser: sessionUser ? { id: sessionUser.id, name: sessionUser.name } : null,
     wsUrl: getWebSocketUrl(request),
   };
 }
@@ -249,6 +255,7 @@ export default function SharePage() {
   const wsUrl = !needsPassword ? (data as any).wsUrl : null;
   const trackChanges: boolean = !needsPassword ? Boolean((data as any).trackChanges) : false;
   const externalEmail: string | null = !needsPassword ? (data as any).externalEmail : null;
+  const sessionUser: { id: string; name: string } | null = !needsPassword ? (data as any).sessionUser : null;
   const isEditable = mode === "public_edit";
 
   // All hooks must be called unconditionally (rules of hooks)
@@ -257,11 +264,16 @@ export default function SharePage() {
   const [saving, setSaving] = useState(false);
   const randomIdentity = useMemo(() => randomGuestIdentity(), []);
   const guestIdentity = useMemo(() => {
+    // A logged-in user keeps their real name/color, even on a share link that
+    // wasn't shared with them directly.
+    if (sessionUser) {
+      return { name: sessionUser.name, color: PALETTE[Math.abs(hashCode(sessionUser.id)) % PALETTE.length] };
+    }
     if (externalEmail) {
       return { name: externalEmail, color: PALETTE[Math.abs(hashCode(externalEmail)) % PALETTE.length] };
     }
     return randomIdentity;
-  }, [externalEmail, randomIdentity]);
+  }, [sessionUser, externalEmail, randomIdentity]);
 
   if (needsPassword) {
     return <PasswordGate docTitle={docTitle || "Document"} token={shareToken || ""} />;
