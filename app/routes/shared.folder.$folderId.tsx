@@ -479,14 +479,14 @@ export default function SharedFolderView() {
       {confirmAction && (
         <ConfirmModal
           title={
-            confirmAction.type === "delete-doc" ? "Delete document" : "Delete folder"
+            confirmAction.type === "delete-doc" ? "Move to trash" : "Move folder to trash"
           }
           message={
             confirmAction.type === "delete-doc"
-              ? `Are you sure you want to delete "${confirmAction.title}"? This will be moved to trash.`
-              : `Are you sure you want to delete "${confirmAction.title}" and all its contents? This will be moved to trash.`
+              ? `Move "${confirmAction.title}" to trash? You can restore it within 30 days.`
+              : `Move "${confirmAction.title}" and all its contents to trash? You can restore it within 30 days.`
           }
-          confirmLabel="Delete"
+          confirmLabel="Move to trash"
           danger
           onConfirm={() => {
             const { type, id } = confirmAction;
