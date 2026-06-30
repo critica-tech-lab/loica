@@ -425,17 +425,17 @@ export default function WorkspaceDashboard() {
         {confirmAction && (
           <ConfirmModal
             title={
-              confirmAction.type === "delete-doc" ? "Delete document" :
-              confirmAction.type === "delete-folder" ? "Delete folder" :
+              confirmAction.type === "delete-doc" ? "Move to trash" :
+              confirmAction.type === "delete-folder" ? "Move folder to trash" :
               confirmAction.type === "unshare-doc" ? "Remove public access" :
               confirmAction.type === "leave-folder" ? "Leave shared folder" :
               "Remove all shares"
             }
             message={
               confirmAction.type === "delete-doc"
-                ? `Are you sure you want to delete "${confirmAction.title}"? This will be moved to trash.`
+                ? `Move "${confirmAction.title}" to trash? You can restore it within 30 days.`
                 : confirmAction.type === "delete-folder"
-                ? `Are you sure you want to delete "${confirmAction.title}" and all its contents? This will be moved to trash.`
+                ? `Move "${confirmAction.title}" and all its contents to trash? You can restore it within 30 days.`
                 : confirmAction.type === "unshare-doc"
                 ? `Remove public access from "${confirmAction.title}"? Anyone with the link will lose access.`
                 : confirmAction.type === "leave-folder"
@@ -444,7 +444,7 @@ export default function WorkspaceDashboard() {
             }
             confirmLabel={
               confirmAction.type === "leave-folder" ? "Leave" :
-              confirmAction.type.startsWith("delete") ? "Delete" : "Unshare"
+              confirmAction.type.startsWith("delete") ? "Move to trash" : "Unshare"
             }
             danger
             onCancel={() => setConfirmAction(null)}
