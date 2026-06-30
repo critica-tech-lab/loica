@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData } from "react-router";
+import { Form, Link, redirect, useLoaderData, useActionData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/settings";
 import { getSessionUser, getSessionId, requireUser, changeOwnPassword, updateProfile, validatePassword } from "~/lib/auth.server";
@@ -72,7 +72,17 @@ export default function Settings() {
   return (
     <AppShell navActions={navActions} scrollable>
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-8">
-        <h1 className="m-0 text-lg font-bold">Settings</h1>
+        <div className="flex flex-col gap-2">
+          <Link
+            to="/w"
+            prefetch="intent"
+            className="inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-fg/55 no-underline transition-colors hover:bg-fg/5 hover:text-fg"
+          >
+            <span>←</span>
+            <span>Files</span>
+          </Link>
+          <h1 className="m-0 text-lg font-bold">Settings</h1>
+        </div>
 
         {/* Profile section */}
         <section className="rounded-xl border border-fg/[0.08] p-6">
