@@ -2,7 +2,7 @@ import { Form, redirect, useActionData, useNavigation, useLoaderData, useSearchP
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/auth.login";
 import { AuthForm, Field, SubmitButton } from "~/components/AuthForm";
-import { getSessionUser, verifyCredentials, createSession } from "~/lib/auth.server";
+import { getSessionUser, verifyCredentials, createSession, safeNextPath } from "~/lib/auth.server";
 import { getUserWorkspaces } from "~/lib/workspace.server";
 import { isLocalLoginEnabled, isRegistrationOpen } from "~/lib/db.server";
 import { getActiveAuthProviders } from "~/extensions/index.server";
@@ -11,10 +11,11 @@ import { checkRateLimit, getClientIp } from "~/lib/rate-limit.server";
 export const meta: MetaFunction = () => [{ title: "Sign in — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const next = safeNextPath(new URL(request.url).searchParams.get("next"));
   const user = getSessionUser(request);
   if (user) {
     const workspaces = getUserWorkspaces(user.id);
-    throw redirect(workspaces.length > 0 ? "/w" : "/");
+    throw redirect(next ?? (workspaces.length > 0 ? "/w" : "/"));
   }
   const authProviders = getActiveAuthProviders();
   if (!isLocalLoginEnabled() && authProviders.length === 0) {
@@ -24,6 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     authProviders,
     localLoginEnabled: isLocalLoginEnabled(),
     registrationOpen: isRegistrationOpen(),
+    next,
   };
 }
 
@@ -56,14 +58,18 @@ export async function action({ request }: Route.ActionArgs) {
 
   const cookie = createSession(user.id);
 
+  const next =
+    safeNextPath(String(form.get("next") || "")) ??
+    safeNextPath(new URL(request.url).searchParams.get("next"));
   const workspaces = getUserWorkspaces(user.id);
-  const destination = workspaces.length > 0 ? "/w" : "/";
+  const destination = next ?? (workspaces.length > 0 ? "/w" : "/");
 
   throw redirect(destination, { headers: { "Set-Cookie": cookie } });
 }
 
 export default function Login() {
-  const { authProviders, localLoginEnabled, registrationOpen } = useLoaderData<typeof loader>();
+  const { authProviders, localLoginEnabled, registrationOpen, next } = useLoaderData<typeof loader>();
+  const nextQuery = next ? `?next=${encodeURIComponent(next)}` : "";
   const result = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -86,7 +92,7 @@ export default function Login() {
           {authProviders.map((p) => (
             <a
               key={p.id}
-              href={p.loginPath}
+              href={`${p.loginPath}${nextQuery}`}
               style={{
                 display: "block",
                 width: "100%",
@@ -128,6 +134,7 @@ export default function Login() {
 
       {localLoginEnabled && (
         <Form method="post" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {next && <input type="hidden" name="next" value={next} />}
           <Field label="Email" name="email" type="email" autoComplete="email" />
           <Field label="Password" name="password" type="password" autoComplete="current-password" />
 

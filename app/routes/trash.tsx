@@ -1,7 +1,7 @@
 import { redirect, useLoaderData, data } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/trash";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getTrashedDocuments,
   purgeExpiredTrash,
@@ -24,7 +24,7 @@ export const meta: MetaFunction = () => [{ title: "Trash — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
   purgeExpiredTrash();
   const documents = getTrashedDocuments(user.id);
   const folders = getTrashedFolders(user.id);

@@ -1,7 +1,7 @@
 import { Form, redirect, useLoaderData, useActionData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/groups";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getUserGroups,
   getPendingGroupInvites,
@@ -23,7 +23,7 @@ export const meta: MetaFunction = () => [{ title: "Groups — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
   const groups = getUserGroups(user.id);
   const pendingInvites = getPendingGroupInvites(user.id);
   return { groups, pendingInvites };
@@ -31,7 +31,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const form = await request.formData();
   const intent = form.get("intent");

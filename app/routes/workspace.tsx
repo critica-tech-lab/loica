@@ -1,7 +1,7 @@
 import { Form, redirect, useLoaderData, useActionData, useFetcher, Link, useNavigate } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/workspace";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getUserPersonalWorkspaces,
   getWorkspace,
@@ -53,7 +53,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => [
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   // Admin can view any workspace via ?ws=<id>
   const url = new URL(request.url);
@@ -96,7 +96,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const url = new URL(request.url);
   const wsParam = url.searchParams.get("ws");

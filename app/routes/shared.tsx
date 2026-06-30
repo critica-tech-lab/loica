@@ -1,7 +1,7 @@
 import { Form, redirect, useLoaderData, useFetcher, data } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/shared";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getSharedFoldersForUser,
   getPendingSharesForUser,
@@ -31,7 +31,7 @@ export const meta: MetaFunction = () => [{ title: "Shared with me — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
   const sharedFolders = getSharedFoldersForUser(user.id);
   const pendingShares = getPendingSharesForUser(user.id);
   const sharedDocs = getSharedDocsForUser(user.id);

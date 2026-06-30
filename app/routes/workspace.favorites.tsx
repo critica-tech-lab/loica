@@ -1,7 +1,7 @@
 import { redirect, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/workspace.favorites";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getUserPersonalWorkspaces,
   getMembership,
@@ -27,7 +27,7 @@ export const meta: MetaFunction =() => [{ title: "Favorites — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const workspaces = getUserPersonalWorkspaces(user.id);
   if (workspaces.length === 0) throw redirect("/");
@@ -52,7 +52,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const workspaces = getUserPersonalWorkspaces(user.id);
   if (workspaces.length === 0) throw new Response("Not found", { status: 404 });

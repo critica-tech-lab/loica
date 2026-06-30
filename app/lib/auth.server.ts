@@ -1,3 +1,4 @@
+import { redirect } from "react-router";
 import { hash, verify } from "@node-rs/argon2";
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
@@ -105,6 +106,32 @@ export function getSessionUser(request: Request): SessionUser | null {
 
   if (!row) return null;
   return { id: row.id, email: row.email, name: row.name, is_admin: !!row.is_admin };
+}
+
+// ─── Post-login redirect ("next") handling ───────────────
+// Validate a redirect target so we only ever bounce back to a same-site
+// path — never an attacker-supplied absolute or protocol-relative URL
+// (open-redirect). Returns the path if safe, otherwise null.
+export function safeNextPath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  // Must be a single root-relative path. Reject absolute URLs, scheme-relative
+  // "//host", and backslash tricks some browsers normalize to "/".
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  if (value.includes("\\")) return null;
+  // Don't loop back into the auth pages themselves.
+  if (value === "/login" || value.startsWith("/login?")) return null;
+  if (value === "/signup" || value.startsWith("/signup?")) return null;
+  if (value === "/logout" || value.startsWith("/auth/")) return null;
+  return value;
+}
+
+// Build a redirect to the login page that remembers where the user was
+// headed, so they land back there after authenticating.
+export function loginRedirect(request: Request): Response {
+  const url = new URL(request.url);
+  const next = safeNextPath(url.pathname + url.search);
+  return redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
 }
 
 export function requireUser(request: Request): SessionUser {
