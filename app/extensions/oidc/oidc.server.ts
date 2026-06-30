@@ -11,7 +11,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { getPublicOrigin } from "~/lib/url.server";
-import { findOrCreateUserViaExternalAuth, createSession } from "~/lib/auth.server";
+import { findOrCreateUserViaExternalAuth, createSession, safeNextPath } from "~/lib/auth.server";
 
 export const PROVIDER_ID = "oidc";
 const CALLBACK_PATH = "/auth/oidc/callback";
@@ -96,6 +96,8 @@ interface Tx {
   nonce: string;
   verifier: string;
   redirectUri: string;
+  // Where to send the user after a successful login (same-site path only).
+  next?: string;
 }
 
 // ─── Step 1: start the flow ──────────────────────────────
@@ -107,8 +109,9 @@ export async function beginLogin(request: Request): Promise<Response> {
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const redirectUri = getPublicOrigin(request) + CALLBACK_PATH;
+  const next = safeNextPath(new URL(request.url).searchParams.get("next")) ?? undefined;
 
-  const tx: Tx = { state, nonce, verifier, redirectUri };
+  const tx: Tx = { state, nonce, verifier, redirectUri, next };
   const txValue = sign(Buffer.from(JSON.stringify(tx)).toString("base64url"));
   const cookie =
     `${TX_COOKIE}=${encodeURIComponent(txValue)}; Path=/auth/oidc; HttpOnly; ` +
@@ -135,7 +138,7 @@ const clearTx =
   `${TX_COOKIE}=; Path=/auth/oidc; HttpOnly; SameSite=Lax;${process.env.SECURE_COOKIE === "true" ? " Secure;" : ""} Max-Age=0`;
 
 export type CallbackResult =
-  | { ok: true; sessionCookie: string; clearTx: string }
+  | { ok: true; sessionCookie: string; clearTx: string; next?: string }
   | { ok: false; error: string };
 
 export async function handleCallback(request: Request): Promise<CallbackResult> {
@@ -210,5 +213,6 @@ export async function handleCallback(request: Request): Promise<CallbackResult> 
 
   const userId = findOrCreateUserViaExternalAuth({ provider: PROVIDER_ID, sub, email, name });
   const sessionCookie = createSession(userId);
-  return { ok: true, sessionCookie, clearTx };
+  // Re-validate on the way out — the Tx cookie is signed, but defense in depth.
+  return { ok: true, sessionCookie, clearTx, next: safeNextPath(tx.next) ?? undefined };
 }

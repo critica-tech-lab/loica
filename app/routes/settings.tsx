@@ -1,7 +1,7 @@
 import { Form, redirect, useLoaderData, useActionData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/settings";
-import { getSessionUser, getSessionId, requireUser, changeOwnPassword, updateProfile, validatePassword } from "~/lib/auth.server";
+import { getSessionUser, getSessionId, requireUser, changeOwnPassword, updateProfile, validatePassword, loginRedirect } from "~/lib/auth.server";
 import { getUserWorkspaces } from "~/lib/workspace.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
@@ -12,7 +12,7 @@ export const meta: MetaFunction = () => [{ title: "Settings — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
   const workspaces = getUserWorkspaces(user.id);
   const workspaceId = workspaces[0]?.id ?? null;
   return { user, workspaceId };

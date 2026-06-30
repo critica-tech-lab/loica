@@ -1,7 +1,7 @@
 import { redirect, useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/shared.doc.$id";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getDocument,
   updateDocument,
@@ -36,7 +36,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const document = getDocument(params.id);
   if (!document) throw new Response("Document not found", { status: 404 });
