@@ -15,7 +15,10 @@ export function formatStorage(bytes: number): string {
 }
 
 export function formatDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleDateString(undefined, {
+  // Pin the locale so server (Node) and client (browser) emit identical
+  // strings — a `undefined` locale resolves to each runtime's default and
+  // causes React hydration mismatches when rendered into the DOM. See #25.
+  return new Date(unixSeconds * 1000).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
