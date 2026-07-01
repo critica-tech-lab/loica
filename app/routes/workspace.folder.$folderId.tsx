@@ -25,6 +25,7 @@ import type { ActionContext } from "~/lib/actions/doc-actions.server";
 import { dispatchAction } from "~/lib/actions/doc-actions.server";
 import { AppShell } from "~/components/AppShell";
 import { ConfirmModal } from "~/components/ConfirmModal";
+import { ConfirmActionModal } from "~/components/ConfirmActionModal";
 import { UserMenu } from "~/components/UserMenu";
 import { MoveDialog } from "~/components/MoveDialog";
 import { ShareDialog } from "~/components/ShareDialog";
@@ -446,26 +447,8 @@ export default function FolderView() {
 
         {/* Confirm modal */}
         {confirmAction && (
-          <ConfirmModal
-            title={
-              confirmAction.type === "delete-doc" ? "Delete document" :
-              confirmAction.type === "delete-folder" ? "Delete folder" :
-              confirmAction.type === "unshare-doc" ? "Remove public access" :
-              "Remove all shares"
-            }
-            message={
-              confirmAction.type === "delete-doc"
-                ? `Are you sure you want to delete "${confirmAction.title}"? This will be moved to trash.`
-                : confirmAction.type === "delete-folder"
-                ? `Are you sure you want to delete "${confirmAction.title}" and all its contents? This will be moved to trash.`
-                : confirmAction.type === "unshare-doc"
-                ? `Remove public access from "${confirmAction.title}"? Anyone with the link will lose access.`
-                : `Remove all shares from "${confirmAction.title}"? Shared users will lose access.`
-            }
-            confirmLabel={
-              confirmAction.type.startsWith("delete") ? "Delete" : "Unshare"
-            }
-            danger
+          <ConfirmActionModal
+            action={confirmAction}
             onCancel={() => setConfirmAction(null)}
             onConfirm={() => {
               const { type, id } = confirmAction;
