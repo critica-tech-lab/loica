@@ -1768,6 +1768,10 @@ footnote.ProseMirror-selectednode::after {
 }
 
 .pm-editor-mount .ProseMirror > * + * { margin-top: 0.9em; }
+/* Adjacent paragraphs use line-height only — no extra block margin, so pressing
+   Enter for a new paragraph doesn't leave a double-spaced gap (#41). Other block
+   pairings (lists, headings, quotes) keep the 0.9em rhythm above. */
+.pm-editor-mount .ProseMirror > p + p { margin-top: 0; }
 /* First block (often an H1) sits flush to the editor's top padding — the
    heading rule below sets margin-top, which would otherwise gap the first line. */
 .pm-editor-mount .ProseMirror > :first-child { margin-top: 0; }
