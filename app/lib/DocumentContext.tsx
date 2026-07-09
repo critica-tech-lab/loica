@@ -95,6 +95,9 @@ export interface EditorApi {
   setTextAlign?: (alignment: string | null) => void;
   addLink?: (url: string) => void;
   getMarkdown?: () => string;
+  /** The raw ProseMirror `EditorView` (typed `unknown` to keep this file
+   *  PM-free). Used by extension selection-menu items. PM editor only. */
+  getView?: () => unknown;
 }
 
 export interface DocumentContextValue {

@@ -40,3 +40,19 @@ export function useEditorPluginFactories(): NonNullable<LoicaExtension["editorPl
     [enabledIds],
   );
 }
+
+/**
+ * Enabled extensions' `selectionMenuItems` factories — actions to render in the
+ * text-selection bubble. Gated on the admin's enabled set, so a disabled
+ * extension's items disappear.
+ */
+export function useSelectionMenuItems(): NonNullable<LoicaExtension["selectionMenuItems"]>[] {
+  const enabledIds = useEnabledExtensionIds();
+  return useMemo(
+    () =>
+      extensions
+        .filter((e) => e.selectionMenuItems && enabledIds.has(e.id))
+        .map((e) => e.selectionMenuItems!),
+    [enabledIds],
+  );
+}
