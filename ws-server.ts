@@ -511,7 +511,34 @@ const wss = new WebSocketServer({
 const MAX_CONNECTIONS_PER_IP = 50;
 const connectionsByIp = new Map<string, number>();
 
+// Heartbeat: server-initiated WS ping every 20s. If a client hasn't ponged
+// within 45s we treat the socket as dead and terminate it, freeing the slot
+// and letting the client's y-websocket auto-reconnect fire immediately
+// instead of waiting for TCP timeouts (which can take minutes).
+const HEARTBEAT_INTERVAL_MS = 20_000;
+const HEARTBEAT_TIMEOUT_MS = 45_000;
+
+const heartbeatTimer = setInterval(() => {
+  const now = Date.now();
+  for (const ws of wss.clients) {
+    const lastPong = (ws as WebSocket & { lastPong?: number }).lastPong ?? now;
+    if (now - lastPong > HEARTBEAT_TIMEOUT_MS) {
+      ws.terminate();
+      continue;
+    }
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.ping(); } catch { /* socket closing */ }
+    }
+  }
+}, HEARTBEAT_INTERVAL_MS);
+wss.on("close", () => clearInterval(heartbeatTimer));
+
 wss.on("connection", (ws, req) => {
+  (ws as WebSocket & { lastPong?: number }).lastPong = Date.now();
+  ws.on("pong", () => {
+    (ws as WebSocket & { lastPong?: number }).lastPong = Date.now();
+  });
+
   const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()
     ?? req.socket.remoteAddress ?? "unknown";
   const count = connectionsByIp.get(ip) ?? 0;

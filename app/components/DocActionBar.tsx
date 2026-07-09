@@ -135,7 +135,9 @@ export function DocActionBar({ content, connectionStatus, showBranding }: DocAct
               flexShrink: 0,
             }}
           />
-          {connectionStatus === "disconnected" ? "offline" : "reconnecting\u2026"}
+          {connectionStatus === "disconnected"
+            ? "offline \u2014 changes saved locally, will sync on reconnect"
+            : "reconnecting\u2026"}
         </span>
       )}
       {showBranding ? (

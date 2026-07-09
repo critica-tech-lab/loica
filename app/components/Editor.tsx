@@ -111,6 +111,7 @@ const yjsDepsPromise =
         import("yjs"),
         import("y-websocket"),
         import("y-codemirror.next"),
+        import("y-indexeddb"),
       ])
     : null;
 
@@ -1074,7 +1075,7 @@ export function Editor({
 
       if (docId && wsUrl) {
         try {
-          const [Y, { WebsocketProvider }, { yCollab, yUndoManagerKeymap }] = await yjsDepsPromise!;
+          const [Y, { WebsocketProvider }, { yCollab, yUndoManagerKeymap }, { IndexeddbPersistence }] = await yjsDepsPromise!;
 
           if (!destroyed && containerRef.current) {
             collabY = Y;
@@ -1082,12 +1083,32 @@ export function Editor({
             const ytext = ydoc.getText("content");
             const ycomments = ydoc.getMap("comments");
 
+            // Offline persistence: edits land in IndexedDB immediately so a WS
+            // drop (WiFi blip, sleep, ISP hiccup) never loses data and edits
+            // survive a tab close/refresh. Sync merges on reconnect.
+            const idb = new IndexeddbPersistence(`loica-${docId}`, ydoc);
+
             // Don't pre-seed ytext — the server provides content via
             // the Yjs sync protocol. Pre-seeding causes CRDT merge to
             // duplicate text when multiple clients connect.
             const provider = new WebsocketProvider(wsUrl, docId, ydoc, {
               params: wsParams ?? {},
             });
+
+            // Fast reconnect on browser network/tab wake — the default
+            // y-websocket backoff can take 30–60s to retry after a drop.
+            const forceReconnect = () => {
+              if (!provider.wsconnected && !destroyed) {
+                try { provider.disconnect(); } catch { /* noop */ }
+                try { provider.connect(); } catch { /* noop */ }
+              }
+            };
+            const onOnline = () => forceReconnect();
+            const onVisible = () => {
+              if (document.visibilityState === "visible") forceReconnect();
+            };
+            window.addEventListener("online", onOnline);
+            document.addEventListener("visibilitychange", onVisible);
             const PRESENCE_COLORS = [
               "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F",
               "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
@@ -1276,8 +1297,11 @@ export function Editor({
               provider.off("status", emitStatus);
               provider.awareness.off("change", emitPresence);
               provider.off("sync", emitPresence);
+              window.removeEventListener("online", onOnline);
+              document.removeEventListener("visibilitychange", onVisible);
               onPresenceRef.current?.([]);
               provider.destroy();
+              idb.destroy();
               ydoc.destroy();
             };
             hasCollab = true;
