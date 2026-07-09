@@ -24,5 +24,5 @@ export async function loader({ request }: Route.LoaderArgs) {
   const headers = new Headers();
   headers.append("Set-Cookie", result.sessionCookie);
   headers.append("Set-Cookie", result.clearTx);
-  throw redirect("/w", { headers });
+  throw redirect(result.next ?? "/w", { headers });
 }

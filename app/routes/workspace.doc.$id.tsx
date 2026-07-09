@@ -1,7 +1,7 @@
 import { redirect, useLoaderData } from "react-router";
 import type { MetaFunction, ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/workspace.doc.$id";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
 import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
 import {
@@ -49,7 +49,7 @@ export function shouldRevalidate({
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const document = getDocument(params.id);
   if (!document) throw new Response("Document not found", { status: 404 });

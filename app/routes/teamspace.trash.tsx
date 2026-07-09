@@ -1,7 +1,7 @@
 import { redirect, useLoaderData, data } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/teamspace.trash";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getMembership, getUserPersonalWorkspaces } from "~/lib/workspace.server";
 import { getTeamspace, getTeamspacesForUser } from "~/lib/teamspace.server";
 import {
@@ -27,7 +27,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const teamspace = getTeamspace(params.workspaceId);
   if (!teamspace) throw new Response("Not found", { status: 404 });

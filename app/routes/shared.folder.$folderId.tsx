@@ -2,7 +2,7 @@ import { Form, redirect, useLoaderData, useNavigation, useActionData, useFetcher
 import { useToast } from "~/components/Toast";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/shared.folder.$folderId";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getWorkspaceDocuments,
   createDocument,
@@ -46,7 +46,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const folder = getFolder(params.folderId);
   if (!folder) throw new Response("Folder not found", { status: 404 });
@@ -72,7 +72,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const folder = getFolder(params.folderId);
   if (!folder) throw new Response("Folder not found", { status: 404 });

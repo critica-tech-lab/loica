@@ -2,7 +2,7 @@ import { Form, redirect, useLoaderData, useActionData, useFetcher, Link } from "
 import { useToast } from "~/components/Toast";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/teamspace.folder.$folderId";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getWorkspace,
   getMembership,
@@ -53,7 +53,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const url = new URL(request.url);
   const pageParam = parseInt(url.searchParams.get("page") ?? "1");
@@ -88,7 +88,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const workspace = getWorkspace(params.workspaceId);
   if (!workspace || workspace.type !== "team") throw new Response("Teamspace not found", { status: 404 });
