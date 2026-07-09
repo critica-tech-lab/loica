@@ -104,6 +104,19 @@ export interface ExtensionDocContext {
 export interface ExtensionEditorBannerProps extends ExtensionDocContext {}
 
 /**
+ * Context handed to an extension's `editorPlugins` factory. The factory returns
+ * ProseMirror plugins that the core mounts into the live editor. Kept minimal
+ * and PM-agnostic so `types.ts` stays client-safe (no `prosemirror-*` import) —
+ * the returned plugins are typed `unknown[]` here and treated as `Plugin[]` at
+ * the mount site (`ProseMirrorEditor.tsx`). Extending this with more fields
+ * later is additive and non-breaking.
+ */
+export interface ExtensionEditorPluginContext {
+  /** Document id (also the Yjs room name) — e.g. an API target. */
+  docId: string;
+}
+
+/**
  * A doc-menu entry contributed by an extension. The host renders these at
  * the top of the doc actions menu, separated from core actions by a
  * divider.
@@ -208,6 +221,20 @@ export interface LoicaExtension {
    * affordances like the "Present" pill.
    */
   EditorBanner?: ComponentType<ExtensionEditorBannerProps>;
+
+  /**
+   * Factory contributing ProseMirror plugins to the core editor. When this
+   * extension is enabled, the editor calls this once per mount and spreads the
+   * returned plugins into its plugin list (non-readOnly editors only). Use for
+   * capability extensions that decorate or augment the editing surface
+   * (grammar-check underlines, inline AI marks, find-highlight, …).
+   *
+   * Returns `unknown[]` to keep `types.ts` free of a `prosemirror-*` import;
+   * the mount site casts to `Plugin[]`. Plugins must import their
+   * `prosemirror-state` / `prosemirror-view` bare so vite's `dedupe` binds them
+   * to the host's single ProseMirror instance.
+   */
+  editorPlugins?: (ctx: ExtensionEditorPluginContext) => unknown[];
 
   /**
    * Items the extension contributes to the doc actions menu. The host

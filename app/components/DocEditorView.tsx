@@ -12,7 +12,7 @@ import { useToast } from "~/components/Toast";
 import { consumeUndoCreate } from "~/lib/undoCreate";
 import { useFetcher, useNavigate } from "react-router";
 import { extensionTemplates } from "~/extensions";
-import { useDocTypeExtension } from "~/extensions/hooks";
+import { useDocTypeExtension, useEditorPluginFactories } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
 import { LinkModal } from "~/components/LinkModal";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
@@ -74,6 +74,9 @@ export function DocEditorView(_props: DocumentProps) {
   // null, so the doc falls back to the plain markdown editor.
   const docTypeExtension = useDocTypeExtension(ctx.docType ?? null);
   const ExtensionEditor = docTypeExtension?.EditorView ?? null;
+  // Capability extensions (grammar-check, AI, ...) that contribute editor
+  // plugins. Empty when none are enabled — the editor is unchanged.
+  const editorPluginFactories = useEditorPluginFactories();
 
   // Default visible — users who want it hidden dismiss with ×, preference sticks.
   // SSR-safe: start with the default, then reconcile with localStorage on mount.
@@ -293,6 +296,7 @@ export function DocEditorView(_props: DocumentProps) {
               currentUserId={user.id}
               readOnly={!canEdit}
               autoFocus={canEdit}
+              editorPlugins={editorPluginFactories}
               mountRefOut={editorMountRef}
               onReady={(api) => registerEditorApi(api)}
               onEditLink={openEditLinkModal}

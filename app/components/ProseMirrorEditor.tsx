@@ -45,6 +45,12 @@ interface Props {
   onSelectionChange?: (sel: { from: number; to: number; top: number; left: number } | null) => void;
   onEditLink?: (url: string, apply: (newUrl: string) => void) => void;
   focusedCommentId?: string | null;
+  // Extension-contributed ProseMirror plugin factories, gathered by
+  // `useEditorPluginFactories()`. Called once per mount; their plugins are
+  // spread into the editor's plugin list (non-readOnly only). Typed `unknown[]`
+  // at the seam — cast to `Plugin[]` where mounted. The core has no knowledge
+  // of which extension (if any) contributes.
+  editorPlugins?: Array<(ctx: { docId: string }) => unknown[]>;
 }
 
 // Module-level lazy promises so deps load once per page lifetime.
@@ -96,6 +102,7 @@ export function ProseMirrorEditor({
   onEditLink,
   focusedCommentId,
   currentUserId,
+  editorPlugins,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<any>(null);
@@ -107,6 +114,10 @@ export function ProseMirrorEditor({
   userInfoRef.current = userInfo;
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
+  // Extension editor-plugin factories, ref'd so the once-per-mount init effect
+  // reads the current set without re-subscribing.
+  const editorPluginsRef = useRef(editorPlugins);
+  editorPluginsRef.current = editorPlugins;
   const [tableMenu, setTableMenu] = useState<{ x: number; y: number; inHeaderRow: boolean } | null>(null);
   const [linkBubble, setLinkBubble] = useState<{ url: string; x: number; y: number; from: number; to: number } | null>(null);
   // Table whose edit handles are shown — the one containing the caret.
@@ -269,6 +280,21 @@ export function ProseMirrorEditor({
           ySyncPluginKey,
           relativePositionToAbsolutePosition,
         }),
+        // Extension-contributed plugins (grammar-check underlines, AI marks, …).
+        // Editing surfaces only — skipped in read-only views. Each factory is
+        // guarded: if it throws at build time it's skipped so a broken extension
+        // can't stop the editor mounting. (Throws *inside* a plugin's
+        // apply/decorations/view still surface — those the plugin must guard.)
+        ...(readOnlyRef.current
+          ? []
+          : (editorPluginsRef.current ?? []).flatMap((make) => {
+              try {
+                return make({ docId }) as any[];
+              } catch (err) {
+                console.error("[extensions] editorPlugins factory threw — skipping:", err);
+                return [];
+              }
+            })),
         ...(readOnlyRef.current ? [] : [
           trackChangesPlugin({
             userID: currentUserId ?? "anonymous",
