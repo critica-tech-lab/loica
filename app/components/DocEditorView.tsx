@@ -12,7 +12,7 @@ import { useToast } from "~/components/Toast";
 import { consumeUndoCreate } from "~/lib/undoCreate";
 import { useFetcher, useNavigate } from "react-router";
 import { extensionTemplates } from "~/extensions";
-import { useDocTypeExtension, useEditorPluginFactories } from "~/extensions/hooks";
+import { useDocTypeExtension, useEditorPluginFactories, useSelectionMenuItems } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
 import { LinkModal } from "~/components/LinkModal";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
@@ -730,8 +730,19 @@ function HistoryPreviewPane({
 }
 
 function SelectionBubble({ onLink, onCommentAdded }: { onLink: () => void; onCommentAdded?: (id: string, pos: { x: number; y: number }) => void }) {
-  const { selectionBubble, setSelectionBubble, editorApi, setActivePanel, setFocusedCommentId, canEdit } = useDocument();
+  const { selectionBubble, setSelectionBubble, editorApi, setActivePanel, setFocusedCommentId, canEdit, document } = useDocument();
+  // Hook must run before the early return. Enabled extensions' selection-menu
+  // factories — core renders their items without knowing which extension.
+  const selectionMenuFactories = useSelectionMenuItems();
   if (!selectionBubble) return null;
+
+  const extItems = selectionMenuFactories.flatMap((make) => {
+    try {
+      return make({ docId: document.id });
+    } catch {
+      return [];
+    }
+  });
 
   const dismiss = () => setSelectionBubble(null);
   const runFormat = (before: string, after: string) => {
@@ -794,6 +805,20 @@ function SelectionBubble({ onLink, onCommentAdded }: { onLink: () => void; onCom
           dismiss();
         }}
       />
+      {canEdit && extItems.length > 0 && <BubbleSep />}
+      {canEdit &&
+        extItems.map((item, i) => (
+          <BubbleBtn
+            key={`ext-${i}`}
+            label={item.label}
+            title={item.title ?? item.label}
+            onActivate={() => {
+              const v = editorApi.current?.getView?.();
+              if (v) item.run(v);
+              dismiss();
+            }}
+          />
+        ))}
     </div>
   );
 }

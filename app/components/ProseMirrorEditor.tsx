@@ -716,6 +716,10 @@ export function ProseMirrorEditor({
           return view.state.doc.textBetween(from, to, " ");
         },
 
+        // The raw view, for extension selection-menu items that need the
+        // current selection + dispatch. Typed `unknown` at the API boundary.
+        getView: () => view,
+
         // Map the markdown-style format("**","**") calls that the existing
         // SelectionBubble and Toolbar emit to proper ProseMirror mark commands.
         format: (before: string, after: string) => {

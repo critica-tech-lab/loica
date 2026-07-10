@@ -117,6 +117,23 @@ export interface ExtensionEditorPluginContext {
 }
 
 /**
+ * An item an extension contributes to the text-selection menu (the bubble that
+ * appears when text is selected — alongside Bold / Link / Comment). `run` is
+ * invoked with the ProseMirror `EditorView`, typed `unknown` to keep `types.ts`
+ * client-safe (no `prosemirror-*` import); the extension casts it and reads the
+ * selection to act. Generic — usable for grammar-check, translate-selection,
+ * define-word, explain, etc.
+ */
+export interface ExtensionSelectionMenuItem {
+  /** Short label shown in the bubble (e.g. "✨ Check"). */
+  label: string;
+  /** Tooltip text. */
+  title?: string;
+  /** Invoked on click with the editor view (cast to `EditorView`). */
+  run: (view: unknown) => void;
+}
+
+/**
  * A doc-menu entry contributed by an extension. The host renders these at
  * the top of the doc actions menu, separated from core actions by a
  * divider.
@@ -235,6 +252,14 @@ export interface LoicaExtension {
    * to the host's single ProseMirror instance.
    */
   editorPlugins?: (ctx: ExtensionEditorPluginContext) => unknown[];
+
+  /**
+   * Items this extension contributes to the text-selection menu (the bubble
+   * shown when text is selected). Gated on the admin's enabled set. The core
+   * renders them alongside the built-in actions and calls `run(view)` on click
+   * — it never names any specific extension.
+   */
+  selectionMenuItems?: (ctx: ExtensionEditorPluginContext) => ExtensionSelectionMenuItem[];
 
   /**
    * Items the extension contributes to the doc actions menu. The host
