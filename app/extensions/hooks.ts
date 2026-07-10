@@ -6,7 +6,7 @@
 
 import { useMemo } from "react";
 import type { LoicaExtension } from "./types";
-import { getEnabledExtensionForDocType } from "./index";
+import { getEnabledExtensionForDocType, extensions } from "./index";
 import { useEnabledExtensionIds } from "~/root";
 
 /**
@@ -22,4 +22,21 @@ import { useEnabledExtensionIds } from "~/root";
 export function useDocTypeExtension(type: string | null | undefined): LoicaExtension | null {
   const enabledIds = useEnabledExtensionIds();
   return useMemo(() => getEnabledExtensionForDocType(type, enabledIds), [type, enabledIds]);
+}
+
+/**
+ * Enabled extensions' `editorPlugins` factories — ProseMirror plugins to mount
+ * in the core editor. Gated on the admin's enabled set, so a disabled
+ * capability extension's editor plugins stop mounting on the next editor mount.
+ * Generic: the core has no knowledge of which extension (if any) contributes.
+ */
+export function useEditorPluginFactories(): NonNullable<LoicaExtension["editorPlugins"]>[] {
+  const enabledIds = useEnabledExtensionIds();
+  return useMemo(
+    () =>
+      extensions
+        .filter((e) => e.editorPlugins && enabledIds.has(e.id))
+        .map((e) => e.editorPlugins!),
+    [enabledIds],
+  );
 }

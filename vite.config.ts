@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const commitHash = execSync("git rev-parse --short HEAD").toString().trim();
 
@@ -22,6 +23,12 @@ export default defineConfig({
   // reload mid-navigation — which cancels in-flight fetcher loads and
   // surfaces as a "JSON.parse: unexpected end of data" error boundary.
   resolve: {
+    // Global `~/…` → app dir. `vite-tsconfig-paths` only maps `~` for files
+    // inside the tsconfig project, so an extension symlinked into
+    // `app/extensions/` from an out-of-root repo can't use `~`. This alias
+    // makes it resolve everywhere; the tsconfig mapping still drives
+    // type-checking. Generic — helps any out-of-root extension.
+    alias: [{ find: /^~\//, replacement: fileURLToPath(new URL("./app/", import.meta.url)) }],
     // @manuscripts/transform bundles its own prosemirror copies.
     // Force a single instance of each PM package to prevent
     // "Duplicate use of selection JSON ID" runtime errors.

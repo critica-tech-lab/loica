@@ -18,17 +18,43 @@ import { pluginsDir } from "~/lib/paths.server";
 import { presentationsServerExtension } from "./presentations/index.server";
 import { oidcServerExtension } from "./oidc/index.server";
 
-/** Built-in extensions compiled into the bare repo. Empty by default. */
+// Built-in server extensions that ship WITH loica.
 const builtinExtensions: LoicaExtension[] = [
   presentationsServerExtension,
   oidcServerExtension,
 ];
 
-/** Ids compiled into the bare repo — everything else is a runtime drop-in. */
-export const builtinExtensionIds = new Set(builtinExtensions.map((e) => e.id));
+/**
+ * Build-time auto-discovery, mirroring the client registry (`index.ts`): any
+ * `app/extensions/<name>/index.server.ts` that `export default`s a
+ * `LoicaExtension` is compiled in and registered — core names none of them, so
+ * dropping a folder in registers it and removing it un-registers it, with no
+ * edit here. Named-export built-ins above are skipped by the glob; id
+ * collisions de-duplicate in favour of the built-in.
+ *
+ * This is distinct from the runtime `plugins/` discovery below: these are
+ * bundled at build (can carry client-paired code), those are loaded from disk
+ * at runtime (server-only drop-ins).
+ */
+const discoveredServerModules = import.meta.glob<{
+  default?: LoicaExtension;
+  extension?: LoicaExtension;
+}>("./*/index.server.ts", { eager: true });
 
-/** Live registry: built-ins + any runtime-discovered drop-in plugins. */
-export const serverExtensions: LoicaExtension[] = [...builtinExtensions];
+const compiledExtensions: LoicaExtension[] = [...builtinExtensions];
+const compiledSeen = new Set(compiledExtensions.map((e) => e.id));
+for (const mod of Object.values(discoveredServerModules)) {
+  const ext = mod.default ?? mod.extension;
+  if (!ext || typeof ext.id !== "string" || compiledSeen.has(ext.id)) continue;
+  compiledSeen.add(ext.id);
+  compiledExtensions.push(ext);
+}
+
+/** Ids compiled into the repo at build time (built-ins + discovered) — everything else is a runtime drop-in. */
+export const builtinExtensionIds = new Set(compiledExtensions.map((e) => e.id));
+
+/** Live registry: compiled-in extensions + any runtime-discovered drop-in plugins. */
+export const serverExtensions: LoicaExtension[] = [...compiledExtensions];
 
 // ─── Drop-in plugin discovery ────────────────────────────────────────────────
 
