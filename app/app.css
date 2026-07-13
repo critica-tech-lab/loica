@@ -1754,7 +1754,12 @@ footnote.ProseMirror-selectednode::after {
      the caret. `min-height` does the filling; `flex: 1` only added the stretch. */
   max-width: 65ch;
   margin: 0 auto;
-  padding: 2rem 1rem 4rem;
+  /* The bottom padding is scroll RUNWAY, not decoration: at the end of a document
+     there is nothing below the last line, so without it the caret cannot rise off
+     the bottom edge however we tune ProseMirror's scrollMargin (#92). 30vh matches
+     CARET_BOTTOM_GAP in ProseMirrorEditor.tsx. Short docs don't gain a scrollbar —
+     content + runway still fits the container until the doc nears a screenful. */
+  padding: 2rem 1rem 30vh;
   width: 100%;
   min-height: 100%;
   font-family: var(--font-editor);

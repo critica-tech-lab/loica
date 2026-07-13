@@ -79,6 +79,33 @@ function loadDeps() {
   return Promise.all([pmDeps, yjsDeps]);
 }
 
+/**
+ * Keep the line you're writing on off the bottom edge of the viewport.
+ *
+ * By default ProseMirror scrolls the *minimum* needed to bring the caret into
+ * view, so typing down a long document pins the caret to the bottom of the
+ * screen. `scrollThreshold` starts the scroll while the caret is still this far
+ * from the edge; `scrollMargin` is the gap left below it once scrolled.
+ *
+ * Sized from the scroller so it holds on a phone and a 27" display alike. The
+ * CSS bottom padding on `.ProseMirror` is what makes the gap reachable at the
+ * END of a document — without that runway there is nothing left to scroll and
+ * the caret sits on the last line no matter what these values say.
+ */
+const CARET_BOTTOM_GAP = 0.3; // of the editor viewport, kept below the caret
+const CARET_TOP_GAP = 0.12; //  ditto above, so it isn't pinned to the top either
+
+function caretScrollProps(mount: HTMLElement | null) {
+  const h = mount?.clientHeight || 600;
+  const box = {
+    top: Math.round(h * CARET_TOP_GAP),
+    bottom: Math.round(h * CARET_BOTTOM_GAP),
+    left: 0,
+    right: 0,
+  };
+  return { scrollThreshold: box, scrollMargin: box };
+}
+
 export function ProseMirrorEditor({
   docId,
   wsUrl,
@@ -550,6 +577,7 @@ export function ProseMirrorEditor({
       view = new EditorView(mountRef.current, {
         state,
         editable: () => !readOnlyRef.current,
+        ...caretScrollProps(mountRef.current),
         nodeViews: {
           image: (node: any, view: any, getPos: any) => makeImageNodeView(node, view, getPos),
           footnote: (node: any, view: any, getPos: any) => makeFootnoteView(node, view, getPos),
@@ -1122,8 +1150,17 @@ export function ProseMirrorEditor({
 
     init();
 
+    // The caret gaps are a fraction of the editor viewport, so they go stale when
+    // it resizes (window drag, tablet rotation, the mobile keyboard opening).
+    const mount = mountRef.current;
+    const ro = mount
+      ? new ResizeObserver(() => viewRef.current?.setProps(caretScrollProps(mount)))
+      : null;
+    if (mount && ro) ro.observe(mount);
+
     return () => {
       destroyed = true;
+      ro?.disconnect();
       viewRef.current?.destroy();
       providerRef.current?.disconnect();
       providerRef.current?.destroy();
