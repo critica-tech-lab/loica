@@ -18,6 +18,7 @@ import { getEnabledExtensionIdSet } from "~/extensions/index.server";
 import { SearchModal } from "~/components/SearchModal";
 import { ToastProvider } from "~/components/Toast";
 import { LogoIcon } from "~/components/icons";
+import { isAppErrorPayload, type AppErrorPayload, type ErrorAction } from "~/lib/errors";
 import stylesheet from "./app.css?url";
 
 export const headers: Route.HeadersFunction = () => ({
@@ -232,32 +233,63 @@ export function useEnabledExtensionIds(): Set<string> {
 const MAX_AUTO_RETRIES = 3;
 const RETRY_KEY = "__loica_transient_retries";
 
-export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Something went wrong";
-  let details = "An unexpected error occurred.";
-  let stack: string | undefined;
-  let isTransient = false;
+/**
+ * Fallbacks for throws that predate the error catalog — a bare
+ * `new Response("Forbidden", { status: 403 })` still gets real words.
+ */
+const STATUS_FALLBACK: Record<number, { title: string; detail: string; action?: ErrorAction }> = {
+  400: { title: "That request didn't make sense", detail: "Something was missing from the request. Reload and try once more." },
+  401: { title: "Sign in to continue", detail: "This page is only visible to signed-in users.", action: { label: "Sign in", href: "/login" } },
+  403: { title: "You don't have access to this", detail: "It lives somewhere you haven't been given permission to open.", action: { label: "Go to your files", href: "/w" } },
+  404: { title: "loica not found", detail: "This page doesn't exist, or it has been deleted.", action: { label: "Go to your files", href: "/w" } },
+  429: { title: "Slow down a moment", detail: "You've made too many requests in a short window. Wait a minute, then try again." },
+  500: { title: "Something went wrong on our end", detail: "The server hit an unexpected error. Try again in a moment." },
+};
 
+type PresentedError = Pick<AppErrorPayload, "title" | "detail"> &
+  Partial<Pick<AppErrorPayload, "hint" | "action">> & { stack?: string; isTransient?: boolean };
+
+function presentError(error: unknown): PresentedError {
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "loica not found" : String(error.status);
-    details =
-      error.status === 404
-        ? "This document doesn't exist or has been deleted."
-        : error.statusText || details;
-  } else if (error instanceof Error) {
-    // Always log the error for debugging
-    console.error("[ErrorBoundary]", error);
-    // Detect network/fetch errors (common after sleep/idle)
-    const msg = error.message.toLowerCase();
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch") || msg.includes("load failed")) {
-      isTransient = true;
-      details = "Connection lost. This can happen after your device sleeps.";
-    }
-    if (import.meta.env.DEV) {
-      details = error.message;
-      stack = error.stack;
-    }
+    // Thrown by `appError()` — carries its own wording and next step.
+    if (isAppErrorPayload(error.data)) return error.data;
+
+    const fallback = STATUS_FALLBACK[error.status];
+    if (fallback) return fallback;
+    return {
+      title: "Something went wrong",
+      detail: error.statusText || "An unexpected error occurred.",
+    };
   }
+
+  if (error instanceof Error) {
+    console.error("[ErrorBoundary]", error);
+
+    // Network/fetch failures are common after the device sleeps, and recover on their own.
+    const msg = error.message.toLowerCase();
+    const isTransient =
+      msg.includes("fetch") ||
+      msg.includes("network") ||
+      msg.includes("failed to fetch") ||
+      msg.includes("load failed");
+
+    return {
+      title: isTransient ? "Connection lost" : "Something went wrong",
+      detail: import.meta.env.DEV
+        ? error.message
+        : isTransient
+          ? "This can happen after your device sleeps. Reconnecting…"
+          : "An unexpected error occurred.",
+      isTransient,
+      stack: import.meta.env.DEV ? error.stack : undefined,
+    };
+  }
+
+  return { title: "Something went wrong", detail: "An unexpected error occurred." };
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const { title, detail, hint, action, stack, isTransient = false } = presentError(error);
 
   // Auto-retry transient errors with backoff (max 3 attempts)
   useEffect(() => {
@@ -287,25 +319,45 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     >
       <LogoIcon style={{ width: "auto", height: 28, opacity: 0.25, marginBottom: "0.5rem" }} />
       <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>
-        {message}
+        {title}
       </h1>
-      <p style={{ opacity: 0.6, margin: 0 }}>{details}</p>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        style={{
-          marginTop: "1rem",
-          padding: "0.5rem 1.5rem",
-          fontSize: "0.85rem",
-          cursor: "pointer",
-          border: "1px solid rgba(28,22,18,0.15)",
-          borderRadius: "var(--radius-md)",
-          background: "transparent",
-          color: "inherit",
-        }}
-      >
-        {isTransient ? "Reconnect" : "Reload page"}
-      </button>
+      <p style={{ opacity: 0.6, margin: 0, maxWidth: "48ch" }}>{detail}</p>
+      {hint && (
+        <p style={{ opacity: 0.45, margin: 0, maxWidth: "48ch", fontSize: "0.85rem" }}>{hint}</p>
+      )}
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+        {action && (
+          <a
+            href={action.href}
+            style={{
+              padding: "0.5rem 1.5rem",
+              fontSize: "0.85rem",
+              border: "1px solid rgba(28,22,18,0.15)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--fg)",
+              color: "var(--bg)",
+              textDecoration: "none",
+            }}
+          >
+            {action.label}
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{
+            padding: "0.5rem 1.5rem",
+            fontSize: "0.85rem",
+            cursor: "pointer",
+            border: "1px solid rgba(28,22,18,0.15)",
+            borderRadius: "var(--radius-md)",
+            background: "transparent",
+            color: "inherit",
+          }}
+        >
+          {isTransient ? "Reconnect" : "Reload page"}
+        </button>
+      </div>
       {stack && (
         <pre
           style={{

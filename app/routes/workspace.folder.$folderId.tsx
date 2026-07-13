@@ -6,6 +6,7 @@ import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import {
   getWorkspace,
   getMembership,
+  getWorkspaceOwnerName,
 } from "~/lib/workspace.server";
 import { getTeamspacesForUser } from "~/lib/teamspace.server";
 import {
@@ -19,7 +20,8 @@ import {
   getAllWorkspaceFolders,
 } from "~/lib/folder.server";
 import { getUserGroups } from "~/lib/group.server";
-import { getFolderShares, getSharedFolderIdsInWorkspace } from "~/lib/sharing.server";
+import { getFolderShares, getSharedFolderIdsInWorkspace, hasSharedAccess } from "~/lib/sharing.server";
+import { appError } from "~/lib/errors";
 import { getDirectlySharedDocIds } from "~/lib/doc-sharing.server";
 import type { ActionContext } from "~/lib/actions/doc-actions.server";
 import { dispatchAction } from "~/lib/actions/doc-actions.server";
@@ -62,13 +64,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const offset = (page - 1) * pageSize;
 
   const folder = getFolder(params.folderId);
-  if (!folder) throw new Response("Folder not found", { status: 404 });
+  if (!folder) throw appError("folder_not_found");
 
   const workspace = getWorkspace(folder.workspace_id);
-  if (!workspace) throw new Response("Workspace not found", { status: 404 });
+  if (!workspace) throw appError("workspace_not_found");
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
-  if (!role) throw new Response("Forbidden", { status: 403 });
+  if (!role) {
+    // Not a member — but they may still hold a share on this folder, in which case
+    // the shared view is the right home for them rather than a dead end (#93).
+    if (hasSharedAccess(folder.id, user.id)) throw redirect(`/shared/folder/${folder.id}`);
+    throw appError("no_folder_access", {
+      subject: folder.name,
+      owner: getWorkspaceOwnerName(workspace.id),
+    });
+  }
 
   const folders = getFoldersAtLevel(workspace.id, folder.id);
   const { documents, total } = getWorkspaceDocumentsPage(workspace.id, folder.id, pageSize, offset, user.id);
@@ -89,13 +99,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!user) throw loginRedirect(request);
 
   const folder = getFolder(params.folderId);
-  if (!folder) throw new Response("Folder not found", { status: 404 });
+  if (!folder) throw appError("folder_not_found");
 
   const workspace = getWorkspace(folder.workspace_id);
-  if (!workspace) throw new Response("Not found", { status: 404 });
+  if (!workspace) throw appError("workspace_not_found");
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
-  if (!role || role === "viewer") throw new Response("Forbidden", { status: 403 });
+  if (!role) throw appError("no_folder_access", { subject: folder.name, owner: getWorkspaceOwnerName(workspace.id) });
+  if (role === "viewer") throw appError("read_only", { subject: workspace.name, owner: getWorkspaceOwnerName(workspace.id) });
 
   const form = await request.formData();
   const intent = form.get("intent");

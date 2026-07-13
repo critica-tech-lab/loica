@@ -6,7 +6,9 @@ import {
   getUserPersonalWorkspaces,
   getWorkspace,
   getMembership,
+  getWorkspaceOwnerName,
 } from "~/lib/workspace.server";
+import { appError } from "~/lib/errors";
 import {
   getWorkspaceDocumentsPage,
   getStarredDocs,
@@ -75,7 +77,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
-  if (!role) throw new Response("Forbidden", { status: 403 });
+  if (!role)
+    throw appError("no_workspace_access", {
+      subject: workspace.name,
+      owner: getWorkspaceOwnerName(workspace.id),
+    });
 
   const { documents, total } = getWorkspaceDocumentsPage(workspace.id, null, pageSize, offset, user.id);
   const folders = getFoldersAtLevel(workspace.id, null);
@@ -112,7 +118,16 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
-  if (!role || role === "viewer") throw new Response("Forbidden", { status: 403 });
+  if (!role)
+    throw appError("no_workspace_access", {
+      subject: workspace.name,
+      owner: getWorkspaceOwnerName(workspace.id),
+    });
+  if (role === "viewer")
+    throw appError("read_only", {
+      subject: workspace.name,
+      owner: getWorkspaceOwnerName(workspace.id),
+    });
 
   const form = await request.formData();
   const intent = form.get("intent");

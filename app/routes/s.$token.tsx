@@ -2,6 +2,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
+import { appError } from "~/lib/errors";
 import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
 import { sendMentionNotification } from "~/lib/email.server";
@@ -108,7 +109,7 @@ function isPasswordAuthenticated(request: Request, token: string): boolean {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const result = getDocumentByToken(params.token);
-  if (!result) throw new Response("Not found", { status: 404 });
+  if (!result) throw appError("link_invalid");
 
   const url = new URL(request.url);
   const trackChanges = url.searchParams.get("track") === "1";
@@ -145,7 +146,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "verify-password") {
     const password = String(form.get("password") || "");
     const result = getDocumentByToken(params.token);
-    if (!result) throw new Response("Not found", { status: 404 });
+    if (!result) throw appError("link_invalid");
 
     const isValid = await verifySharePassword(result.document.id, password);
     if (!isValid) {
@@ -168,12 +169,11 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Handle content save (for public_edit mode)
   const result = getDocumentByToken(params.token);
-  if (!result || result.mode !== "public_edit") {
-    throw new Response("Forbidden", { status: 403 });
-  }
+  if (!result) throw appError("link_invalid");
+  if (result.mode !== "public_edit") throw appError("link_view_only");
 
   if (!isPasswordAuthenticated(request, params.token) && result.hasPassword) {
-    throw new Response("Forbidden", { status: 403 });
+    throw appError("link_password_required");
   }
 
   // A logged-in user editing via a share link is still that user — attribute

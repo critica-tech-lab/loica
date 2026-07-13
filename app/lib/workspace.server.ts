@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
+import { appError } from "./errors";
 
 export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
 
@@ -116,6 +117,23 @@ export function getMembership(
   return null;
 }
 
+const stmtGetOwnerName = prep<{ name: string | null; email: string }, [string]>(
+  `SELECT u.name, u.email
+   FROM workspace_members wm JOIN users u ON u.id = wm.user_id
+   WHERE wm.workspace_id = ? AND wm.role = 'owner'
+   ORDER BY u.name IS NULL, u.name
+   LIMIT 1`
+);
+
+/**
+ * Who to point a locked-out user at. Used in "ask X for access" messaging, so it
+ * falls back to the email when the owner never set a display name.
+ */
+export function getWorkspaceOwnerName(workspaceId: string): string | null {
+  const row = stmtGetOwnerName.get(workspaceId);
+  return row ? (row.name ?? row.email) : null;
+}
+
 // ─── Permission helper ────────────────────────────────────
 
 export function requireRole(
@@ -125,7 +143,7 @@ export function requireRole(
 ): WorkspaceRole {
   const role = getMembership(workspaceId, userId);
   if (!role || !allowed.includes(role)) {
-    throw new Response("Forbidden", { status: 403 });
+    appError("no_workspace_access");
   }
   return role;
 }

@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
 import { sendFolderShareNotification } from "./email.server";
 import { createNotification } from "./notification.server";
+import { getFolderPath, type BreadcrumbSegment } from "./folder.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -216,6 +217,24 @@ export function hasSharedAccess(folderId: string, userId: string): boolean {
 /** Convenience wrapper — returns the shared root folder ID. */
 export function findSharedRootFolder(folderId: string, userId: string): string | null {
   return getSharedAccessInfo(folderId, userId).sharedRootId;
+}
+
+/**
+ * Breadcrumb trail for a folder, trimmed to the part the user may actually open.
+ *
+ * A share grants access to one folder and its subtree — never to its parents. The
+ * raw path from `getFolderPath()` walks all the way to the workspace root, so
+ * rendering it whole hands a shared user links into folders that 403 (and leaks
+ * the names of private folders along the way). Starting the trail at the shared
+ * root keeps every crumb clickable.
+ */
+export function getSharedFolderPath(folderId: string, userId: string): BreadcrumbSegment[] {
+  const { hasAccess, sharedRootId } = getSharedAccessInfo(folderId, userId);
+  if (!hasAccess || !sharedRootId) return [];
+
+  const path = getFolderPath(folderId);
+  const rootIndex = path.findIndex((seg) => seg.id === sharedRootId);
+  return rootIndex === -1 ? [] : path.slice(rootIndex);
 }
 
 // ─── Shared folder IDs in a workspace ────────────────────

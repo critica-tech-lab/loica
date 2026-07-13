@@ -3,6 +3,7 @@ import { hash, verify } from "@node-rs/argon2";
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
 import { createWorkspace } from "./workspace.server";
+import { appError } from "./errors";
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -136,14 +137,14 @@ export function loginRedirect(request: Request): Response {
 
 export function requireUser(request: Request): SessionUser {
   const user = getSessionUser(request);
-  if (!user) throw new Response("Unauthorized", { status: 401 });
+  if (!user) appError("not_authenticated");
   return user;
 }
 
 export function requireAdmin(request: Request): SessionUser {
   const user = getSessionUser(request);
-  if (!user) throw new Response("Unauthorized", { status: 401 });
-  if (!user.is_admin) throw new Response("Forbidden", { status: 403 });
+  if (!user) appError("not_authenticated");
+  if (!user.is_admin) appError("admin_only");
   return user;
 }
 
