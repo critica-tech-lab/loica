@@ -1762,6 +1762,12 @@ footnote.ProseMirror-selectednode::after {
   padding: 2rem 1rem 30vh;
   width: 100%;
   min-height: 100%;
+  /* `min-height: 100%` overrides the flex item's default `min-height: auto`, which
+     is what normally stops a column flex item from shrinking below its content. So
+     without this the box collapses to the container's height and the text overflows
+     it — leaving the padding above the last line instead of below it, and the
+     scroller with no runway at all. Measured: box 656px tall, content 12439px. */
+  flex-shrink: 0;
   font-family: var(--font-editor);
   font-size: var(--fs-lg); /* 18px document reading size — on the shared scale */
   line-height: 1.6;
