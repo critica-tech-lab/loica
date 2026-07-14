@@ -133,6 +133,10 @@ export function PMToolbar({ activeState, trackChangesState, editingMode = "editi
           </svg>
         }
       />
+      <CalloutDropdown
+        variant={active?.calloutVariant ?? null}
+        onSelect={(v) => { api?.setCallout?.(v); api?.focus?.(); }}
+      />
       <Btn title="Horizontal rule" active={false} onActivate={run(() => api?.insertHr?.())} style={{ letterSpacing: "-1px" }}>{"—"}</Btn>
       <Btn
         title="Insert footnote"
@@ -235,6 +239,132 @@ function Btn({
     >
       {icon ?? children}
     </button>
+  );
+}
+
+// Mirrors CALLOUT_VARIANTS in editor/schema.ts — kept local so the toolbar
+// doesn't pull the ProseMirror schema into its bundle. The swatch colours must
+// match the callout's left edge in app.css, or the picker misreports itself.
+const CALLOUT_META: Array<{ variant: string; label: string; color: string }> = [
+  { variant: "note",    label: "Note",    color: "var(--fg)" },
+  { variant: "tip",     label: "Tip",     color: "var(--color-success)" },
+  { variant: "warning", label: "Warning", color: "var(--color-tawny)" },
+  { variant: "danger",  label: "Danger",  color: "var(--color-danger)" },
+];
+
+function CalloutDropdown({ variant, onSelect }: {
+  variant: string | null;
+  onSelect: (variant: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = CALLOUT_META.find((c) => c.variant === variant);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const select = (v: string | null) => {
+    setOpen(false);
+    onSelect(v);
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <Btn
+        title={current ? `Callout: ${current.label}` : "Insert callout"}
+        active={!!current}
+        style={current ? { color: current.color, boxShadow: `inset 0 -2px 0 ${current.color}` } : undefined}
+        onActivate={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="7" y1="4" x2="7" y2="20" />
+            <line x1="13" y1="9" x2="13" y2="13" />
+            <line x1="13" y1="16" x2="13" y2="16" />
+          </svg>
+        }
+      />
+
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            minWidth: 150,
+            background: "var(--bg)",
+            border: "1px solid color-mix(in srgb, var(--fg) 12%, transparent)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-md)",
+            zIndex: "var(--z-dropdown)",
+            overflow: "hidden",
+            fontFamily: "var(--font-ui)",
+          }}
+        >
+          {CALLOUT_META.map((c) => {
+            const isActive = c.variant === variant;
+            return (
+              <button
+                key={c.variant}
+                role="option"
+                aria-selected={isActive}
+                onMouseDown={(e) => { e.preventDefault(); select(c.variant); }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.6rem",
+                  padding: "0.45rem 0.75rem",
+                  border: "none",
+                  background: isActive ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent",
+                  color: "var(--fg)",
+                  fontSize: "var(--fs-sm)",
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "var(--font-ui)",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "color-mix(in srgb, var(--fg) 5%, transparent)" : "transparent"; }}
+              >
+                <span style={{ width: 3, alignSelf: "stretch", background: c.color, borderRadius: 2, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{c.label}</span>
+                {isActive && <CheckIcon width={14} height={14} style={{ color: "var(--accent)" }} />}
+              </button>
+            );
+          })}
+          {current && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); select(null); }}
+              style={{
+                width: "100%",
+                padding: "0.45rem 0.75rem",
+                border: "none",
+                borderTop: "1px solid color-mix(in srgb, var(--fg) 10%, transparent)",
+                background: "transparent",
+                color: "color-mix(in srgb, var(--fg) 65%, transparent)",
+                fontSize: "var(--fs-sm)",
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "var(--font-ui)",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 6%, transparent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              Remove callout
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

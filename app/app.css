@@ -1911,6 +1911,51 @@ footnote.ProseMirror-selectednode::after {
 }
 .pm-editor-mount .tableWrapper { overflow-x: auto; }
 
+/* Callouts — the same surface as the comment popup (see `popoverSurface` in
+   lib/popover-styles.ts): plain background, hard 1.5px rule, offset shadow, no
+   radius. The only departure is the left edge, which carries the variant. */
+.pm-editor-mount .ProseMirror .pm-callout {
+  --callout-color: var(--fg);
+  background: var(--bg);
+  border: 1.5px solid var(--fg);
+  border-left: 3px solid var(--callout-color);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--fg) 18%, transparent);
+  padding: 12px 14px;
+  margin: 1.4em 0;
+}
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="tip"]     { --callout-color: var(--color-success); }
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="warning"] { --callout-color: var(--color-tawny); }
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="danger"]  { --callout-color: var(--color-danger); }
+.pm-editor-mount .ProseMirror .pm-callout > :first-child { margin-top: 0; }
+.pm-editor-mount .ProseMirror .pm-callout > :last-child { margin-bottom: 0; }
+/* An empty callout is otherwise a bordered void. Prompt into its one empty
+   paragraph — ProseMirror marks an empty textblock with a trailing <br>, and
+   `float` + zero height keeps the hint out of the text flow so the caret sits
+   at the start of the line. The wording names the variant, so the box says what
+   it's for now that the [NOTE] label is gone. */
+.pm-editor-mount .ProseMirror .pm-callout > p:only-child:has(> br.ProseMirror-trailingBreak)::before {
+  content: "Write a note…";
+  float: left;
+  height: 0;
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-ui);
+  color: color-mix(in srgb, var(--fg) 40%, transparent);
+}
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="tip"]     > p:only-child:has(> br.ProseMirror-trailingBreak)::before { content: "Write a tip…"; }
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="warning"] > p:only-child:has(> br.ProseMirror-trailingBreak)::before { content: "Write a warning…"; }
+.pm-editor-mount .ProseMirror .pm-callout[data-variant="danger"]  > p:only-child:has(> br.ProseMirror-trailingBreak)::before { content: "Say what to avoid…"; }
+
+/* Browser print (Cmd+P from the share view): the offset shadow doesn't ink, it
+   just leaves a gap. Drop it and let the rule carry the box. */
+@media print {
+  .pm-editor-mount .ProseMirror .pm-callout {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}
+
 /* Collaboration cursors */
 .pm-editor-mount .ProseMirror-yjs-cursor {
   position: relative;
