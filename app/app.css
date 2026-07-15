@@ -139,6 +139,7 @@
   --fg: #0a0a0a;
   --accent: var(--color-scarlet);
   --accent-fg: #ffffff;
+  color-scheme: light; /* UA canvas / form controls; dark block flips it */
 
   /* Derived neutrals. Components reference these as `var(--border, …fallback)`
      etc.; without the definitions the hardcoded fallback (dark ink) always won,

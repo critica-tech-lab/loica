@@ -52,20 +52,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Declares the doc supports both schemes so the UA canvas can go dark. */}
+        <meta name="color-scheme" content="light dark" />
         {/* Set the saved (or system) theme before first paint. The script sets
-            data-theme; the critical style below carries the base + dark vars and
-            paints html immediately — app.css loads render-blocking but a moment
-            after head parse, so without this the base bg would flash light before
-            it applies. Both mirror ~/lib/theme.ts + app.css; kept inline so they
-            run synchronously in the head. */}
+            data-theme AND color-scheme inline on <html>: color-scheme colors the
+            browser's own canvas — including the blank frame shown between full
+            page navigations — so setting it this early kills the white blink when
+            opening a doc in dark mode. The critical style below carries the base
+            + dark vars and paints html immediately, since app.css loads a moment
+            after head parse. Both mirror ~/lib/theme.ts + app.css; kept inline so
+            they run synchronously in the head. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('loica-theme');if(t!=='dark'&&t!=='light'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.dataset.theme=t;}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('loica-theme');if(t!=='dark'&&t!=='light'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}var d=document.documentElement;d.dataset.theme=t;d.style.colorScheme=t;}catch(e){}})();`,
           }}
         />
         <style
           dangerouslySetInnerHTML={{
-            __html: `:root{--bg:#fff;--fg:#0a0a0a}:root[data-theme=dark]{--bg:#282a36;--fg:#f8f8f2}html{background-color:var(--bg);color:var(--fg)}`, // allow-hex: no-FOUC critical theme vars, must be literal
+            __html: `:root{--bg:#fff;--fg:#0a0a0a;color-scheme:light}:root[data-theme=dark]{--bg:#282a36;--fg:#f8f8f2;color-scheme:dark}html{background-color:var(--bg);color:var(--fg)}`, // allow-hex: no-FOUC critical theme vars, must be literal
           }}
         />
         <Meta />

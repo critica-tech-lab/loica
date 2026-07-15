@@ -31,7 +31,11 @@ export function currentTheme(): Theme {
 }
 
 export function applyTheme(theme: Theme): void {
-  document.documentElement.dataset.theme = theme;
+  const el = document.documentElement;
+  el.dataset.theme = theme;
+  // Keep the UA canvas (and the blank frame between navigations) in sync so an
+  // in-session toggle doesn't leave a light canvas behind.
+  el.style.colorScheme = theme;
 }
 
 export function setTheme(theme: Theme): void {
