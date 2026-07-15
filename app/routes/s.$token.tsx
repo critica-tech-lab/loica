@@ -414,6 +414,7 @@ export default function SharePage() {
           wsUrl={wsUrl}
           shareToken={shareToken ?? ""}
           guestIdentity={guestIdentity}
+          currentUserId={currentUserId}
           onPresenceChange={setPeers}
           onConnectionStatus={setConnectionStatus}
         />
@@ -430,6 +431,7 @@ function LiveReadOnlyView({
   wsUrl,
   shareToken,
   guestIdentity,
+  currentUserId,
   onPresenceChange,
   onConnectionStatus,
 }: {
@@ -437,6 +439,7 @@ function LiveReadOnlyView({
   wsUrl: string;
   shareToken: string;
   guestIdentity: { name: string; color: string };
+  currentUserId: string;
   onPresenceChange: (peers: Peer[]) => void;
   onConnectionStatus: (status: ConnectionStatus) => void;
 }) {
@@ -477,6 +480,7 @@ function LiveReadOnlyView({
           docId={document.id}
           wsUrl={wsUrl}
           wsParams={{ token: shareToken }}
+          currentUserId={currentUserId}
           userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
           onPresenceChange={onPresenceChange}
           onConnectionStatus={onConnectionStatus}
@@ -487,6 +491,7 @@ function LiveReadOnlyView({
           docId={document.id}
           wsUrl={wsUrl}
           wsParams={{ token: shareToken }}
+          currentUserId={currentUserId}
           userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
           onPresenceChange={onPresenceChange}
           onConnectionStatus={onConnectionStatus}
@@ -499,6 +504,7 @@ function LiveReadOnlyView({
           docId={document.id}
           wsUrl={wsUrl}
           wsParams={{ token: shareToken }}
+          currentUserId={currentUserId}
           userInfo={{ name: `${guestIdentity.name} (viewer)`, color: guestIdentity.color }}
           onPresenceChange={onPresenceChange}
           onConnectionStatus={onConnectionStatus}

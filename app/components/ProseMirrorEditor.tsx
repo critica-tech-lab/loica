@@ -254,16 +254,22 @@ export function ProseMirrorEditor({
       });
 
       provider.awareness.on("change", () => {
-        const peers: Peer[] = [];
+        // Collapse the presence list to one entry per identity. A single user
+        // with the doc open in several tabs/browsers has one awareness state
+        // per connection — all sharing the same userId — so keying by userId
+        // (falling back to clientId for anonymous guests) stops their name
+        // appearing multiple times. The current user is dropped entirely: they
+        // already see themselves via `currentUser`, and their other sessions
+        // are just extra clients of the same person. (Fixes #99.)
+        const byIdentity = new Map<string | number, Peer>();
         provider.awareness.getStates().forEach((state: any, clientId: number) => {
-          if (clientId !== ydoc.clientID && state.user) {
-            peers.push({
-              name: state.user.name,
-              color: state.user.color,
-            });
-          }
+          if (clientId === ydoc.clientID || !state.user) return;
+          const selfId = currentUserIdRef.current;
+          if (selfId && state.user.userId === selfId) return;
+          const key = state.user.userId ?? clientId;
+          byIdentity.set(key, { name: state.user.name, color: state.user.color });
         });
-        onPresenceChange?.(peers);
+        onPresenceChange?.(Array.from(byIdentity.values()));
       });
 
       const wrappedOnThreadsChange = (threads: ResolvedThread[]) => {

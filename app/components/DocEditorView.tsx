@@ -283,6 +283,7 @@ export function DocEditorView(_props: DocumentProps) {
             docId={document.id}
             wsUrl={wsUrl}
             userInfo={{ name: user.name, color: userColor(user.id) }}
+            currentUserId={user.id}
             onConnectionStatus={setConnectionStatus}
             onPresenceChange={setPeers}
           />
