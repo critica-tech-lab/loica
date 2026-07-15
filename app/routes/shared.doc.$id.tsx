@@ -13,11 +13,11 @@ import {
   isStarred as checkStarred,
   toggleStar,
 } from "~/lib/document.server";
-import { getFolderPath } from "~/lib/folder.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
 import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
-import { hasSharedAccess } from "~/lib/sharing.server";
+import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
+import { appError } from "~/lib/errors";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
@@ -39,9 +39,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!user) throw loginRedirect(request);
 
   const document = getDocument(params.id);
-  if (!document) throw new Response("Document not found", { status: 404 });
+  if (!document) throw appError("doc_not_found");
 
-  const hasFolderAccess = document.folder_id && hasSharedAccess(document.folder_id, user.id);
+  const hasFolderAccess = !!document.folder_id && hasSharedAccess(document.folder_id, user.id);
   let hasDocAccess = hasDocSharedAccess(document.id, user.id);
 
   // Auto-accept pending doc shares when the recipient clicks the email link
@@ -54,15 +54,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     // User may have access via workspace membership — redirect to the canonical doc route
     const role = getMembership(document.workspace_id, user.id, user.is_admin);
     if (role) throw redirect(`/w/doc/${params.id}`);
-    throw new Response("Not found", { status: 404 });
+    throw appError("no_doc_access", { subject: document.title });
   }
 
   const workspace = getWorkspace(document.workspace_id);
-  if (!workspace) throw new Response("Workspace not found", { status: 404 });
+  if (!workspace) throw appError("workspace_not_found");
 
-  const folderPath: BreadcrumbSegment[] = document.folder_id
-    ? getFolderPath(document.folder_id)
-    : [];
+  // Only breadcrumb the folders this user can open. A doc-only share grants no
+  // folder access at all, so its trail is empty rather than a chain of 403s (#93).
+  const folderPath: BreadcrumbSegment[] =
+    document.folder_id && hasFolderAccess
+      ? getSharedFolderPath(document.folder_id, user.id)
+      : [];
 
   const starred = checkStarred(user.id, params.id);
 

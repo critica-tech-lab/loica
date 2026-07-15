@@ -23,8 +23,9 @@ import {
   renameFolder,
   moveFolder,
 } from "~/lib/folder.server";
-import { getWorkspace } from "~/lib/workspace.server";
-import { hasSharedAccess, findSharedRootFolder, getSharedAccessInfo } from "~/lib/sharing.server";
+import { getWorkspace, getWorkspaceOwnerName } from "~/lib/workspace.server";
+import { hasSharedAccess, findSharedRootFolder, getSharedAccessInfo, getSharedFolderPath } from "~/lib/sharing.server";
+import { appError } from "~/lib/errors";
 import { AppShell } from "~/components/AppShell";
 import { ConfirmModal } from "~/components/ConfirmModal";
 import { UserMenu } from "~/components/UserMenu";
@@ -49,18 +50,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!user) throw loginRedirect(request);
 
   const folder = getFolder(params.folderId);
-  if (!folder) throw new Response("Folder not found", { status: 404 });
+  if (!folder) throw appError("folder_not_found");
 
   const accessInfo = getSharedAccessInfo(folder.id, user.id);
   if (!accessInfo.hasAccess)
-    throw new Response("Forbidden", { status: 403 });
+    throw appError("no_folder_access", {
+      subject: folder.name,
+      owner: getWorkspaceOwnerName(folder.workspace_id),
+    });
 
   const workspace = getWorkspace(folder.workspace_id);
-  if (!workspace) throw new Response("Workspace not found", { status: 404 });
+  if (!workspace) throw appError("workspace_not_found");
 
   const folders = getFoldersAtLevel(workspace.id, folder.id);
   const documents = getWorkspaceDocuments(workspace.id, folder.id);
-  const folderPath = getFolderPath(folder.id);
+  // Trail stops at the shared root — the folders above it are private (#93).
+  const folderPath = getSharedFolderPath(folder.id, user.id);
 
   const sharedRootId = accessInfo.sharedRootId ?? folder.id;
   const allFolders = getSubtreeFolders(sharedRootId);

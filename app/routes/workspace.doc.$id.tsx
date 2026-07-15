@@ -2,7 +2,8 @@ import { redirect, useLoaderData } from "react-router";
 import type { MetaFunction, ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/workspace.doc.$id";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
-import { getWorkspace, getMembership } from "~/lib/workspace.server";
+import { getWorkspace, getMembership, getWorkspaceOwnerName } from "~/lib/workspace.server";
+import { appError } from "~/lib/errors";
 import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
 import {
   getDocument,
@@ -52,10 +53,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!user) throw loginRedirect(request);
 
   const document = getDocument(params.id);
-  if (!document) throw new Response("Document not found", { status: 404 });
+  if (!document) throw appError("doc_not_found");
 
   const workspace = getWorkspace(document.workspace_id);
-  if (!workspace) throw new Response("Not found", { status: 404 });
+  if (!workspace) throw appError("workspace_not_found");
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
   if (!role) {
@@ -63,7 +64,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const hasFolderAccess = document.folder_id && hasSharedAccess(document.folder_id, user.id);
     const hasDocAccess = hasDocSharedAccess(document.id, user.id);
     if (hasFolderAccess || hasDocAccess) throw redirect(`/shared/doc/${params.id}`);
-    throw new Response("Not found", { status: 404 });
+    // Deliberately "not found" rather than "no access" — a stranger shouldn't be
+    // able to probe which document IDs exist.
+    throw appError("doc_not_found");
   }
 
   const folderPath: BreadcrumbSegment[] = document.folder_id
@@ -130,7 +133,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const role = getMembership(workspace.id, user.id, user.is_admin);
-  if (!role || role === "viewer") throw new Response("Forbidden", { status: 403 });
+  if (!role) throw appError("no_doc_access", { owner: getWorkspaceOwnerName(workspace.id) });
+  if (role === "viewer")
+    throw appError("read_only", {
+      subject: workspace.name,
+      owner: getWorkspaceOwnerName(workspace.id),
+    });
 
   if (intent === "save") {
     const title = form.get("title");
@@ -259,7 +267,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === "trash-doc") {
     const isOwner = role === "owner" || role === "admin";
-    if (!isOwner && doc.created_by !== user.id) throw new Response("Forbidden", { status: 403 });
+    if (!isOwner && doc.created_by !== user.id)
+      throw appError("read_only", {
+        subject: doc.title,
+        extra: "Only its creator or a workspace owner can delete it.",
+        owner: getWorkspaceOwnerName(workspace.id),
+      });
     trashDocument(params.id, user.id);
     // Send the user back to where they came from (parent folder → workspace root).
     const redirectTo = doc.folder_id
