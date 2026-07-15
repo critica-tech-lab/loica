@@ -132,6 +132,43 @@ export function footnoteInline(content: Token[]): Token[] {
   return out;
 }
 
+// Callouts are serialized as GitHub alerts (`> [!NOTE]`), which `marked` lexes
+// as an ordinary blockquote. Both renderers detect that shape here so the `[!X]`
+// marker doesn't leak into the page as literal text. The exported callout is a
+// plain quote for now — giving it a printed style is a separate job.
+const ALERT_RE = /^\[!(note|tip|important|warning|caution|danger)\][ \t]*\n?/i;
+const ALERT_VARIANT: Record<string, string> = {
+  note: "note", important: "note", tip: "tip",
+  warning: "warning", caution: "danger", danger: "danger",
+};
+
+/**
+ * If `bq` is a GitHub alert, return its variant plus the body tokens with the
+ * `[!X]` label stripped off. Returns null for a plain blockquote.
+ */
+export function matchCallout(bq: Tokens.Blockquote): { variant: string; tokens: Token[] } | null {
+  const [first, ...rest] = bq.tokens ?? [];
+  if (first?.type !== "paragraph") return null;
+  const para = first as Tokens.Paragraph;
+  const m = ALERT_RE.exec(para.text ?? "");
+  if (!m) return null;
+
+  // Strip the label from the paragraph's text and from its leading inline text
+  // token (marked keeps the whole first line in that token's `text`).
+  const inline = [...(para.tokens ?? [])];
+  const lead = inline[0] as Tokens.Text | undefined;
+  if (lead?.type === "text") {
+    const stripped = (lead.text ?? "").replace(ALERT_RE, "");
+    if (stripped) inline[0] = { ...lead, text: stripped, raw: stripped } as Token;
+    else inline.shift();
+  }
+  const body: Token[] = inline.length
+    ? [{ ...para, text: (para.text ?? "").replace(ALERT_RE, ""), tokens: inline } as Token, ...rest]
+    : rest;
+
+  return { variant: ALERT_VARIANT[m[1].toLowerCase()] ?? "note", tokens: body };
+}
+
 /** Cap an image's render width to fit the page content box (in pt). */
 export function fitWidth(img: ResolvedImage, maxWidth: number): number {
   if (!img.width) return maxWidth;

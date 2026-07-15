@@ -2,6 +2,7 @@ import { defaultMarkdownSerializer, defaultMarkdownParser, MarkdownSerializer } 
 
 // Extends defaultMarkdownSerializer to cover the full loica schema:
 // - table/table_row/table_cell/table_header → GFM pipe tables
+// - callout → GitHub alert blockquote (`> [!NOTE]`)
 // - underline, highlight, tracked_insert → emit text only
 // - tracked_delete → emit text only (exported as accepted)
 // - strikethrough → ~~text~~
@@ -42,6 +43,16 @@ export const loicaMarkdownSerializer = new MarkdownSerializer(
       }
       state.write("\n");
     },
+    // Callout → GitHub alert: a blockquote whose first line is `[!VARIANT]`.
+    // Renderers that don't know alerts still show it as a blockquote.
+    callout(state: any, node: any) {
+      state.wrapBlock("> ", null, node, () => {
+        state.write(`[!${String(node.attrs.variant || "note").toUpperCase()}]`);
+        state.ensureNewLine();
+        state.renderContent(node);
+      });
+    },
+
     // Footnote: emit a numbered reference `[^N]`. The numbering comes from the
     // order footnotes are encountered (= document order). The matching
     // definitions are appended by serializeWithFootnotes below. Without that
@@ -85,6 +96,47 @@ type FnJSONNode = { type: string; text?: string; content?: FnJSONNode[]; marks?:
 
 const FN_DEF_RE = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
 
+// GitHub alerts (`> [!NOTE] …`) parse as plain blockquotes, so rebuild them as
+// callout nodes. GitHub's five labels collapse onto our four variants.
+const ALERT_RE = /^\[!(note|tip|important|warning|caution|danger)\]\s*/i;
+const ALERT_VARIANT: Record<string, string> = {
+  note: "note", important: "note", tip: "tip",
+  warning: "warning", caution: "danger", danger: "danger",
+};
+
+function calloutFromBlockquote(node: FnJSONNode): FnJSONNode {
+  const [first, ...restBlocks] = node.content ?? [];
+  const label = first?.type === "paragraph" ? first.content?.[0] : undefined;
+  if (label?.type !== "text" || !label.text) return node;
+  const m = ALERT_RE.exec(label.text);
+  if (!m) return node;
+
+  // The label sits on its own markdown line, but a soft break renders as a
+  // space — so the body usually shares the paragraph. Drop the `[!X]` prefix
+  // and keep whatever inline content followed it.
+  const tail = label.text.slice(m[0].length);
+  const inline = tail
+    ? [{ ...label, text: tail }, ...(first!.content ?? []).slice(1)]
+    : (first!.content ?? []).slice(1);
+  const blocks = inline.length ? [{ ...first!, content: inline }, ...restBlocks] : restBlocks;
+
+  return {
+    type: "callout",
+    attrs: { variant: ALERT_VARIANT[m[1].toLowerCase()] ?? "note" },
+    content: blocks.length ? blocks : [{ type: "paragraph" }],
+  };
+}
+
+// `inCallout` guards the schema's no-nesting rule: an alert nested inside
+// another alert stays a plain blockquote. Without this, nodeFromJSON (which
+// doesn't validate) would hand the editor a doc that fails `check()`.
+function convertAlerts(node: FnJSONNode, inCallout = false): FnJSONNode {
+  const out = !inCallout && node.type === "blockquote" ? calloutFromBlockquote(node) : node;
+  if (!out.content) return out;
+  const nested = inCallout || out.type === "callout";
+  return { ...out, content: out.content.map((c) => convertAlerts(c, nested)) };
+}
+
 export function parseMarkdownWithFootnotes(markdown: string, schema: any): any {
   const defs = new Map<string, string>();
   const bodyLines: string[] = [];
@@ -96,7 +148,7 @@ export function parseMarkdownWithFootnotes(markdown: string, schema: any): any {
 
   const mdDoc = defaultMarkdownParser.parse(bodyLines.join("\n"));
   if (!mdDoc) return null;
-  const json: FnJSONNode = mdDoc.toJSON();
+  const json: FnJSONNode = convertAlerts(mdDoc.toJSON());
   if (defs.size === 0) return schema.nodeFromJSON(json);
 
   // Parse each definition's body once into its inline JSON (the first block's

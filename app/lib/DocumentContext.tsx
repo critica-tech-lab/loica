@@ -80,6 +80,9 @@ export interface EditorApi {
   setHeading?: (level: number) => void;
   clearFormatting?: () => void;
   toggleBlockquote?: () => void;
+  /** Wrap the selection in a callout of `variant`; null (or the current
+   *  variant) unwraps it. PM editor only. */
+  setCallout?: (variant: string | null) => void;
   toggleBulletList?: () => void;
   toggleOrderedList?: () => void;
   insertTable?: () => void;

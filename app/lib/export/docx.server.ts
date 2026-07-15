@@ -8,7 +8,7 @@ import {
   Table, TableRow, TableCell, WidthType, ImageRun, FootnoteReferenceRun, AlignmentType,
   TableLayoutType, CommentRangeStart, CommentRangeEnd, CommentReference,
 } from "docx";
-import { lexDoc, resolveImages, fitWidth, footnoteInline, type ResolvedImage } from "./shared.server";
+import { lexDoc, resolveImages, fitWidth, footnoteInline, matchCallout, type ResolvedImage } from "./shared.server";
 import type { CommentThread } from "~/lib/comments.server";
 
 const HEADING = [
@@ -278,7 +278,10 @@ function renderBlocks(tokens: Token[], images: Map<string, ResolvedImage>, ctx?:
       }
       case "blockquote": {
         const bq = t as Tokens.Blockquote;
-        for (const block of renderBlocks(bq.tokens, images, ctx)) {
+        // A callout exports as a plain quote; matchCallout only strips its
+        // `[!NOTE]` marker so it doesn't land in the document as literal text.
+        const body = matchCallout(bq)?.tokens ?? bq.tokens;
+        for (const block of renderBlocks(body, images, ctx)) {
           if (block instanceof Paragraph) out.push(block);
         }
         break;

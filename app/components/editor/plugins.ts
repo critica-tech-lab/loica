@@ -80,6 +80,12 @@ function buildInputRules(schema: Schema): Plugin {
     ),
     // > → blockquote
     wrappingInputRule(/^\s*>\s$/, schema.nodes.blockquote),
+    // ::: / :::warning → callout (Docusaurus-style admonition syntax)
+    wrappingInputRule(
+      /^:::(note|tip|warning|danger)?\s$/,
+      schema.nodes.callout,
+      (match) => ({ variant: match[1] || "note" })
+    ),
     // - / * / + → bullet list
     wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list),
     // 1. → ordered list

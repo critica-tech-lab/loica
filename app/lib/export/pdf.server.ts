@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import type { Token, Tokens } from "marked";
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
-import { lexDoc, resolveImages, fitWidth, footnoteInline, type ResolvedImage } from "./shared.server";
+import { lexDoc, resolveImages, fitWidth, footnoteInline, matchCallout, type ResolvedImage } from "./shared.server";
 
 // pdfmake's node entry (PdfPrinter) is CJS with internal requires; load it via
 // createRequire so the SSR bundler leaves it external.
@@ -114,9 +114,12 @@ function renderBlocks(tokens: Token[], images: Map<string, ResolvedImage>, conte
         break;
       case "blockquote": {
         const bq = t as Tokens.Blockquote;
+        // A callout prints as a plain quote; matchCallout only strips its
+        // `[!NOTE]` marker so it doesn't land on the page as literal text.
+        const body = matchCallout(bq)?.tokens ?? bq.tokens;
         out.push({
           margin: [12, 0, 0, 8],
-          stack: renderBlocks(bq.tokens, images, contentWidth - 12),
+          stack: renderBlocks(body, images, contentWidth - 12),
           color: "#555555",
           italics: true,
         });

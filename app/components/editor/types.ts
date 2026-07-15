@@ -9,6 +9,8 @@ export interface PMActiveState {
   inBlockquote: boolean;
   inBulletList: boolean;
   inOrderedList: boolean;
+  /** Variant of the callout the cursor sits in, null when outside one. */
+  calloutVariant: string | null;
   textAlign: string | null;
 }
 

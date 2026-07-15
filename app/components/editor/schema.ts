@@ -115,8 +115,43 @@ const footnoteSpec = {
 
 const allNodesWithFootnote = allNodesWithDT.addToEnd("footnote", footnoteSpec);
 
+// Callout (admonition): a tinted block that wraps other blocks, e.g. a note or
+// a warning. The variant label is rendered by CSS (::before on data-variant),
+// so the node carries no extra content of its own.
+// Serialized to markdown as a GitHub alert (`> [!NOTE]`).
+export const CALLOUT_VARIANTS = ["note", "tip", "warning", "danger"] as const;
+export type CalloutVariant = (typeof CALLOUT_VARIANTS)[number];
+
+function asVariant(v: unknown): CalloutVariant {
+  return (CALLOUT_VARIANTS as readonly string[]).includes(v as string)
+    ? (v as CalloutVariant)
+    : "note";
+}
+
+const calloutSpec = {
+  group: "block",
+  // Every block *except* callout — spelled out rather than `block+` so a
+  // callout can't nest inside a callout (paste is the only way to try).
+  content: "(paragraph | heading | blockquote | code_block | horizontal_rule | bullet_list | ordered_list | table)+",
+  defining: true,
+  attrs: { variant: { default: "note" } },
+  toDOM(node: any) {
+    return ["div", { class: "pm-callout", "data-variant": asVariant(node.attrs.variant) }, 0];
+  },
+  parseDOM: [
+    {
+      tag: "div.pm-callout",
+      getAttrs(dom: any) {
+        return { variant: asVariant(dom.getAttribute("data-variant")) };
+      },
+    },
+  ],
+};
+
+const allNodesWithCallout = allNodesWithFootnote.addToEnd("callout", withDT(calloutSpec));
+
 export const schema = new Schema({
-  nodes: allNodesWithFootnote,
+  nodes: allNodesWithCallout,
   marks: {
     ...basicMarks,
     underline: {

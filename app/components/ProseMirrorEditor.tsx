@@ -349,6 +349,7 @@ export function ProseMirrorEditor({
         let inBlockquote = false;
         let inBulletList = false;
         let inOrderedList = false;
+        let calloutVariant: string | null = null;
         let textAlign: string | null = null;
         for (let d = $from.depth; d > 0; d--) {
           const node = $from.node(d);
@@ -356,6 +357,7 @@ export function ProseMirrorEditor({
           if (node.type === schema.nodes.blockquote) inBlockquote = true;
           if (node.type === schema.nodes.bullet_list) inBulletList = true;
           if (node.type === schema.nodes.ordered_list) inOrderedList = true;
+          if (node.type === schema.nodes.callout) calloutVariant = node.attrs.variant || "note";
         }
         // textAlign lives on the direct block parent (paragraph or heading)
         const blockNode = $from.node($from.depth);
@@ -371,6 +373,7 @@ export function ProseMirrorEditor({
           inBlockquote,
           inBulletList,
           inOrderedList,
+          calloutVariant,
           textAlign,
         };
       }
@@ -802,6 +805,30 @@ export function ProseMirrorEditor({
           }
           if (inBlockquote) lift(view.state, view.dispatch);
           else wrapIn(schema.nodes.blockquote)(view.state, view.dispatch);
+          view.focus();
+        },
+        // Wrap the selection in a callout, switch the variant of the callout it
+        // already sits in, or unwrap it (variant === null, or the same variant
+        // picked again).
+        setCallout: (variant: string | null) => {
+          const calloutType = schema.nodes.callout;
+          const { $from } = view.state.selection;
+          let depth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            if ($from.node(d).type === calloutType) { depth = d; break; }
+          }
+          if (depth === -1) {
+            if (variant) wrapIn(calloutType, { variant })(view.state, view.dispatch);
+          } else {
+            const callout = $from.node(depth);
+            if (!variant || callout.attrs.variant === variant) {
+              lift(view.state, view.dispatch);
+            } else {
+              view.dispatch(
+                view.state.tr.setNodeMarkup($from.before(depth), undefined, { ...callout.attrs, variant })
+              );
+            }
+          }
           view.focus();
         },
         toggleBulletList: () => {
