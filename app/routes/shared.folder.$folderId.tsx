@@ -284,7 +284,7 @@ export default function SharedFolderView() {
                   className="group/recent flex flex-col gap-1 rounded-lg border border-fg/[0.08] px-3 py-2.5 no-underline transition-colors hover:border-fg/15 hover:bg-fg/[0.03]"
                 >
                   <span className="flex items-center gap-1.5">
-                    {doc.pdf_file ? <PdfIcon className="h-3.5 w-3.5 shrink-0 text-[#AF3029]/60" /> : <DocIcon className="h-3.5 w-3.5 shrink-0 text-fg/25" />}
+                    {doc.pdf_file ? <PdfIcon className="h-3.5 w-3.5 shrink-0 text-scarlet/60" /> : <DocIcon className="h-3.5 w-3.5 shrink-0 text-fg/25" />}
                     <span className="truncate text-sm font-medium text-fg">
                       {doc.title}
                     </span>
@@ -424,7 +424,7 @@ export default function SharedFolderView() {
                     href={`/shared/doc/${doc.id}`}
                     className="flex flex-1 items-center gap-3 px-4 py-2.5 no-underline text-fg"
                   >
-                    {doc.pdf_file ? <PdfIcon className="h-4 w-4 shrink-0 text-[#AF3029]/60" /> : <DocIcon className={`h-4 w-4 shrink-0 ${isDocShared ? "text-accent/50" : "text-fg/25"}`} />}
+                    {doc.pdf_file ? <PdfIcon className="h-4 w-4 shrink-0 text-scarlet/60" /> : <DocIcon className={`h-4 w-4 shrink-0 ${isDocShared ? "text-accent/50" : "text-fg/25"}`} />}
                     <span className="flex flex-1 items-center gap-2 truncate text-sm font-medium">
                       {starredSet.has(doc.id) && (
                         <StarIcon filled className="h-3.5 w-3.5 shrink-0 text-star" />

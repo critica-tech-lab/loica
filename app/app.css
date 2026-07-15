@@ -139,6 +139,44 @@
   --fg: #0a0a0a;
   --accent: var(--color-scarlet);
   --accent-fg: #ffffff;
+
+  /* Derived neutrals. Components reference these as `var(--border, …fallback)`
+     etc.; without the definitions the hardcoded fallback (dark ink) always won,
+     which was invisible in dark mode. Defined here as color-mix on --fg so they
+     flip with the theme automatically — no dark-specific override needed. */
+  --border: color-mix(in srgb, var(--fg) 15%, transparent);
+  --fg-secondary: color-mix(in srgb, var(--fg) 60%, transparent);
+  --muted: color-mix(in srgb, var(--fg) 45%, transparent);
+  --surface: color-mix(in srgb, var(--fg) 3%, var(--bg));
+  --color-error: var(--color-danger); /* themes: scarlet in light, #ff5555 in dark */
+}
+
+/* ─── Dark mode (Dracula) ────────────────────────────────── */
+/* Nearly every UI color is a color-mix on --bg/--fg, so flipping those two base
+   vars cascades a coherent dark theme everywhere for free. The rest maps the
+   Dracula palette (https://draculatheme.com) onto Loica's semantic slots:
+   purple is the accent/spot color (comments too), cyan the link, green/red the
+   track-change pair. Shadows drop the light-mode plumage tint for deeper black.
+   Applied via [data-theme="dark"] on <html> — set pre-paint by the no-FOUC
+   script + critical style in root.tsx and toggled from the user menu. */
+:root[data-theme="dark"] {
+  --bg: #282a36;            /* Dracula background */
+  --fg: #f8f8f2;            /* Dracula foreground */
+  --accent: #bd93f9;        /* Dracula purple — spot/accent + comments */
+  --accent-fg: #282a36;     /* dark text reads on the light purple accent */
+  --color-link: #8be9fd;    /* Dracula cyan */
+  --color-success: #50fa7b; /* Dracula green — track-change inserts */
+  --color-danger: #ff5555;  /* Dracula red — track-change deletes */
+  /* --color-highlight stays the neutral fg/bg auto-mix: it's a text-mark
+     background and light fg sits on it, so a solid yellow would kill contrast.
+     --comment-color already resolves to --accent (purple) via @theme. */
+
+  /* Plumage-tinted shadows disappear on dark; deepen to black. */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark; /* native form controls, scrollbars, caret follow dark */
 }
 
 /* ─── Base ───────────────────────────────────────────────── */

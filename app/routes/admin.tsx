@@ -769,7 +769,7 @@ export default function AdminPanel() {
                 className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out disabled:opacity-40"
                 style={{
                   backgroundColor: registrationOpen
-                    ? "#10b981"
+                    ? "var(--color-success)"
                     : "color-mix(in srgb, var(--fg) 20%, transparent)",
                 }}
               >
@@ -801,7 +801,7 @@ export default function AdminPanel() {
                 className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out disabled:opacity-40"
                 style={{
                   backgroundColor: loginEnabled
-                    ? "#10b981"
+                    ? "var(--color-success)"
                     : "color-mix(in srgb, var(--fg) 20%, transparent)",
                 }}
               >
@@ -872,7 +872,7 @@ export default function AdminPanel() {
                     className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out disabled:opacity-40"
                     style={{
                       backgroundColor: p.enabled
-                        ? "#10b981"
+                        ? "var(--color-success)"
                         : "color-mix(in srgb, var(--fg) 20%, transparent)",
                     }}
                   >

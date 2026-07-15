@@ -51,8 +51,8 @@ const BIRDS = [
   "Semillero","Negrillo","Pizarrita","Monterita","Naranjero","Celestino",
 ];
 const PALETTE = [
-  "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F",
-  "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
+  "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F", // allow-hex: per-user author hue
+  "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41", // allow-hex: per-user author hue
 ];
 
 function secureRandomInt(maxExclusive: number): number {
@@ -280,7 +280,7 @@ function PasswordGate({ docTitle, token }: { docTitle: string; token: string }) 
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-            {error && <p style={{ margin: "0", fontSize: "var(--fs-xs)", color: "var(--color-error, #dc2626)" }}>{error}</p>}
+            {error && <p style={{ margin: "0", fontSize: "var(--fs-xs)", color: "var(--color-error)" }}>{error}</p>}
           </div>
 
           <button
@@ -371,7 +371,7 @@ export default function SharePage() {
                 <span style={{ opacity: 0.35 }}>saving…</span>
               ) : (
                 <span style={{ opacity: 0.35, display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-sage, #66800B)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-sage)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                   saved

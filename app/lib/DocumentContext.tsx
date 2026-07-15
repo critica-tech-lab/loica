@@ -253,8 +253,8 @@ function cleanupOrphanFootnotes(doc: string): string {
 
 export function userColor(id: string): string {
   const palette = [
-    "#AF3029", "#4a9ee8", "#2cb67d", "#f59e0b", "#8b5cf6", "#e84ab5",
-    "#06b6d4", "#84cc16", "#f97316", "#6366f1", "#14b8a6", "#dc2626",
+    "#AF3029", "#4a9ee8", "#2cb67d", "#f59e0b", "#8b5cf6", "#e84ab5", // allow-hex: per-user cursor hue
+    "#06b6d4", "#84cc16", "#f97316", "#6366f1", "#14b8a6", "#dc2626", // allow-hex: per-user cursor hue
   ];
   let hash = 0;
   for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;

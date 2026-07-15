@@ -85,7 +85,7 @@ export function Toolbar(props: ToolbarProps = {}) {
         background: "var(--bg)",
         border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
         borderRadius: "var(--radius-pill)",
-        boxShadow: "0 2px 8px rgba(16,15,15,0.04), 0 1px 2px rgba(16,15,15,0.02)",
+        boxShadow: "var(--shadow-sm)",
         flexShrink: 0,
         flexWrap: "nowrap",
         overflow: "hidden",

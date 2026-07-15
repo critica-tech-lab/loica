@@ -91,9 +91,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 border: "1px solid",
                 borderColor:
                   t.type === "error"
-                    ? "var(--color-scarlet, #AF3029)"
+                    ? "var(--color-scarlet)"
                     : t.type === "success"
-                      ? "var(--color-sage, #66800B)"
+                      ? "var(--color-sage)"
                       : "color-mix(in srgb, var(--fg) 15%, transparent)",
                 background: "var(--bg)",
                 color: "var(--fg)",

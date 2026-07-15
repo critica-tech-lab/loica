@@ -120,7 +120,7 @@ export function DocActionBar({ content, connectionStatus, showBranding }: DocAct
             gap: "0.3rem",
             marginRight: "auto",
             color: connectionStatus === "disconnected"
-              ? "var(--color-scarlet, #AF3029)"
+              ? "var(--color-scarlet)"
               : "color-mix(in srgb, var(--fg) 55%, transparent)",
           }}
         >
@@ -130,8 +130,8 @@ export function DocActionBar({ content, connectionStatus, showBranding }: DocAct
               height: 6,
               borderRadius: "50%",
               background: connectionStatus === "disconnected"
-                ? "var(--color-scarlet, #AF3029)"
-                : "var(--color-tawny, #DA702C)",
+                ? "var(--color-scarlet)"
+                : "var(--color-tawny)",
               flexShrink: 0,
             }}
           />

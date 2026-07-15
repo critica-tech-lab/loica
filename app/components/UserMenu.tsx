@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Form } from "react-router";
+import { currentTheme, toggleTheme, type Theme } from "~/lib/theme";
 
 const AVATAR_COLORS = [
-  "#AF3029", // red
-  "#DA702C", // orange
-  "#D0A215", // yellow
-  "#66800B", // green
-  "#205EA6", // blue
-  "#5E409D", // purple
-  "#A02F6F", // magenta
-  "#24837B", // cyan
+  "#AF3029", // red // allow-hex: per-user avatar hue
+  "#DA702C", // orange // allow-hex: per-user avatar hue
+  "#D0A215", // yellow // allow-hex: per-user avatar hue
+  "#66800B", // green // allow-hex: per-user avatar hue
+  "#205EA6", // blue // allow-hex: per-user avatar hue
+  "#5E409D", // purple // allow-hex: per-user avatar hue
+  "#A02F6F", // magenta // allow-hex: per-user avatar hue
+  "#24837B", // cyan // allow-hex: per-user avatar hue
 ];
 
 function avatarColor(name: string): string {
@@ -80,6 +81,11 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Read on mount only — localStorage/matchMedia are client-only, so reading
+  // during render would mismatch the SSR markup. null until hydrated.
+  const [theme, setThemeState] = useState<Theme | null>(null);
+  useEffect(() => setThemeState(currentTheme()), []);
+
   const color = useMemo(() => avatarColor(userName), [userName]);
   const initials = getInitials(userName);
 
@@ -112,7 +118,7 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
           borderRadius: "50%",
           border: "none",
           background: color,
-          color: "#fff",
+          color: "#fff", // allow-hex: avatar initials on colored fill
           fontSize: initials.length > 1 ? "0.6rem" : "0.75rem",
           fontWeight: 600,
           cursor: "pointer",
@@ -150,6 +156,17 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
           >
             Settings
           </a>
+          {theme !== null && (
+            <button
+              type="button"
+              style={itemStyle}
+              onMouseEnter={hoverIn}
+              onMouseLeave={hoverOut}
+              onClick={() => setThemeState(toggleTheme())}
+            >
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+          )}
           {isAdmin && (
             <>
               <div style={separatorStyle} />

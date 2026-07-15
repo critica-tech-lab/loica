@@ -52,6 +52,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Set the saved (or system) theme before first paint. The script sets
+            data-theme; the critical style below carries the base + dark vars and
+            paints html immediately — app.css loads render-blocking but a moment
+            after head parse, so without this the base bg would flash light before
+            it applies. Both mirror ~/lib/theme.ts + app.css; kept inline so they
+            run synchronously in the head. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('loica-theme');if(t!=='dark'&&t!=='light'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.dataset.theme=t;}catch(e){}})();`,
+          }}
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `:root{--bg:#fff;--fg:#0a0a0a}:root[data-theme=dark]{--bg:#282a36;--fg:#f8f8f2}html{background-color:var(--bg);color:var(--fg)}`, // allow-hex: no-FOUC critical theme vars, must be literal
+          }}
+        />
         <Meta />
         <Links />
       </head>
@@ -194,7 +210,7 @@ export default function App() {
             alignItems: "center",
             justifyContent: "center",
             gap: "1rem",
-            background: "rgba(255,255,255,0.92)",
+            background: "color-mix(in srgb, var(--bg) 92%, transparent)",
             backdropFilter: "blur(4px)",
           }}
         >
@@ -332,7 +348,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             style={{
               padding: "0.5rem 1.5rem",
               fontSize: "0.85rem",
-              border: "1px solid rgba(28,22,18,0.15)",
+              border: "1px solid var(--border)",
               borderRadius: "var(--radius-md)",
               background: "var(--fg)",
               color: "var(--bg)",
@@ -349,7 +365,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             padding: "0.5rem 1.5rem",
             fontSize: "0.85rem",
             cursor: "pointer",
-            border: "1px solid rgba(28,22,18,0.15)",
+            border: "1px solid var(--border)",
             borderRadius: "var(--radius-md)",
             background: "transparent",
             color: "inherit",

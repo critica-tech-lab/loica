@@ -337,7 +337,7 @@ export function Editor({
           cursor: "pointer",
         },
         ".cm-list-marker, .cm-list-marker span": {
-          color: "#E8392A !important",
+          color: "var(--accent) !important",
         },
         ".cm-list-bullet": {
           fontSize: "0",
@@ -345,7 +345,7 @@ export function Editor({
         ".cm-list-bullet::after": {
           content: "'–'",
           fontSize: "var(--editor-font-size, 1rem)",
-          color: "#E8392A",
+          color: "var(--accent)",
         },
         ".cm-critic-highlight": {
           background: "color-mix(in srgb, var(--color-highlight) 18%, transparent)",
@@ -1110,8 +1110,8 @@ export function Editor({
             window.addEventListener("online", onOnline);
             document.addEventListener("visibilitychange", onVisible);
             const PRESENCE_COLORS = [
-              "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F",
-              "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41",
+              "#AF3029", "#205EA6", "#66800B", "#D0A215", "#5E409D", "#A02F6F", // allow-hex: per-user author hue
+              "#24837B", "#879A39", "#DA702C", "#4385BE", "#3AA99F", "#D14D41", // allow-hex: per-user author hue
             ];
 
             const userName = userInfo?.name ?? "Guest";

@@ -768,7 +768,7 @@ function SelectionBubble({ onLink, onCommentAdded }: { onLink: () => void; onCom
         background: "var(--fg)",
         color: "var(--bg)",
         borderRadius: "8px",
-        boxShadow: "0 8px 24px rgba(16,15,15,0.25), 0 2px 6px rgba(16,15,15,0.15)",
+        boxShadow: "var(--shadow-lg)",
         overflow: "hidden",
         fontFamily: "var(--font-ui)",
       }}
@@ -1222,20 +1222,20 @@ function DocFooterLeft() {
   // Stoplight palette: green (all good) → yellow (in progress) → red (broken).
   // Flexoki's sage (#66800B) and green-400 (#879A39) are olive-leaning and read grey
   // at the 6-7px dot size, so we use saturated greens/yellows/reds to read at a glance.
-  let color = "#16A34A"; // vivid green
+  let color = "#16A34A"; // vivid green // allow-hex: vivid stoplight, tokens read grey at dot size
   let label = "Saved";
   let showLabel = false;
 
   if (connectionStatus === "disconnected") {
-    color = "#DC2626"; // vivid red
+    color = "#DC2626"; // vivid red // allow-hex: vivid stoplight, tokens read grey at dot size
     label = "Offline";
     showLabel = true;
   } else if (connectionStatus === "connecting") {
-    color = "#EAB308"; // vivid amber
+    color = "#EAB308"; // vivid amber // allow-hex: vivid stoplight, tokens read grey at dot size
     label = "Reconnecting…";
     showLabel = true;
   } else if (saving) {
-    color = "#EAB308"; // vivid amber
+    color = "#EAB308"; // vivid amber // allow-hex: vivid stoplight, tokens read grey at dot size
     label = "Saving…";
     showLabel = true;
   }

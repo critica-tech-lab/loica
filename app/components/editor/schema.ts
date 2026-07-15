@@ -170,12 +170,12 @@ export const schema = new Schema({
       toDOM() { return ["s", 0] as const; },
     },
     highlight: {
-      attrs: { color: { default: "#fef08a" } },
+      attrs: { color: { default: "#fef08a" } }, // allow-hex: persisted highlight-mark color
       parseDOM: [
         {
           tag: "mark",
           getAttrs(node) {
-            return { color: (node as HTMLElement).style.backgroundColor || "#fef08a" };
+            return { color: (node as HTMLElement).style.backgroundColor || "#fef08a" }; // allow-hex: persisted highlight-mark color
           },
         },
       ],
