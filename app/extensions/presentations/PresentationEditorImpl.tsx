@@ -60,6 +60,7 @@ export function PresentationEditorImpl({
   wsUrl,
   wsParams,
   userInfo,
+  currentUserId,
   onConnectionStatus,
   onPresenceChange,
 }: ExtensionEditorViewProps) {
@@ -106,6 +107,7 @@ export function PresentationEditorImpl({
             wsUrl={wsUrl ?? ""}
             wsParams={wsParams}
             userInfo={userInfo ?? { name: "?", color: "#888888" }}
+            currentUserId={currentUserId}
             readOnly={readOnly}
             autoFocus={!readOnly}
             onReady={(api) => {

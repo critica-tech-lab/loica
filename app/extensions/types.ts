@@ -84,6 +84,8 @@ export interface ExtensionEditorViewProps {
   wsParams?: Record<string, string>;
   /** Display info for the local user; the editor sets this on awareness. */
   userInfo?: { name: string; color: string };
+  /** Stable identity for the local user; dedupes presence across their tabs. */
+  currentUserId?: string;
   /** Connection status callbacks for the doc footer indicator. */
   onConnectionStatus?: (status: "connected" | "connecting" | "disconnected") => void;
   /** Remote-peer presence callbacks for the avatar stack. */

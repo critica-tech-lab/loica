@@ -1118,6 +1118,7 @@ export function Editor({
             provider.awareness.setLocalStateField("user", {
               name: userName,
               color: userInfo?.color ?? PRESENCE_COLORS[0],
+              userId: currentUserIdRef.current,
             });
 
             const undoManager = new Y.UndoManager(ytext);
@@ -1146,6 +1147,7 @@ export function Editor({
                 provider.awareness.setLocalStateField("user", {
                   name: userName,
                   color: available,
+                  userId: currentUserIdRef.current,
                 });
               }
             };
@@ -1166,13 +1168,19 @@ export function Editor({
             const emitPresence = () => {
               const states = provider.awareness.getStates();
               const localId = provider.awareness.clientID;
-              const peers: Peer[] = [];
+              // One entry per identity: a user with the doc open in several
+              // tabs/browsers shares one userId across their connections, so
+              // key by userId (fall back to clientId for anonymous guests) and
+              // drop the current user's own sessions. (Fixes #99.)
+              const selfId = currentUserIdRef.current;
+              const byIdentity = new Map<string | number, Peer>();
               states.forEach((state, clientId) => {
-                if (state.user && clientId !== localId) {
-                  peers.push({ name: state.user.name, color: state.user.color });
-                }
+                if (!state.user || clientId === localId) return;
+                if (selfId && state.user.userId === selfId) return;
+                const key = state.user.userId ?? clientId;
+                byIdentity.set(key, { name: state.user.name, color: state.user.color });
               });
-              onPresenceRef.current?.(peers);
+              onPresenceRef.current?.(Array.from(byIdentity.values()));
             };
             provider.awareness.on("change", emitPresence);
             provider.on("sync", emitPresence);
