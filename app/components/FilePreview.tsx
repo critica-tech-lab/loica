@@ -114,7 +114,7 @@ export function FilePreview({ document, user, starred, breadcrumbs }: FilePrevie
         title={isStarred ? "Unstar" : "Star"}
         style={{
           background: "none", border: "none", cursor: "pointer", padding: "0.2rem", lineHeight: 1,
-          color: isStarred ? "var(--color-tawny, #DA702C)" : "color-mix(in srgb, var(--fg) 25%, transparent)",
+          color: isStarred ? "var(--color-tawny)" : "color-mix(in srgb, var(--fg) 25%, transparent)",
         }}
       >
         <StarIcon filled={isStarred} className="h-4 w-4" />

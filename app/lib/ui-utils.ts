@@ -1,6 +1,6 @@
 // Shared UI utilities — used by both client and server route modules
 
-const FALLBACK_COLORS = ["#AF3029","#66800B","#DA702C","#205EA6","#5E409D","#A02F6F","#D0A215","#24837B"];
+const FALLBACK_COLORS = ["#AF3029","#66800B","#DA702C","#205EA6","#5E409D","#A02F6F","#D0A215","#24837B"]; // allow-hex: per-user identity hue
 
 export function nameColor(name: string): string {
   let h = 0;

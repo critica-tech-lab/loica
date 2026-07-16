@@ -84,7 +84,7 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
         alignItems: "flex-start",
         justifyContent: "center",
         paddingTop: "min(20vh, 10rem)",
-        background: "rgba(28,22,18,0.4)",
+        background: "rgba(28,22,18,0.4)", // allow-hex: modal scrim, dark veil both themes
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

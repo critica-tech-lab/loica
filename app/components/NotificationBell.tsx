@@ -146,7 +146,7 @@ export function NotificationBell() {
             right: 0,
             marginTop: "0.5rem",
             background: "var(--bg)",
-            border: "1px solid var(--border, rgba(28,22,18,0.15))",
+            border: "1px solid var(--border)",
             borderRadius: "var(--radius-lg)",
             boxShadow: "var(--shadow-md)",
             zIndex: "var(--z-toast)",
@@ -162,7 +162,7 @@ export function NotificationBell() {
           <div
             style={{
               padding: "0.75rem 1rem",
-              borderBottom: "1px solid var(--border, rgba(28,22,18,0.15))",
+              borderBottom: "1px solid var(--border)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -204,7 +204,7 @@ export function NotificationBell() {
                   padding: "2rem 1rem",
                   textAlign: "center",
                   fontSize: "var(--fs-md)",
-                  color: "var(--fg-secondary, rgba(28,22,18,0.6))",
+                  color: "var(--fg-secondary)",
                 }}
               >
                 No notifications yet
@@ -258,7 +258,7 @@ export function NotificationBell() {
                         <div
                           style={{
                             fontSize: "var(--fs-base)",
-                            color: "var(--fg-secondary, rgba(28,22,18,0.6))",
+                            color: "var(--fg-secondary)",
                             marginTop: "0.25rem",
                             wordBreak: "break-word",
                           }}
@@ -269,7 +269,7 @@ export function NotificationBell() {
                       <div
                         style={{
                           fontSize: "var(--fs-xs)",
-                          color: "var(--fg-secondary, rgba(28,22,18,0.5))",
+                          color: "var(--muted)",
                           marginTop: "0.25rem",
                         }}
                       >

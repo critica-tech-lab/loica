@@ -63,13 +63,13 @@ export function getThreads(view: EditorView): ResolvedThread[] {
 // ─── Helpers ──────────────────────────────────────────────
 
 export function authorColorFromName(name: string | null): string {
-  if (!name) return "#facc15"; // default yellow for legacy comments
+  if (!name) return "#facc15"; // default yellow for legacy comments // allow-hex: legacy comment default
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   const hue = ((hash % 360) + 360) % 360;
-  return `hsl(${hue}, 70%, 65%)`;
+  return `hsl(${hue}, 70%, 65%)`; // allow-hex: per-user comment hue
 }
 
 // ─── Decorations ──────────────────────────────────────────

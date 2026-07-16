@@ -168,7 +168,7 @@ function ChangeCard({ change, active, onClick, onAccept, onReject }: {
         <span style={{
           width: 20, height: 20, borderRadius: "50%", background: color, flexShrink: 0,
           display: "inline-flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontSize: "var(--fs-2xs)", fontWeight: 700, userSelect: "none",
+          color: "#fff", fontSize: "var(--fs-2xs)", fontWeight: 700, userSelect: "none", // allow-hex: text on colored author badge
         }}>
           {(change.authorId || "?").slice(0, 1).toUpperCase()}
         </span>
