@@ -129,7 +129,7 @@ export function NotificationBell() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "var(--fs-sm)",
+              fontSize: "var(--fs-2xs)",
               fontWeight: 600,
             }}
           >
@@ -168,7 +168,7 @@ export function NotificationBell() {
               alignItems: "center",
             }}
           >
-            <h3 style={{ margin: 0, fontSize: "var(--fs-md)", fontWeight: 600 }}>
+            <h3 style={{ margin: 0, fontSize: "var(--fs-sm)", fontWeight: 600 }}>
               Notifications
             </h3>
             {unreadCount > 0 && (
@@ -179,7 +179,7 @@ export function NotificationBell() {
                   border: "none",
                   color: "var(--accent)",
                   cursor: "pointer",
-                  fontSize: "var(--fs-sm)",
+                  fontSize: "var(--fs-xs)",
                   fontWeight: 600,
                   padding: 0,
                 }}
@@ -203,7 +203,7 @@ export function NotificationBell() {
                 style={{
                   padding: "2rem 1rem",
                   textAlign: "center",
-                  fontSize: "var(--fs-md)",
+                  fontSize: "var(--fs-xs)",
                   color: "var(--fg-secondary)",
                 }}
               >
@@ -248,7 +248,7 @@ export function NotificationBell() {
                       <div
                         style={{
                           fontWeight: notif.read_at ? 400 : 600,
-                          fontSize: "var(--fs-md)",
+                          fontSize: "var(--fs-sm)",
                           wordBreak: "break-word",
                         }}
                       >
@@ -257,7 +257,7 @@ export function NotificationBell() {
                       {notif.body && (
                         <div
                           style={{
-                            fontSize: "var(--fs-base)",
+                            fontSize: "var(--fs-xs)",
                             color: "var(--fg-secondary)",
                             marginTop: "0.25rem",
                             wordBreak: "break-word",
@@ -268,7 +268,7 @@ export function NotificationBell() {
                       )}
                       <div
                         style={{
-                          fontSize: "var(--fs-xs)",
+                          fontSize: "var(--fs-2xs)",
                           color: "var(--muted)",
                           marginTop: "0.25rem",
                         }}

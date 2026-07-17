@@ -296,8 +296,18 @@ export function saveCommentsFromYjs(db: Database.Database, docId: string, commen
   }
 }
 
-const lastNotificationTime = new Map<string, number>();
-const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000;
+const lastEmailTime = new Map<string, number>();
+const EMAIL_COOLDOWN_MS = 5 * 60 * 1000;
+const PREVIEW_MAX_CHARS = 140;
+
+/** Render `@[Name](user:id)` mention markers as plain `@Name`. */
+function stripMentionMarkers(body: string): string {
+  return body.replace(/@\[(.+?)\]\(user:.+?\)/g, "@$1");
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
 
 function notifyOwnerOfNewComments(
   db: Database.Database,
@@ -305,10 +315,6 @@ function notifyOwnerOfNewComments(
   newComments: Array<{ userId: string; body: string; threadId: string | null }>
 ): void {
   try {
-    const now = Date.now();
-    const lastSent = lastNotificationTime.get(docId) ?? 0;
-    if (now - lastSent < NOTIFICATION_COOLDOWN_MS) return;
-    lastNotificationTime.set(docId, now);
     const doc = db.prepare<[string], { created_by: string; title: string }>(
       "SELECT created_by, title FROM documents WHERE id = ?"
     ).get(docId);
@@ -341,6 +347,27 @@ function notifyOwnerOfNewComments(
     // Use the first new comment's body as preview
     const previewBody = othersComments[0].body;
 
+    // In-app notification for the bell. Not rate-limited: each batch of new
+    // comments is only ever reported once, and the bell is the only place the
+    // owner can catch up on what it missed.
+    db.prepare(
+      "INSERT INTO notifications (id, user_id, type, title, body, link) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(
+      nanoid(16),
+      doc.created_by,
+      "comment_added",
+      "New comment on your document",
+      `${commenterLabel} commented on "${doc.title}": ${truncate(stripMentionMarkers(previewBody), PREVIEW_MAX_CHARS)}`,
+      `/w/doc/${docId}`
+    );
+
+    // Email is throttled per document so a burst of comments can't fan out
+    // into a mail each.
+    const now = Date.now();
+    const lastSent = lastEmailTime.get(docId) ?? 0;
+    if (now - lastSent < EMAIL_COOLDOWN_MS) return;
+    lastEmailTime.set(docId, now);
+
     sendCommentNotification(
       owner.email,
       owner.name,
@@ -350,7 +377,7 @@ function notifyOwnerOfNewComments(
       docUrl
     );
   } catch (err) {
-    console.error(`[ws-server] Failed to send comment email for doc ${docId}:`, err);
+    console.error(`[ws-server] Failed to notify owner of comments for doc ${docId}:`, err);
   }
 }
 
