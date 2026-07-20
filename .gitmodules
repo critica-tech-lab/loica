@@ -1,3 +1,9 @@
 [submodule "app/extensions/languagetool"]
 	path = app/extensions/languagetool
 	url = git@github.com:critica-tech-lab/loica-extension-languagetool.git
+[submodule "app/extensions/ai-proofreader"]
+	path = app/extensions/ai-proofreader
+	url = git@github.com:critica-tech-lab/loica-extension-ai-proofreader.git
+[submodule "app/extensions/translation"]
+	path = app/extensions/translation
+	url = git@github.com:critica-tech-lab/loica-extension-translation.git
