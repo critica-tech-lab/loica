@@ -16,6 +16,9 @@ module.exports = {
         PORT: "3000",
         HOST: "0.0.0.0",
         SECURE_COOKIE: "true",
+        // Local LanguageTool container listens on 8010 (8081 is taken by the
+        // Icecast radio server on this host). The extension defaults to 8081.
+        LANGUAGETOOL_URL: "http://localhost:8010",
       },
       restart_delay: 1000,
       max_restarts: 10,
