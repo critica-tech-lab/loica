@@ -211,7 +211,7 @@ export function ProseMirrorEditor({
       const { addColumnAfter } = await import("prosemirror-tables");
       const { makeImageNodeView } = await import("./editor/image-view");
       const { makeFootnoteView } = await import("./editor/footnote-view");
-      const { pmCommentPlugin } = await import("./editor/pm-comments");
+      const { pmCommentPlugin, pmCommentPluginKey } = await import("./editor/pm-comments");
       const {
         trackChangesPlugin,
         trackChangesPluginKey,
@@ -901,25 +901,43 @@ export function ProseMirrorEditor({
           view.dispatch(tr);
         },
 
-        // Comments — store plain PM integer positions (no y-prosemirror mapping needed)
+        // Comments — anchor to Yjs relative positions so the highlight tracks
+        // the text through later edits (and concurrent edits by other peers).
+        // Storing raw PM integer offsets broke every comment the moment the doc
+        // changed: the offsets went stale and the anchors no longer matched.
+        // Relative positions are stored as JSON (round-trips through the DB
+        // comments table unchanged) and resolved back to offsets on render.
         addComment: (body = "") => {
           const { from, to } = view.state.selection;
           const anchorText = from < to ? view.state.doc.textBetween(from, to, " ") : "";
           const id = nanoid();
           const now = Math.floor(Date.now() / 1000);
+          const mapping = ySyncPluginKey.getState(view.state)?.binding?.mapping;
+          const toRel = (pos: number) => {
+            if (!mapping) return pos; // pre-sync fallback: keep an absolute offset
+            try {
+              return Y.relativePositionToJSON(
+                absolutePositionToRelativePosition(pos, yXmlFragment, mapping)
+              );
+            } catch {
+              return pos;
+            }
+          };
           commentsMap.set(id, {
             threadId: null,
             userId: currentUserId ?? "",
             userName: userInfo.name,
             body,
-            anchorFrom: from < to ? from : null,
-            anchorTo:   from < to ? to   : null,
+            anchorFrom: from < to ? toRel(from) : null,
+            anchorTo:   from < to ? toRel(to)   : null,
             anchorText,
             resolved: 0,
             createdAt: now,
             updatedAt: now,
           });
-          view.dispatch(view.state.tr); // rebuild decorations so indicator appears immediately
+          // Rebuild decorations now so the highlight + indicator appear at once
+          // (the plugin only re-resolves anchors on this explicit rebuild flag).
+          view.dispatch(view.state.tr.setMeta(pmCommentPluginKey, { rebuild: true }));
 
           // Immediately surface the new comment to React without waiting for
           // the plugin observer chain (which may be async or miss first render).
