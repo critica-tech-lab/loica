@@ -2,6 +2,8 @@ import fs from "node:fs";
 import { execSync } from "node:child_process";
 import { db } from "~/lib/db.server";
 import { dbPath as DB_PATH } from "~/lib/paths.server";
+import { requireAdmin } from "~/lib/auth.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 const startTime = Date.now();
 
@@ -29,7 +31,13 @@ function getDiskFree(): { available: number; total: number; percent: number } | 
   }
 }
 
-export function loader() {
+// Detailed infra metrics (db/WAL size, disk free/used, uptime) are admin-only:
+// they are reconnaissance for an attacker and were previously served to anyone.
+// Liveness monitors want /api/healthz, which is unauthenticated by design and
+// carries none of this — the client-side server-down poll uses that one.
+export function loader({ request }: LoaderFunctionArgs) {
+  requireAdmin(request);
+
   let dbOk = false;
   let walMode = false;
   try {

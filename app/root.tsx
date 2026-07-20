@@ -138,7 +138,7 @@ export default function App() {
 
     async function check() {
       try {
-        const res = await fetch("/api/health", { cache: "no-store" });
+        const res = await fetch("/api/healthz", { cache: "no-store" });
         if (res.ok) {
           if (downSinceRef.current !== null) {
             if (overlayShownRef.current) {
