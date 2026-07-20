@@ -1,0 +1,3 @@
+[submodule "app/extensions/languagetool"]
+	path = app/extensions/languagetool
+	url = git@github.com:critica-tech-lab/loica-extension-languagetool.git
