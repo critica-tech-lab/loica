@@ -1,9 +1,25 @@
 import { getSessionUser } from "~/lib/auth.server";
 import { db } from "~/lib/db.server";
+import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
+  }
+
+  // Anonymous by design — client errors on public share pages have no session —
+  // but that also means an unauthenticated caller could flood the table with up
+  // to ~7.5KB per row. Bound it by IP; a real client logs a handful of errors.
+  const { allowed, retryAfterSeconds } = checkRateLimit(getClientIp(request), {
+    windowMs: 60_000,
+    max: 20,
+    prefix: "client-error",
+  });
+  if (!allowed) {
+    return new Response("Too many requests", {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSeconds) },
+    });
   }
 
   const user = getSessionUser(request);
