@@ -1,29 +1,10 @@
 import type { Route } from "./+types/api.doc-docx.$id";
-import { getSessionUser } from "~/lib/auth.server";
-import { getDocument } from "~/lib/document.server";
-import { getMembership } from "~/lib/workspace.server";
-import { hasSharedAccess } from "~/lib/sharing.server";
+import { authorizeDocRead } from "~/lib/doc-access.server";
 import { parseFrontmatter, stripFrontmatter } from "~/lib/templates";
 import { ensurePluginsLoaded, getServerExtensionForDocType, getActiveGlobalExporter } from "~/extensions/index.server";
 import { renderDocx } from "~/lib/export/docx.server";
 import { safeFilename } from "~/lib/export/shared.server";
 import { getDocumentThreads } from "~/lib/comments.server";
-
-async function authorizeDoc(request: Request, params: { id?: string }) {
-  const doc = getDocument(params.id!);
-  if (!doc) throw new Response("Not found", { status: 404 });
-
-  const isPublic = !!(doc.public_token || doc.edit_token);
-  if (!isPublic) {
-    const user = getSessionUser(request);
-    if (!user) throw new Response("Not found", { status: 404 });
-    const role = getMembership(doc.workspace_id, user.id, user.is_admin);
-    const shared = doc.folder_id ? hasSharedAccess(doc.folder_id, user.id) : false;
-    if (!role && !shared) throw new Response("Not found", { status: 404 });
-  }
-
-  return doc;
-}
 
 async function exportDocx(doc: any, content: string): Promise<Response> {
   const frontmatter = parseFrontmatter(doc.content || "");
@@ -51,7 +32,7 @@ async function exportDocx(doc: any, content: string): Promise<Response> {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   await ensurePluginsLoaded();
-  const doc = await authorizeDoc(request, params);
+  const doc = authorizeDocRead(request, params.id);
   return exportDocx(doc, doc.content || "");
 }
 
@@ -59,7 +40,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 // so the export reflects unsaved edits.
 export async function action({ request, params }: Route.ActionArgs) {
   await ensurePluginsLoaded();
-  const doc = await authorizeDoc(request, params);
+  const doc = authorizeDocRead(request, params.id);
   const { content = "" } = (await request.json()) as { content?: string };
   return exportDocx(doc, content || doc.content || "");
 }
