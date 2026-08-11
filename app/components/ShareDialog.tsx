@@ -159,7 +159,7 @@ function DocShareDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Share document"
-        className="flex max-h-[80vh] w-[min(26rem,92vw)] flex-col overflow-hidden rounded-xl border border-fg/10 bg-bg shadow-lg"
+        className="flex max-h-[80dvh] w-[min(26rem,92vw)] flex-col overflow-hidden rounded-xl border border-fg/10 bg-bg shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -175,7 +175,7 @@ function DocShareDialog({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 py-4">
 
           {/* Invite section */}
           <div className="flex flex-col gap-2.5">
@@ -993,7 +993,7 @@ function FolderShareDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Share folder"
-        className="flex max-h-[70vh] w-[min(28rem,90vw)] flex-col gap-4 rounded-lg border border-fg/15 bg-bg p-5 shadow-lg"
+        className="flex max-h-[70dvh] w-[min(28rem,90vw)] flex-col gap-4 rounded-lg border border-fg/15 bg-bg p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline justify-between">
@@ -1064,7 +1064,7 @@ function FolderShareDialog({
 
             {/* Existing shares */}
             {shares.length > 0 && (
-              <div className="flex flex-col gap-1 overflow-y-auto">
+              <div className="flex flex-col gap-1 overflow-y-auto overscroll-contain">
                 <h4 className="m-0 text-xs font-medium opacity-40">Current shares</h4>
                 {shares.map((s) => (
                   <div

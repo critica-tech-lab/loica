@@ -348,6 +348,7 @@ html {
   height: 100%;
   cursor: col-resize;
   z-index: 2;
+  touch-action: none;
 }
 .cm-table-resize-handle:hover,
 .cm-table-resize-active {

@@ -341,7 +341,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>
         {title}
       </h1>
-      <p style={{ opacity: 0.6, margin: 0 }}>{details}</p>
+      <p style={{ opacity: 0.6, margin: 0 }}>{detail}</p>
       <button
         type="button"
         onClick={() => window.location.reload()}

@@ -679,26 +679,29 @@ export function createTableDecorations(modules: {
       const createResizeHandle = (colIdx: number) => {
         const handle = document.createElement("div");
         handle.className = "cm-table-resize-handle";
-        handle.addEventListener("mousedown", (e) => {
+        handle.addEventListener("pointerdown", (e) => {
           e.preventDefault();
           e.stopPropagation();
           const th = handle.parentElement!;
           const startX = e.clientX;
           const startW = th.offsetWidth;
           handle.classList.add("cm-table-resize-active");
+          handle.setPointerCapture(e.pointerId);
 
-          const onMove = (ev: MouseEvent) => {
+          const onMove = (ev: PointerEvent) => {
             const newW = Math.max(40, startW + ev.clientX - startX);
             table.style.tableLayout = "fixed";
             th.style.width = `${newW}px`;
           };
           const onUp = () => {
             handle.classList.remove("cm-table-resize-active");
-            document.removeEventListener("mousemove", onMove);
-            document.removeEventListener("mouseup", onUp);
+            handle.removeEventListener("pointermove", onMove);
+            handle.removeEventListener("pointerup", onUp);
+            handle.removeEventListener("pointercancel", onUp);
           };
-          document.addEventListener("mousemove", onMove);
-          document.addEventListener("mouseup", onUp);
+          handle.addEventListener("pointermove", onMove);
+          handle.addEventListener("pointerup", onUp);
+          handle.addEventListener("pointercancel", onUp);
         });
         return handle;
       };

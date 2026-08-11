@@ -12,6 +12,18 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(onClose?: (
     const el = ref.current;
     if (!el) return;
 
+    // Lock background scroll while the modal is open — without this, iOS
+    // Safari rubber-bands the page behind a `fixed` overlay once the
+    // modal's own scroll pane hits its top/bottom edge.
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
     // Focus the first focusable element
@@ -55,6 +67,8 @@ export function useFocusTrap<T extends HTMLElement = HTMLDivElement>(onClose?: (
     return () => {
       el.removeEventListener("keydown", handleKeyDown);
       previouslyFocused?.focus();
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
     };
   }, [onClose]);
 

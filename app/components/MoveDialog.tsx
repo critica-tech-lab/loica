@@ -122,7 +122,7 @@ export function MoveDialog({
         role="dialog"
         aria-modal="true"
         aria-label={`Move ${itemLabel}`}
-        className="flex max-h-[60vh] w-[min(24rem,90vw)] flex-col gap-3 rounded-lg border border-fg/15 bg-bg p-4 shadow-lg"
+        className="flex max-h-[60dvh] w-[min(24rem,90vw)] flex-col gap-3 rounded-lg border border-fg/15 bg-bg p-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline justify-between">
@@ -185,7 +185,7 @@ export function MoveDialog({
               </div>
             )}
 
-            <div className="flex flex-col gap-0.5 overflow-y-auto">
+            <div className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain">
               {isLoading ? (
                 <div className="py-4 text-center text-xs opacity-50">Loading folders...</div>
               ) : (
