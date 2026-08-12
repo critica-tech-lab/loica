@@ -26,3 +26,7 @@ CLAUDE.md
 .claudeignore
 server.log
 package-lock.json
+
+# Private security assessments — describe unpatched vulns in a deployed system,
+# and this repo is public. Share over a private channel, never commit.
+SECURITY-ASSESSMENT-*.md
