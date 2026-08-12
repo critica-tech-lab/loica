@@ -350,7 +350,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
           padding: "0.5rem 1.5rem",
           fontSize: "0.85rem",
           cursor: "pointer",
-          border: "1px solid rgba(28,22,18,0.15)",
+          border: "1px solid var(--border)",
           borderRadius: "var(--radius-md)",
           background: "transparent",
           color: "inherit",
