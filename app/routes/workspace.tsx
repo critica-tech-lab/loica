@@ -49,8 +49,8 @@ import { useDocListState } from "~/components/hooks/useDocListState";
 import { timeAgo } from "~/lib/ui-utils";
 import { NotificationBell } from "~/components/NotificationBell";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => [
-  { title: `${data?.workspace.name ?? "Workspace"} — loica` },
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => [
+  { title: `${loaderData?.workspace.name ?? "Workspace"} — loica` },
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {

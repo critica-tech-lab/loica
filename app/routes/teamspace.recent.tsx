@@ -21,8 +21,8 @@ import { FolderTreeSidebar } from "~/components/FolderTreeSidebar";
 import { RecentView } from "~/components/RecentView";
 import { useSessionUser } from "~/root";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as Record<string, any> | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as Record<string, any> | undefined;
   return [{ title: `Recent — ${d?.teamspace.name ?? "Teamspace"} teamspace — loica` }];
 };
 

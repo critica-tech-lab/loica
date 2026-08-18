@@ -40,8 +40,8 @@ import { useSessionUser } from "~/root";
 import { useState, useMemo } from "react";
 import { timeAgo, randomDocName } from "~/lib/ui-utils";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as Record<string, any> | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as Record<string, any> | undefined;
   return [{ title: `${d?.folder.name ?? "Folder"} (shared) — loica` }];
 };
 

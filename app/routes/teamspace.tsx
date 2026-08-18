@@ -45,8 +45,8 @@ import { useDocListState } from "~/components/hooks/useDocListState";
 import { TeamspaceIconPicker } from "~/components/TeamspaceIconPicker";
 
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as { workspace?: { name?: string } } | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as { workspace?: { name?: string } } | undefined;
   return [{ title: `${d?.workspace?.name ?? "Teamspace"} teamspace — loica` }];
 };
 

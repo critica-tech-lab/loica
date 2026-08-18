@@ -8,8 +8,8 @@ import { hasDocSharedAccess } from "~/lib/doc-sharing.server";
 import { getEnabledExtensionIdSet } from "~/extensions/index.server";
 import { PresentView } from "./PresentView";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const title = (data as { docTitle?: string } | undefined)?.docTitle ?? "Presenting";
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const title = (loaderData as { docTitle?: string } | undefined)?.docTitle ?? "Presenting";
   return [{ title: `Presenting: ${title} — loica` }];
 };
 

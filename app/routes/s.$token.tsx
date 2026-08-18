@@ -82,8 +82,8 @@ function hashCode(s: string): number {
 
 // ─── Route ───────────────────────────────────────────────────
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as { document?: { title?: string }; docTitle?: string } | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as { document?: { title?: string }; docTitle?: string } | undefined;
   const title = d?.document?.title ?? d?.docTitle ?? "Document";
   return [{ title: `${title} — loica` }];
 };

@@ -29,8 +29,8 @@ import { DocumentProvider } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
 import { useSessionUser } from "~/root";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as { document?: { title?: string } } | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as { document?: { title?: string } } | undefined;
   return [{ title: `${d?.document?.title ?? "Document"} (shared) — loica` }];
 };
 

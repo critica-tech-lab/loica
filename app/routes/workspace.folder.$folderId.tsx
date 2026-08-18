@@ -46,8 +46,8 @@ import { useState, useMemo } from "react";
 import { useImport } from "~/components/hooks/useImport";
 import { NotificationBell } from "~/components/NotificationBell";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as { folder?: { name?: string }; workspace?: { name?: string } } | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as { folder?: { name?: string }; workspace?: { name?: string } } | undefined;
   return [
     { title: `${d?.folder?.name ?? "Folder"} — ${d?.workspace?.name ?? "Workspace"} — loica` },
   ];

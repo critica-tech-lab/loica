@@ -30,8 +30,8 @@
     "@manuscripts/track-changes-plugin": "^2.4.0",
     "@manuscripts/transform": "^4.5.1",
     "@node-rs/argon2": "^2.1.0",
-    "@react-router/node": "^7.18.2",
-    "@react-router/serve": "^7.18.2",
+    "@react-router/node": "^8.3.0",
+    "@react-router/serve": "^8.3.0",
     "@types/diff": "^8.0.0",
     "@types/dompurify": "^3.2.0",
     "@types/marked": "^6.0.0",
@@ -68,7 +68,7 @@
     "prosemirror-view": "^1.42.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router": "^7.18.2",
+    "react-router": "^8.3.0",
     "reveal.js": "^6.0.1",
     "sharp": "^0.35.3",
     "turndown": "^7.2.4",
@@ -81,7 +81,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@react-router/dev": "^7.18.2",
+    "@react-router/dev": "^8.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/nodemailer": "^8.0.1",
@@ -91,8 +91,8 @@
     "@types/ws": "^8.18.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^6.4.3",
-    "vite-tsconfig-paths": "^5.1.4",
+    "vite": "^8.2.1",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitepress": "^1.6.4"
   }
 }

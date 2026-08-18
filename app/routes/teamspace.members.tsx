@@ -28,8 +28,8 @@ import { UserAutocomplete } from "~/components/UserAutocomplete";
 import { useSessionUser } from "~/root";
 import { useEffect, useRef, useState } from "react";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as Record<string, any> | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as Record<string, any> | undefined;
   return [{ title: `Settings — ${d?.teamspace.name ?? "Teamspace"} teamspace — loica` }];
 };
 

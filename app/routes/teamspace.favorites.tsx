@@ -20,8 +20,8 @@ import { FolderTreeSidebar } from "~/components/FolderTreeSidebar";
 import { FavoritesView } from "~/components/FavoritesView";
 import { useSessionUser } from "~/root";
 
-export const meta: MetaFunction<typeof loader> = ({ data }) => {
-  const d = data as Record<string, any> | undefined;
+export const meta: MetaFunction<typeof loader> = ({ loaderData }) => {
+  const d = loaderData as Record<string, any> | undefined;
   return [{ title: `Favorites — ${d?.teamspace.name ?? "Teamspace"} teamspace — loica` }];
 };
 
