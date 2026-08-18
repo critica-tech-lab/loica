@@ -216,9 +216,13 @@ export async function renderPdf(markdown: string, title: string, landscape = fal
     content,
   };
 
-  const PdfPrinter = require("pdfmake/src/printer");
-  const printer = new PdfPrinter(fonts);
-  const pdfDoc = printer.createPdfKitDocument(docDefinition);
+  const PdfPrinter = require("pdfmake/js/Printer").default;
+  const URLResolver = require("pdfmake/js/URLResolver").default;
+  const vfs = require("pdfmake/js/virtual-fs").default;
+  // Fonts are local file paths, never remote URLs, so the resolver never
+  // actually fetches anything — pdfmake just requires one to be present.
+  const printer = new PdfPrinter(fonts, vfs, new URLResolver(vfs));
+  const pdfDoc = await printer.createPdfKitDocument(docDefinition);
 
   return await new Promise<Buffer>((res, rej) => {
     const chunks: Buffer[] = [];
