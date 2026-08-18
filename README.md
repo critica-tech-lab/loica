@@ -68,6 +68,18 @@ See the [deployment guide](https://critica-tech-lab.github.io/loica/deployment) 
 
 The public registry ships with no extensions enabled. To add your own, create a folder under [`app/extensions/`](app/extensions) and register it with two lines in `app/extensions/index.ts` (and `index.server.ts` for server-only code). See [`app/extensions/README.md`](app/extensions/README.md) for the full contract: `docType`, `template`, `EditorView`, `EditorBanner`, `getDocMenuItems`, `exporters.pdf` / `.docx`, `previewHtml`, `authProvider`.
 
+## Security audits
+
+Dependencies are checked with `bun audit` (`bun.lock` is the source of truth — `package-lock.json`, if present, is gitignored and not used for installs).
+
+```sh
+bun audit               # list vulnerabilities
+bun update               # apply compatible-range fixes
+bun update --latest       # apply all fixes, including breaking major bumps
+```
+
+Run `bun audit` before releases and periodically in between. After `bun update --latest`, re-test the app before shipping — major bumps can break behavior. [Dependabot](https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/dependabot-quickstart) is configured in [`.github/dependabot.yml`](.github/dependabot.yml) to open weekly PRs for outdated npm and GitHub Actions dependencies.
+
 ## License
 
 [AGPL-3.0](LICENSE). If you run a modified version on a server, you have to offer your users access to the source.
