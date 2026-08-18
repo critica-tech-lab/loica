@@ -26,8 +26,11 @@ artifacts, not part of the bare repo.
 
 See `app/extensions/types.ts` (`LoicaExtension`). Notably:
 
-- `pdfStyle` — install-wide PDF house styling (preamble, Lua filters, fonts,
-  extra pandoc args) layered onto the core pandoc/tectonic pipeline.
+- `globalExporters.pdf` / `.docx` — replace the core pure-JS PDF/DOCX
+  renderers for every doc (any type without its own `exporters` override).
+  The escape hatch for an opinionated install to bring its own pipeline
+  (pandoc/tectonic/LaTeX, a remote service) while the bare core stays
+  binary-free.
 - `exporters.pdf` / `exporters.docx` — replace the export pipeline for one
   doc `type`.
 - `docType` + `template` / `EditorView` — custom doc types.

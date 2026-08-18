@@ -42,9 +42,9 @@ If either is false, it's **core**:
 | appear in New/Insert + starter content | `template` | ✅ |
 | a row icon in lists | `rowIcon` | ✅ |
 | an item in the doc ⋯ menu | `getDocMenuItems` | ✅ |
-| override PDF / DOCX export | `exporters.pdf` / `.docx` | ✅ |
+| override PDF / DOCX export for one doc type | `exporters.pdf` / `.docx` | ✅ |
+| replace the core PDF/DOCX pipeline install-wide | `globalExporters.pdf` / `.docx` | ✅ |
 | take over print/share preview | `previewHtml` | ✅ |
-| install-wide PDF styling | `pdfStyle` | ✅ |
 | add a sign-in method | `authProvider` | ✅ |
 | a **custom editor UI** for the type | `EditorView` / `EditorBanner` | ❌ → core |
 | a **new route / UI surface / DB access / a hook the SDK lacks** | — none — | ❌ → core |
@@ -245,6 +245,7 @@ you care about.
 | `authProvider` | `AuthProvider` | When the extension contributes a sign-in option (Google OAuth, SAML, generic OIDC). |
 | `exporters.pdf` | function | When PDF export of this doc type needs custom rendering. Falls back to core markdown→PDF when absent. |
 | `exporters.docx` | function | Same, for DOCX. Falls back to core markdown→DOCX. |
+| `globalExporters.pdf` / `.docx` | function | Replaces the core pure-JS renderer for every doc without its own `exporters` override. The escape hatch for a self-hosted install to swap in its own pipeline (pandoc/tectonic, a remote service). The first enabled extension declaring one wins. |
 | `previewHtml` | function | Server hook for `api/doc-preview/:id`. Return a `Response` to take over the print/share preview, or `null` to use core's markdown render. |
 
 See `app/extensions/types.ts` for the full type definitions.

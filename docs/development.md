@@ -51,7 +51,7 @@ Both `dev` and `ws` must be running for real-time collaboration to work.
 
 Two processes sharing one SQLite database (`app.db`):
 
-1. **Web server** (React Router 7, SSR) — handles all HTTP requests, renders pages, processes form actions
+1. **Web server** (React Router 8, SSR) — handles all HTTP requests, renders pages, processes form actions
 2. **WebSocket server** (`ws-server.ts`) — Yjs CRDT sync protocol + awareness/presence
 
 ### Real-time collaboration flow

@@ -22,7 +22,7 @@ Docs are at [critica-tech-lab.github.io/loica](https://critica-tech-lab.github.i
 
 ## Built with
 
-Loica runs on [React Router 7](https://reactrouter.com/) with a [ProseMirror](https://prosemirror.net/) editor and [Yjs](https://yjs.dev/) for the real-time sync. The server is [Bun](https://bun.sh/) with SQLite ([better-sqlite3](https://github.com/WiseLibs/better-sqlite3)) for storage, and passwords are hashed with Argon2.
+Loica runs on [React Router 8](https://reactrouter.com/) with a [ProseMirror](https://prosemirror.net/) editor and [Yjs](https://yjs.dev/) for the real-time sync. The server is [Bun](https://bun.sh/) with SQLite ([better-sqlite3](https://github.com/WiseLibs/better-sqlite3)) for storage, and passwords are hashed with Argon2.
 
 ## Quick start (development)
 

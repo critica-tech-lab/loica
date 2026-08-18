@@ -37,7 +37,7 @@ features:
 | Layer | Technology |
 |-------|-----------|
 | Runtime | Bun |
-| Framework | React Router 7 (SSR) |
+| Framework | React Router 8 (SSR) |
 | UI | React 19 + Tailwind CSS 4 |
 | Editor | ProseMirror + Markdown |
 | Real-time sync | Yjs (CRDT) + WebSocket |
@@ -49,7 +49,7 @@ features:
 
 Loica runs two processes sharing one SQLite database:
 
-1. **Web server** — React Router 7 SSR app handling all HTTP requests, page rendering, and form actions
+1. **Web server** — React Router 8 SSR app handling all HTTP requests, page rendering, and form actions
 2. **WebSocket server** — Standalone Yjs CRDT sync with awareness/presence protocol
 
 Both must be running for real-time collaboration to work. In production, a reverse proxy (Caddy or nginx) sits in front for TLS termination and WebSocket routing.
