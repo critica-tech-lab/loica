@@ -2,6 +2,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { stripFontCdn } from "./vite-plugins/strip-font-cdn.ts";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -11,7 +12,7 @@ export default defineConfig({
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
-  plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), stripFontCdn()],
   server: {
     port: 4000,
     host: "0.0.0.0",
