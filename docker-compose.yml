@@ -1,0 +1,45 @@
+# Loica, two processes off one image, sharing one data volume.
+#
+#   docker compose up --build
+#   open http://localhost:3000
+#
+# The first account to sign up becomes the admin.
+#
+# For a real deployment put a reverse proxy in front, stop publishing port 4001,
+# and route /ws to the ws service — see docs/deployment.md. Then set
+# WS_URL=wss://your-domain.com/ws, SITE_URL=https://your-domain.com and
+# SECURE_COOKIE=true.
+
+services:
+  web:
+    build: .
+    image: loica:local
+    restart: unless-stopped
+    environment:
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
+      # The WebSocket URL as the *browser* sees it, not as the container does.
+      WS_URL: ${WS_URL:-ws://localhost:4001}
+      SECURE_COOKIE: ${SECURE_COOKIE:-false}
+    volumes:
+      - loica-data:/data
+    ports:
+      - "3000:3000"
+
+  ws:
+    build: .
+    image: loica:local
+    restart: unless-stopped
+    command: ["node", "ws-server.ts"]
+    environment:
+      # Origin check for incoming WebSocket connections. Derived from WS_URL
+      # when unset; set explicitly if the browser reaches the app on a
+      # different origin than WS_URL implies.
+      WS_URL: ${WS_URL:-ws://localhost:4001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    volumes:
+      - loica-data:/data
+    ports:
+      - "4001:4001"
+
+volumes:
+  loica-data:

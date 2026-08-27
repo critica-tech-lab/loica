@@ -6,7 +6,27 @@ import { stripFontCdn } from "./vite-plugins/strip-font-cdn.ts";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+// Commit hash for the admin panel's build info. A build does not always run
+// inside a git checkout — a source tarball, a container image, a CI runner
+// with no history — and there `git` is missing or fails. Fall back instead of
+// killing the build; SOURCE_COMMIT lets those builds inject the real hash.
+function resolveCommit(): string {
+  const injected = process.env.SOURCE_COMMIT?.trim();
+  if (injected) {
+    return injected.slice(0, 7);
+  }
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+const commitHash = resolveCommit();
 
 export default defineConfig({
   define: {
