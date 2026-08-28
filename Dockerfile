@@ -49,9 +49,10 @@ FROM toolchain AS prod-deps
 
 COPY package.json bun.lock ./
 
-# --omit=peer keeps next out of the image: it is a peer dependency of `geist`,
-# which exists only to supply four .woff2 files that Vite has already baked
-# into build/client. Installing it costs ~370 MB and nothing reads it here.
+# --omit=peer as a standing guard. Peers are a build-time concern that nothing
+# here loads at runtime, and one of them — next, pulled in by the `geist` font
+# package — used to cost this image ~370 MB on its own. That dependency is gone
+# now, but the flag keeps the next one from arriving unnoticed.
 RUN bun install --frozen-lockfile --production --omit=peer
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
