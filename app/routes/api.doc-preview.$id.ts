@@ -33,7 +33,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 <meta charset="utf-8">
 <title>${escapeHtml(title)} — loica</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,700;1,400;1,700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+  /* No webfont import: this HTML renders in the viewer's browser, and fetching
+     from a font CDN would leak their IP to a third party and stall the preview
+     on installs with no outbound network. IBM Plex stays first in the stacks
+     below, so anyone who has it installed still gets it. */
 
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -107,7 +110,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   /* Code */
   code, samp, kbd {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.94em;
     background: rgba(36, 36, 36, 0.055);
     padding: 0.083em 0.167em;
