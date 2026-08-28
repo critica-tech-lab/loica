@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Parse `.env` from the working directory into process.env. Existing
@@ -44,6 +44,12 @@ loadDotEnv();
 // separate or persistent volume — e.g. a deployment with a read-only
 // application directory.
 export const DATA_DIR = process.env.DATA_DIR || process.cwd();
+
+// Create it if it is missing. better-sqlite3 will not create the directory
+// holding the database and fails the process outright — "Cannot open database
+// because the directory does not exist" — which is the first thing a fresh
+// container or a newly mounted volume hits.
+mkdirSync(DATA_DIR, { recursive: true });
 
 export const dbPath = join(DATA_DIR, "app.db");
 export const uploadsDir = join(DATA_DIR, "uploads");

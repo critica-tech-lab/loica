@@ -36,6 +36,48 @@ NODE_ENV=production
 WS_URL=wss://your-domain.com/ws
 ```
 
+## Docker
+
+The repository ships a `Dockerfile` and a `docker-compose.yml`. One image holds
+both processes; the container's command decides which one it runs.
+
+```bash
+git clone https://github.com/critica-tech-lab/loica.git
+cd loica
+docker compose up --build
+```
+
+Open <http://localhost:3000> and sign up — the first account becomes the admin.
+
+Everything mutable lives under `DATA_DIR`, which the image sets to `/data` and
+compose mounts as a named volume: the SQLite database, `uploads/`, and any
+drop-in `plugins/`. Back up that volume and you have backed up the install.
+
+For a real deployment, put a reverse proxy in front, stop publishing port 4001,
+route `/ws` to the `ws` service (see [Reverse Proxy](#reverse-proxy-nginx-alternative)),
+and set:
+
+```env
+SITE_URL=https://your-domain.com
+WS_URL=wss://your-domain.com/ws
+SECURE_COOKIE=true
+```
+
+To run the two processes without compose:
+
+```bash
+docker build -t loica .
+docker volume create loica-data
+
+docker run -d --name loica-web -p 3000:3000 -v loica-data:/data \
+  -e WS_URL=ws://localhost:4001 -e SECURE_COOKIE=false loica
+
+docker run -d --name loica-ws -p 4001:4001 -v loica-data:/data \
+  -e ALLOWED_ORIGINS=http://localhost:3000 loica node ws-server.ts
+```
+
+Both containers must mount the same volume — they share one SQLite database.
+
 ## Step-by-Step Deployment (Linux)
 
 ### 1. DNS

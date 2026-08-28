@@ -1,0 +1,32 @@
+# Build context hygiene. Anything listed here is either rebuilt inside the
+# image, install-specific, or must never end up in a published layer.
+
+.git
+.github
+node_modules
+build
+.react-router
+
+# Install data. `DATA_DIR` is a mounted volume at runtime, never baked in.
+*.db
+*.db-shm
+*.db-wal
+uploads
+backups
+.env
+.env.*
+
+# Drop-in plugins are install-specific and `plugins/critica-pdf` is a symlink
+# to an out-of-root repo, which docker cannot follow. Plugins load from
+# `DATA_DIR/plugins` at runtime.
+plugins
+
+docs/.vitepress/cache
+docs/.vitepress/dist
+
+.DS_Store
+.claude
+CLAUDE.md
+*.log
+nohup.out
+ecosystem.config.cjs
