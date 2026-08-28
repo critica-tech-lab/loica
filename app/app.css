@@ -1,10 +1,11 @@
-/* ─── Google Fonts (must precede @import "tailwindcss") ── */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap");
-
 /* ─── Geist fonts ────────────────────────────────────────── */
+/* Vendored under app/fonts/geist (SIL OFL 1.1, license alongside). Self-hosted
+   on purpose: a fetch from a font CDN would hand every visitor's IP to a third
+   party and break installs with no outbound network. Vite fingerprints these
+   into build/client/assets, so they cache immutably. */
 @font-face {
   font-family: "Geist Pixel";
-  src: url("/node_modules/geist/dist/fonts/geist-pixel/GeistPixel-Square.woff2") format("woff2");
+  src: url("./fonts/geist/GeistPixel-Square.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -12,21 +13,21 @@
 
 @font-face {
   font-family: "Geist Sans";
-  src: url("/node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  src: url("./fonts/geist/Geist-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Geist Sans";
-  src: url("/node_modules/geist/dist/fonts/geist-sans/Geist-Italic[wght].woff2") format("woff2");
+  src: url("./fonts/geist/Geist-Italic-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: "Geist Mono";
-  src: url("/node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  src: url("./fonts/geist/GeistMono-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -35,7 +36,7 @@
    render in mono while the rest of the text stays Geist Sans. */
 @font-face {
   font-family: "Geist Numerals";
-  src: url("/node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  src: url("./fonts/geist/GeistMono-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -43,7 +44,7 @@
 }
 @font-face {
   font-family: "Geist Mono";
-  src: url("/node_modules/geist/dist/fonts/geist-mono/GeistMono-Italic[wght].woff2") format("woff2");
+  src: url("./fonts/geist/GeistMono-Italic-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: italic;
   font-display: swap;
@@ -78,7 +79,7 @@
      the highlight + margin indicator. */
   --comment-color: var(--accent);
 
-  --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
 
   /* Radius scale */
   --radius-xs: 4px;
@@ -124,7 +125,7 @@
 
 /* ─── Design tokens ─────────────────────────────────────── */
 :root {
-  --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
   /* Editor body: Geist Sans for text, Geist Mono for digits only (see the
      "Geist Numerals" @font-face — unicode-range scopes it to U+0030–0039). */
   --font-editor: "Geist Numerals", var(--font-ui);
