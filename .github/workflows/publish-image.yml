@@ -1,0 +1,67 @@
+# Publishes Loica's container image to the GitHub Container Registry.
+#
+# The Cloudron package layers onto this image (cloudron/Dockerfile, FROM_IMAGE),
+# so until it exists in a registry the package can only be built in two local
+# steps and cannot be distributed at all.
+#
+# amd64 only. The image compiles better-sqlite3, @node-rs/argon2 and sharp from
+# the toolchain stage, so an arm64 build means emulation and a build time in the
+# tens of minutes. Cloudron runs amd64; add arm64 when something needs it.
+
+name: Publish image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ghcr
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # latest on main; X.Y.Z and X.Y on a version tag.
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # vite.config.ts reads this; the build context has no .git, so
+          # without it the admin panel would report an unknown commit.
+          build-args: |
+            SOURCE_COMMIT=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

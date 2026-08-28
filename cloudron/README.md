@@ -47,7 +47,21 @@ runs under systemd and pm2.
 
 ## Building
 
-The base image is not published to a registry yet, so the build is two steps:
+`.github/workflows/publish-image.yml` publishes the base image to
+`ghcr.io/critica-tech-lab/loica` on every push to `main` and on version tags,
+which is what `FROM_IMAGE` defaults to. So the normal build is one step:
+
+```bash
+cloudron build          # from this directory
+```
+
+> **First publish only:** a new ghcr package is private even when the repository
+> is public. Until someone flips it to public under the repository's *Packages*
+> settings, `cloudron install` cannot pull it and the build above cannot resolve
+> `FROM_IMAGE`.
+
+To build against local changes instead of the published image — which is what
+you want while developing the package itself:
 
 ```bash
 # 1. Loica's ordinary image, from the repository root
@@ -57,14 +71,11 @@ docker build -t loica:local .
 docker build -t loica-cloudron --build-arg FROM_IMAGE=loica:local cloudron/
 ```
 
-Then push `loica-cloudron` to a registry your Cloudron can reach and install it:
+Then push `loica-cloudron` to a registry your Cloudron can reach:
 
 ```bash
 cloudron install --image <registry>/loica-cloudron:<tag>
 ```
-
-Once the base image is published, `cloudron build` from this directory works
-directly — `FROM_IMAGE` already defaults to the intended registry path.
 
 ## Developing against a running install
 
@@ -80,5 +91,6 @@ cloudron debug --disable
 `version` in `CloudronManifest.json` is what Cloudron compares to decide
 whether an update is available. Bump it with the app.
 
-Before publishing, fill in the empty fields in the manifest — `packagerName`,
-`packagerUrl`, `contactEmail`, `iconUrl` — and add a square `logo.png`.
+`logo.png` is the square 256×256 variant of the Loica mark, supplied as
+artwork. Replace it with another square PNG if the brand changes — do not derive
+one from `public/loica-logo.png`, which is the wide lockup.
