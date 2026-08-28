@@ -1,0 +1,6 @@
+[0.1.0]
+* First Cloudron package.
+* Real-time collaborative Markdown editing, workspaces, comments, version
+  history, and PDF/DOCX export.
+* Optional single sign-on through the OIDC addon and outbound mail through the
+  sendmail addon.

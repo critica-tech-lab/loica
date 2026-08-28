@@ -1,0 +1,38 @@
+{
+  "id": "tech.critica.loica",
+  "manifestVersion": 2,
+  "title": "Loica",
+  "tagline": "Collaborative Markdown editor",
+  "version": "0.1.0",
+  "healthCheckPath": "/api/healthz",
+  "httpPort": 8000,
+  "memoryLimit": 1073741824,
+  "optionalSso": true,
+  "addons": {
+    "localstorage": {
+      "sqlite": {
+        "paths": ["/app/data/app.db"]
+      }
+    },
+    "sendmail": {
+      "optional": true
+    },
+    "oidc": {
+      "optional": true,
+      "loginRedirectUri": "/auth/oidc/callback",
+      "logoutRedirectUri": "/",
+      "tokenSignatureAlgorithm": "RS256"
+    }
+  },
+  "website": "https://github.com/critica-tech-lab/loica",
+  "documentationUrl": "https://critica-tech-lab.github.io/loica",
+  "contactEmail": "",
+  "packagerName": "",
+  "packagerUrl": "",
+  "iconUrl": "",
+  "description": "file://DESCRIPTION.md",
+  "changelog": "file://CHANGELOG",
+  "postInstallMessage": "file://POSTINSTALL.md",
+  "tags": ["markdown", "editor", "collaboration", "writing", "documents"],
+  "mediaLinks": []
+}
