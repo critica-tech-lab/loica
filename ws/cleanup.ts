@@ -4,7 +4,7 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { readdirSync, unlinkSync } from "node:fs";
+import { readdirSync, unlinkSync, statSync } from "node:fs";
 import { STALE_AGE_SECS, MIN_CONTENT_LEN, RING_BUFFER_SIZE } from "./types.ts";
 import { uploadsDir } from "../app/lib/paths.server.ts";
 
@@ -13,13 +13,21 @@ import { uploadsDir } from "../app/lib/paths.server.ts";
  */
 export function initializeCleanupStatements(db: Database.Database) {
   return {
+    // Abandoned blank docs only. Two exclusions, both load-bearing:
+    //   · pdf_file — an uploaded PDF/docx stores '' as content (createPdfDocument),
+    //     so without this every upload becomes a delete target after 48h.
+    //   · deleted_at — trashed docs are the trash's business (30-day retention
+    //     via purgeExpiredTrash); this hard DELETE would bypass it.
     findStale: db.prepare(
       `SELECT id FROM documents
        WHERE length(content) < @minLen
-         AND created_at < (unixepoch() - @ageSecs)`
+         AND created_at < (unixepoch() - @ageSecs)
+         AND (pdf_file IS NULL OR length(pdf_file) = 0)
+         AND deleted_at IS NULL`
     ),
     deleteDoc: db.prepare(`DELETE FROM documents WHERE id = ?`),
     allContent: db.prepare(`SELECT content FROM documents`),
+    allVersionContent: db.prepare(`SELECT content FROM document_versions`),
     pruneUpdates: db.prepare(
       `DELETE FROM document_updates
        WHERE document_id = @docId
@@ -66,8 +74,46 @@ export function cleanupStaleDocs(
   }
 }
 
+// An upload must go unreferenced for this long before it can be deleted. The
+// markdown projection in `documents.content` is regenerated asynchronously by
+// the ws-server, so a reference can be briefly absent from it while the file is
+// very much still in use. Deleting a file is irreversible; waiting is free.
+const MIN_ORPHAN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
 /**
- * Delete upload files that are not referenced in any document.
+ * Names still referenced by a Yjs binary — the actual source of truth for
+ * document contents (see storage-architecture.md); `documents.content` is only
+ * a one-way projection of it. Image `src` attributes live in the binary as
+ * plain UTF-8, so a substring scan is enough and avoids decoding every doc.
+ *
+ * Only called for names that already look orphaned, so the blob scan is skipped
+ * entirely on the common run where nothing is up for deletion.
+ */
+function referencedInYjsState(db: Database.Database, candidates: Set<string>): Set<string> {
+  const found = new Set<string>();
+  if (candidates.size === 0) return found;
+
+  const needles = [...candidates].map((name) => ({ name, buf: Buffer.from(name, "utf8") }));
+
+  for (const sql of [
+    `SELECT yjs_state AS blob FROM documents WHERE yjs_state IS NOT NULL`,
+    `SELECT yjs_state AS blob FROM document_versions WHERE yjs_state IS NOT NULL`,
+  ]) {
+    for (const row of db.prepare(sql).iterate() as Iterable<{ blob: Buffer }>) {
+      for (const { name, buf } of needles) {
+        if (!found.has(name) && row.blob.includes(buf)) found.add(name);
+      }
+      if (found.size === candidates.size) return found;
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Delete upload files that no document references — from its markdown, its
+ * version history, or its Yjs binary — and that have been unreferenced long
+ * enough to be safely considered dead.
  * Also checks workspace icons.
  */
 export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatements): void {
@@ -92,6 +138,12 @@ export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatem
     for (const m of matches) referenced.add(m[1]);
   }
 
+  // Version history counts as a reference: an image dropped from the live doc
+  // must survive so restoring an older version doesn't yield a broken image.
+  for (const row of stmts.allVersionContent.all() as { content: string }[]) {
+    for (const m of row.content.matchAll(/\/api\/uploads\/([^\s)"']+)/g)) referenced.add(m[1]);
+  }
+
   // Also check pdf_file column (uploaded PDFs, docx, pages, xlsx, etc.)
   const pdfFileRows = db.prepare(`SELECT pdf_file FROM documents WHERE pdf_file IS NOT NULL AND length(pdf_file) > 0`).all() as { pdf_file: string }[];
   for (const row of pdfFileRows) {
@@ -108,9 +160,26 @@ export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatem
     if (m) referenced.add(m[1]);
   }
 
-  let removed = 0;
+  // Candidates: unreferenced by any projection AND old enough that a lagging
+  // projection can't explain the absence.
+  const cutoff = Date.now() - MIN_ORPHAN_AGE_MS;
+  const candidates = new Set<string>();
   for (const file of files) {
     if (referenced.has(file)) continue;
+    try {
+      if (statSync(join(uploadDir, file)).mtimeMs > cutoff) continue;
+    } catch {
+      continue; // vanished under us — nothing to do
+    }
+    candidates.add(file);
+  }
+
+  // Final gate: the Yjs binary. Anything still reachable there is live.
+  const liveInYjs = referencedInYjsState(db, candidates);
+
+  let removed = 0;
+  for (const file of candidates) {
+    if (liveInYjs.has(file)) continue;
     try {
       unlinkSync(join(uploadDir, file));
       removed++;
