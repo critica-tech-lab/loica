@@ -246,17 +246,33 @@ server {
 
 ## Backups
 
-Loica doesn't ship operational tooling — wire up backups the way your platform expects. SQLite hot-backup via cron is a good baseline:
+Loica doesn't ship operational tooling — wire up backups the way your platform expects.
+
+**Back up two things, not one.** `app.db` holds documents, but every uploaded
+image and file lives on disk in `uploads/` and is referenced from the database
+only by filename. A database-only backup restores documents with broken images.
 
 ```bash
-# Every 6 hours
-0 */6 * * * sqlite3 /path/to/app.db "VACUUM INTO '/path/to/backups/app-$(date +\%Y\%m\%d-\%H\%M).db'"
+# The backup directory must already exist — cron opens the log redirect BEFORE
+# running the command, so a missing directory silently kills the job forever.
+mkdir -p /path/to/backups
 
-# Prune backups older than 30 days
-30 3 * * * find /path/to/backups -name "app-*.db" -mtime +30 -delete
+# Database, every 6 hours
+0 */6 * * * sqlite3 /path/to/app.db "VACUUM INTO '/path/to/backups/app-$(date +\%Y\%m\%d-\%H\%M).db'" >> /path/to/backups/db.log 2>&1
+
+# Uploads, to wherever you keep offsite copies. Do NOT pass --delete: a sync
+# that mirrors deletions turns any accidental removal into permanent loss.
+0 */6 * * * rsync -a /path/to/uploads/ backup-host:/loica-uploads/ >> /path/to/backups/uploads.log 2>&1
 ```
 
-For continuous replication, [Litestream](https://litestream.io) streams WAL changes to an S3-compatible store. Install it separately and run as its own systemd service against your `app.db`.
+Verify the jobs actually run — check the logs after the first scheduled fire,
+not just the crontab. A cron job that fails at the shell leaves no trace.
+
+Pruning old backups is deliberately not shown here. If you add it, make it
+opt-in and confirm it only ever targets database snapshots; the archive is
+usually the only copy of anything you have already lost from the live disk.
+
+For continuous replication, [Litestream](https://litestream.io) streams WAL changes to an S3-compatible store. Install it separately and run as its own systemd service against your `app.db`. Note that its `retention` setting bounds a point-in-time rewind window — it is not a long-term archive, and it does not cover `uploads/`.
 
 ## Security Checklist
 
@@ -264,7 +280,8 @@ For continuous replication, [Litestream](https://litestream.io) streams WAL chan
 - [ ] Use HTTPS everywhere (Caddy handles this automatically)
 - [ ] Set `WS_URL` to `wss://`
 - [ ] Disable open registration if needed (toggle in admin panel)
-- [ ] Set up database backups
+- [ ] Set up database backups — and `uploads/` backups; the database alone is not enough
+- [ ] Confirm the backup jobs actually ran (check their logs, not the crontab)
 - [ ] Restrict `app.db` file permissions to the service user
 - [ ] Consider rate limiting via your reverse proxy
 

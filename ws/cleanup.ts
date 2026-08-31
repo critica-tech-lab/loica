@@ -1,12 +1,28 @@
 /**
  * Background cleanup tasks: stale documents, orphan uploads, version pruning.
+ *
+ * Design rule for everything in this file: **an unattended job never destroys
+ * user data.** It may only move data somewhere recoverable. Deciding what to
+ * destroy from a derived value (`documents.content` is a one-way projection of
+ * the Yjs binary — see storage-architecture.md) means every bug upstream of
+ * that projection becomes permanent data loss down here. So:
+ *
+ *   · stale documents  → soft-deleted into the owner's trash, not DELETEd
+ *   · orphan uploads   → moved to uploads/.quarantine/, not unlinked
+ *
+ * Both leave an operator in the loop, and both are reversible by hand.
  */
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { readdirSync, unlinkSync, statSync } from "node:fs";
+import { readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from "node:fs";
 import { STALE_AGE_SECS, MIN_CONTENT_LEN, RING_BUFFER_SIZE } from "./types.ts";
 import { uploadsDir } from "../app/lib/paths.server.ts";
+
+/** Where orphaned uploads go instead of being deleted. Never emptied automatically. */
+const QUARANTINE_DIR = ".quarantine";
+/** Append-only record of what was quarantined and when, so a restore is possible. */
+const QUARANTINE_LOG = "quarantine.log";
 
 /**
  * Initialize cleanup statements.
@@ -25,7 +41,14 @@ export function initializeCleanupStatements(db: Database.Database) {
          AND (pdf_file IS NULL OR length(pdf_file) = 0)
          AND deleted_at IS NULL`
     ),
-    deleteDoc: db.prepare(`DELETE FROM documents WHERE id = ?`),
+    // Soft-delete, not DELETE. `deleted_by` is set to the document's own owner
+    // so the row lands in *their* trash (getTrashedDocuments filters on it) and
+    // they can restore it, rather than vanishing with no trace and no notice.
+    trashDoc: db.prepare(
+      `UPDATE documents
+       SET deleted_at = unixepoch(), deleted_by = created_by
+       WHERE id = ? AND deleted_at IS NULL`
+    ),
     allContent: db.prepare(`SELECT content FROM documents`),
     allVersionContent: db.prepare(`SELECT content FROM document_versions`),
     pruneUpdates: db.prepare(
@@ -44,9 +67,14 @@ export function initializeCleanupStatements(db: Database.Database) {
 export type CleanupStatements = ReturnType<typeof initializeCleanupStatements>;
 
 /**
- * Delete documents that are stale (< MIN_CONTENT_LEN chars, > 48h old)
- * and not currently in use (in a room).
- * Pass the rooms map to skip docs with active connections.
+ * Move stale documents (< MIN_CONTENT_LEN chars, > 48h old) into their owner's
+ * trash. Docs with an active room are skipped — someone is editing.
+ *
+ * This used to be a hard `DELETE`. It isn't any more: `content` is a derived
+ * projection, so "this document looks empty" is a claim about the projection,
+ * not about the document. The Yjs binary may hold a perfectly good doc whose
+ * markdown projection momentarily failed to regenerate. Trashing keeps the
+ * 30-day window (purgeExpiredTrash) and lets the owner restore it.
  */
 export function cleanupStaleDocs(
   stmts: CleanupStatements,
@@ -59,17 +87,16 @@ export function cleanupStaleDocs(
 
   if (stale.length === 0) return;
 
-  let deleted = 0;
+  let trashed = 0;
   for (const { id } of stale) {
     // Skip docs with active rooms (someone is editing)
     if (activeRooms.has(id)) continue;
-    stmts.deleteDoc.run(id);
-    deleted++;
+    trashed += stmts.trashDoc.run(id).changes;
   }
 
-  if (deleted > 0) {
+  if (trashed > 0) {
     console.log(
-      `[ws-server] Cleaned up ${deleted} stale document(s) (< ${MIN_CONTENT_LEN} chars, > 48h old)`
+      `[ws-server] Moved ${trashed} stale document(s) to trash (< ${MIN_CONTENT_LEN} chars, > 48h old)`
     );
   }
 }
@@ -111,17 +138,23 @@ function referencedInYjsState(db: Database.Database, candidates: Set<string>): S
 }
 
 /**
- * Delete upload files that no document references — from its markdown, its
- * version history, or its Yjs binary — and that have been unreferenced long
- * enough to be safely considered dead.
+ * Move upload files that no document references — not from its markdown, its
+ * version history, or its Yjs binary — into `uploads/.quarantine/`, and only
+ * once they have been unreferenced long enough to be plausibly dead.
  * Also checks workspace icons.
+ *
+ * Nothing here deletes. Emptying the quarantine is a human decision.
  */
 export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatements): void {
   const uploadDir = uploadsDir;
 
   let files: string[];
   try {
-    files = readdirSync(uploadDir);
+    // Files only — skips `.quarantine/` itself, which would otherwise become a
+    // candidate and get renamed into itself.
+    files = readdirSync(uploadDir, { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => e.name);
   } catch {
     return; // uploads/ doesn't exist yet
   }
@@ -177,19 +210,27 @@ export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatem
   // Final gate: the Yjs binary. Anything still reachable there is live.
   const liveInYjs = referencedInYjsState(db, candidates);
 
-  let removed = 0;
+  const quarantineDir = join(uploadDir, QUARANTINE_DIR);
+  let moved = 0;
   for (const file of candidates) {
     if (liveInYjs.has(file)) continue;
     try {
-      unlinkSync(join(uploadDir, file));
-      removed++;
+      mkdirSync(quarantineDir, { recursive: true });
+      renameSync(join(uploadDir, file), join(quarantineDir, file));
+      appendFileSync(
+        join(quarantineDir, QUARANTINE_LOG),
+        `${new Date().toISOString()}\t${file}\tunreferenced\n`,
+      );
+      moved++;
     } catch (e) {
-      console.error("[ws-server] error deleting orphan upload:", file, e);
+      console.error("[ws-server] error quarantining orphan upload:", file, e);
     }
   }
 
-  if (removed > 0) {
-    console.log(`[ws-server] Cleaned up ${removed} orphan upload(s)`);
+  if (moved > 0) {
+    console.log(
+      `[ws-server] Quarantined ${moved} orphan upload(s) to ${QUARANTINE_DIR}/ — review and delete by hand`
+    );
   }
 }
 
