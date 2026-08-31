@@ -558,6 +558,11 @@ function EditableView({
     [fetcher]
   );
 
+  // Only the legacy CodeMirror editor and extension editors post content here —
+  // their onChange yields the real document text. The PM editor's onChange yields
+  // *plaintext* (doc.textContent), so posting it would clobber the markdown
+  // projection the ws-server writes from the Yjs binary, dropping image links and
+  // every other markdown construct. Mirrors the guard in DocumentContext.save.
   function scheduleSave(c: string) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => save(c), 600);
@@ -667,7 +672,7 @@ function EditableView({
               onReady={(api) => { editorApi.current = api; setEditorReady(true); }}
               onPresenceChange={onPresenceChange}
               onConnectionStatus={(s) => { setLocalConnectionStatus(s); onConnectionStatus(s); }}
-              onChange={(val) => { setContent(val); scheduleSave(val); }}
+              onChange={(val) => { setContent(val); }}
               onStateChange={setPmActiveState}
               onTrackChangesStateChange={setTrackChangesState}
               onTrackChangeClick={(changeId, pos) => setTrackPopup({ changeId, pos })}

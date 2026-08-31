@@ -98,6 +98,14 @@ sudo apt update && sudo apt install -y caddy
 
 ```bash
 sudo tee /etc/caddy/Caddyfile << 'EOF'
+{
+    # Serve HTTP/1.1 and HTTP/2 only. See the HTTP/3 note below before
+    # removing this — uploads break in a way that leaves no server-side trace.
+    servers {
+        protocols h1 h2
+    }
+}
+
 your-domain.com {
     handle_path /ws/* {
         reverse_proxy localhost:4001
@@ -112,6 +120,27 @@ sudo systemctl restart caddy
 ```
 
 Caddy automatically obtains a Let's Encrypt TLS certificate.
+
+#### Why HTTP/3 is disabled
+
+Caddy serves h1+h2+h3 by default. Over HTTP/3, uploads larger than **1 MiB**
+stall permanently in QUIC stream flow control: the browser sends exactly
+1048576 bytes of a much larger body and then waits forever.
+
+This failure is invisible from the server. The request never reaches the
+application, so there is no error to log — the access log shows the POST with no
+status code and no duration, and the browser only reports
+`BodyStreamBuffer was aborted`. It looks like an application bug and is not one.
+
+If you re-enable HTTP/3, test an upload over 1 MiB before trusting it, and know
+that **the browser caches `Alt-Svc: h3=":443"` for 30 days** — after Caddy stops
+advertising HTTP/3 a browser will keep using it, so the change appears to do
+nothing. Test in a private window (separate Alt-Svc cache) or confirm the
+Network tab's Protocol column reads `HTTP/2`. From outside:
+
+```bash
+curl -sI https://your-domain.com/api/healthz | grep -i alt-svc   # expect no output
+```
 
 ### 4. Create systemd services
 
@@ -246,17 +275,33 @@ server {
 
 ## Backups
 
-Loica doesn't ship operational tooling — wire up backups the way your platform expects. SQLite hot-backup via cron is a good baseline:
+Loica doesn't ship operational tooling — wire up backups the way your platform expects.
+
+**Back up two things, not one.** `app.db` holds documents, but every uploaded
+image and file lives on disk in `uploads/` and is referenced from the database
+only by filename. A database-only backup restores documents with broken images.
 
 ```bash
-# Every 6 hours
-0 */6 * * * sqlite3 /path/to/app.db "VACUUM INTO '/path/to/backups/app-$(date +\%Y\%m\%d-\%H\%M).db'"
+# The backup directory must already exist — cron opens the log redirect BEFORE
+# running the command, so a missing directory silently kills the job forever.
+mkdir -p /path/to/backups
 
-# Prune backups older than 30 days
-30 3 * * * find /path/to/backups -name "app-*.db" -mtime +30 -delete
+# Database, every 6 hours
+0 */6 * * * sqlite3 /path/to/app.db "VACUUM INTO '/path/to/backups/app-$(date +\%Y\%m\%d-\%H\%M).db'" >> /path/to/backups/db.log 2>&1
+
+# Uploads, to wherever you keep offsite copies. Do NOT pass --delete: a sync
+# that mirrors deletions turns any accidental removal into permanent loss.
+0 */6 * * * rsync -a /path/to/uploads/ backup-host:/loica-uploads/ >> /path/to/backups/uploads.log 2>&1
 ```
 
-For continuous replication, [Litestream](https://litestream.io) streams WAL changes to an S3-compatible store. Install it separately and run as its own systemd service against your `app.db`.
+Verify the jobs actually run — check the logs after the first scheduled fire,
+not just the crontab. A cron job that fails at the shell leaves no trace.
+
+Pruning old backups is deliberately not shown here. If you add it, make it
+opt-in and confirm it only ever targets database snapshots; the archive is
+usually the only copy of anything you have already lost from the live disk.
+
+For continuous replication, [Litestream](https://litestream.io) streams WAL changes to an S3-compatible store. Install it separately and run as its own systemd service against your `app.db`. Note that its `retention` setting bounds a point-in-time rewind window — it is not a long-term archive, and it does not cover `uploads/`.
 
 ## Security Checklist
 
@@ -264,7 +309,8 @@ For continuous replication, [Litestream](https://litestream.io) streams WAL chan
 - [ ] Use HTTPS everywhere (Caddy handles this automatically)
 - [ ] Set `WS_URL` to `wss://`
 - [ ] Disable open registration if needed (toggle in admin panel)
-- [ ] Set up database backups
+- [ ] Set up database backups — and `uploads/` backups; the database alone is not enough
+- [ ] Confirm the backup jobs actually ran (check their logs, not the crontab)
 - [ ] Restrict `app.db` file permissions to the service user
 - [ ] Consider rate limiting via your reverse proxy
 
