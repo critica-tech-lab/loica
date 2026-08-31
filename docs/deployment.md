@@ -98,6 +98,14 @@ sudo apt update && sudo apt install -y caddy
 
 ```bash
 sudo tee /etc/caddy/Caddyfile << 'EOF'
+{
+    # Serve HTTP/1.1 and HTTP/2 only. See the HTTP/3 note below before
+    # removing this — uploads break in a way that leaves no server-side trace.
+    servers {
+        protocols h1 h2
+    }
+}
+
 your-domain.com {
     handle_path /ws/* {
         reverse_proxy localhost:4001
@@ -112,6 +120,27 @@ sudo systemctl restart caddy
 ```
 
 Caddy automatically obtains a Let's Encrypt TLS certificate.
+
+#### Why HTTP/3 is disabled
+
+Caddy serves h1+h2+h3 by default. Over HTTP/3, uploads larger than **1 MiB**
+stall permanently in QUIC stream flow control: the browser sends exactly
+1048576 bytes of a much larger body and then waits forever.
+
+This failure is invisible from the server. The request never reaches the
+application, so there is no error to log — the access log shows the POST with no
+status code and no duration, and the browser only reports
+`BodyStreamBuffer was aborted`. It looks like an application bug and is not one.
+
+If you re-enable HTTP/3, test an upload over 1 MiB before trusting it, and know
+that **the browser caches `Alt-Svc: h3=":443"` for 30 days** — after Caddy stops
+advertising HTTP/3 a browser will keep using it, so the change appears to do
+nothing. Test in a private window (separate Alt-Svc cache) or confirm the
+Network tab's Protocol column reads `HTTP/2`. From outside:
+
+```bash
+curl -sI https://your-domain.com/api/healthz | grep -i alt-svc   # expect no output
+```
 
 ### 4. Create systemd services
 
