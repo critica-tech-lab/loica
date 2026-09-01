@@ -1,7 +1,7 @@
 import { Form, redirect, useLoaderData, useActionData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/teamspaces";
-import { getSessionUser, loginRedirect } from "~/lib/auth.server";
+import { requireAdmin } from "~/lib/auth.server";
 import { getTeamspacesForUser, createTeamspace } from "~/lib/teamspace.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
@@ -12,14 +12,15 @@ import { useState } from "react";
 export const meta: MetaFunction = () => [{ title: "Teamspaces — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = getSessionUser(request);
-  if (!user) throw loginRedirect(request);
+  const user = requireAdmin(request);
   return { teamspaces: getTeamspacesForUser(user.id) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const user = getSessionUser(request);
-  if (!user) throw loginRedirect(request);
+  // The menu entry was already admin-only, but the route wasn't: any logged-in
+  // user could POST here and create a teamspace. Hiding a link is not a
+  // permission.
+  const user = requireAdmin(request);
 
   const form = await request.formData();
 
