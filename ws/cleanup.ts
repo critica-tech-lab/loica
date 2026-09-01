@@ -75,6 +75,12 @@ export type CleanupStatements = ReturnType<typeof initializeCleanupStatements>;
  * not about the document. The Yjs binary may hold a perfectly good doc whose
  * markdown projection momentarily failed to regenerate. Trashing keeps the
  * 30-day window (purgeExpiredTrash) and lets the owner restore it.
+ *
+ * Measured yield in production (Sept 2026): **zero candidates**, out of 910
+ * documents. Once pdf_file and deleted_at are excluded there is almost nothing
+ * left for it to match. It is kept because it is cheap and harmless, not
+ * because it is holding anything back — don't read its caution as evidence
+ * that it does important work.
  */
 export function cleanupStaleDocs(
   stmts: CleanupStatements,
@@ -144,6 +150,16 @@ function referencedInYjsState(db: Database.Database, candidates: Set<string>): S
  * Also checks workspace icons.
  *
  * Nothing here deletes. Emptying the quarantine is a human decision.
+ *
+ * Measured yield in production (Sept 2026): **zero orphans**, out of 424 files
+ * and 112 MB. Every upload on disk is still referenced. Note also that even a
+ * hit reclaims no space — quarantining is a rename within the same volume — so
+ * this job's contribution to disk usage is zero by construction.
+ *
+ * It only ever looks one way: file on disk, is it referenced? The opposite
+ * failure — a document referencing a file that is gone, which is what the
+ * pre-quarantine version of this code left behind — is invisible here. Use
+ * `scripts/audit-uploads.sh` for that direction.
  */
 export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatements): void {
   const uploadDir = uploadsDir;
@@ -250,8 +266,23 @@ export function deleteOldNotifications(db: Database.Database): void {
  * - Ring buffer: always keep the last RING_BUFFER_SIZE auto-versions per doc
  * - Tier 0 (beyond ring, 0–1h old): keep one per 10 minutes per document
  * - Tier 1 (1h–24h old): keep one per hour per document
- * - Tier 2 (8–30 days): keep latest auto-version per (document, day)
+ * - Tier 2 (7–30 days): keep latest auto-version per (document, day)
  * - Tier 3 (> 30 days): keep latest auto-version per (document, ISO week)
+ *
+ * **24h–7d is deliberately untouched.** No tier matches that window, so a
+ * document's first week keeps every auto-version it made. That is where people
+ * actually go looking — "what did I write on Tuesday" — and thinning it is the
+ * one saving nobody would thank us for. It is also cheap: 238 versions, 5 MB,
+ * measured in production against a 110 MB database.
+ *
+ * If document_versions ever dominates the database, this window is the first
+ * place to add a tier (one per 6h would be the obvious shape). Until then the
+ * gap is the feature.
+ *
+ * Note that none of this reads `documents.content`. Tiers are decided from
+ * `created_at` and `auto` alone, which is why this job was safe while the
+ * cleanup jobs above were destroying data: it never trusted the derived
+ * projection.
  */
 export function pruneAutoVersions(db: Database.Database): void {
   // Ring buffer: IDs of the last N auto-versions per document — never prune these
