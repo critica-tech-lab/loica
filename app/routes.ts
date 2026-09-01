@@ -24,6 +24,8 @@ export default [
   route("t/:workspaceId/trash", "routes/teamspace.trash.tsx"),
   route("t/:workspaceId/members", "routes/teamspace.members.tsx"),
   route("s/:token", "routes/s.$token.tsx"),
+  route("teamspaces", "routes/teamspaces.tsx"),
+  // Redirects only — see the route modules.
   route("groups", "routes/groups.tsx"),
   route("groups/:groupId", "routes/groups.$groupId.tsx"),
   route("shared", "routes/shared.tsx"),

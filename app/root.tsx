@@ -11,7 +11,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/root";
 import { getSessionUser } from "~/lib/auth.server";
-import { getPendingGroupInviteCount } from "~/lib/group.server";
 import { getPendingSharesForUser } from "~/lib/sharing.server";
 import { getPendingDocSharesForUser } from "~/lib/doc-sharing.server";
 import { getEnabledExtensionIdSet } from "~/extensions/index.server";
@@ -32,12 +31,11 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = getSessionUser(request);
-  const pendingInviteCount = user ? getPendingGroupInviteCount(user.id) : 0;
   const pendingShareCount = user
     ? getPendingSharesForUser(user.id).length + getPendingDocSharesForUser(user.id).length
     : 0;
   const enabledExtensionIds = Array.from(getEnabledExtensionIdSet());
-  return { user, pendingInviteCount, pendingShareCount, enabledExtensionIds };
+  return { user, pendingShareCount, enabledExtensionIds };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -82,7 +80,6 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const data = useRouteLoaderData<typeof loader>("root");
   const user = data?.user ?? null;
-  const pendingInviteCount = data?.pendingInviteCount ?? 0;
   const pendingShareCount = data?.pendingShareCount ?? 0;
 
   useEffect(() => {
@@ -179,14 +176,6 @@ export default function App() {
 
   return (
     <ToastProvider>
-      {pendingInviteCount > 0 && (
-        <a
-          href="/groups"
-          className="block bg-accent/10 px-4 py-2 text-center text-xs font-medium text-accent no-underline hover:bg-accent/15"
-        >
-          You have {pendingInviteCount} pending group invitation{pendingInviteCount > 1 ? "s" : ""}
-        </a>
-      )}
       {pendingShareCount > 0 && (
         <a
           href="/shared"
