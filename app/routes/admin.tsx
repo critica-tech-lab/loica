@@ -24,15 +24,29 @@ import { extensions } from "~/extensions";
 import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds, getCoreExtensionIdSet } from "~/extensions/index.server";
 import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
 import type { LoicaExtension } from "~/extensions/types";
-import { deleteTeamspace, renameTeamspace } from "~/lib/teamspace.server";
+import {
+  deleteTeamspace,
+  renameTeamspace,
+  getTeamspaceMembers,
+  addTeamspaceMember,
+  removeTeamspaceMember,
+  updateTeamspaceMemberRole,
+} from "~/lib/teamspace.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
+import { UserAutocomplete } from "~/components/UserAutocomplete";
+import { TrashIcon } from "~/components/icons";
 import { useSessionUser } from "~/root";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRevalidator } from "react-router";
 
 export const meta: MetaFunction = () => [{ title: "Admin — loica" }];
+
+// Mirrors the workspace_members CHECK constraint. 'editor' is the wire value
+// for what the UI calls "member", matching /t/:id/members.
+const TEAMSPACE_ROLES = ["admin", "editor", "viewer"] as const;
+type TeamspaceRole = (typeof TEAMSPACE_ROLES)[number];
 
 export async function loader({ request }: Route.LoaderArgs) {
   requireAdmin(request);
@@ -89,18 +103,22 @@ export async function loader({ request }: Route.LoaderArgs) {
     // ws-server not reachable — ignore
   }
 
-  // Fetch teamspaces
-  const teamspaces = prep<
-    { id: string; name: string; slug: string; group_name: string; member_count: number },
+  // Fetch teamspaces, each with its roster — membership is managed from this
+  // panel, so the members travel with the row instead of costing a second trip.
+  const teamspaceRows = prep<
+    { id: string; name: string; slug: string; group_name: string },
     []
   >(`
-    SELECT w.id, w.name, w.slug, g.name AS group_name,
-           (SELECT COUNT(*) FROM workspace_members WHERE workspace_id = w.id) AS member_count
+    SELECT w.id, w.name, w.slug, g.name AS group_name
     FROM workspaces w
     JOIN groups g ON g.workspace_id = w.id
     WHERE w.type = 'team'
     ORDER BY w.name ASC
   `).all();
+  const teamspaces = teamspaceRows.map((ts) => ({
+    ...ts,
+    members: getTeamspaceMembers(ts.id),
+  }));
 
   // Fetch client errors grouped by message
   const clientErrors = prep<
@@ -326,6 +344,49 @@ export async function action({ request }: Route.ActionArgs) {
     return { success: "Teamspace renamed." };
   }
 
+  // Membership intents delegate to teamspace.server, which writes
+  // workspace_members and group_members in one transaction. Going straight to
+  // the tables from here would leave the group behind and the teamspace would
+  // stop agreeing with itself about who belongs to it.
+  if (intent === "add-teamspace-member") {
+    const workspaceId = String(form.get("workspaceId") || "");
+    const email = String(form.get("email") || "").trim().toLowerCase();
+    if (!workspaceId || !email) return { error: "Teamspace and email are required." };
+
+    const target = prep<{ id: string }, [string]>("SELECT id FROM users WHERE email = ?")
+      .get(email);
+    if (!target) return { error: `No user found with email "${email}".` };
+
+    const existing = prep<{ user_id: string }, [string, string]>(
+        "SELECT user_id FROM workspace_members WHERE workspace_id = ? AND user_id = ?"
+      )
+      .get(workspaceId, target.id);
+    if (existing) return { error: "User is already a member of this teamspace." };
+
+    addTeamspaceMember(workspaceId, target.id, "editor");
+    return { success: `${email} has been added to the teamspace.` };
+  }
+
+  if (intent === "remove-teamspace-member") {
+    const workspaceId = String(form.get("workspaceId") || "");
+    const userId = String(form.get("userId") || "");
+    if (!workspaceId || !userId) return { error: "Teamspace and user are required." };
+
+    removeTeamspaceMember(workspaceId, userId);
+    return { success: "Member removed from the teamspace." };
+  }
+
+  if (intent === "update-teamspace-member-role") {
+    const workspaceId = String(form.get("workspaceId") || "");
+    const userId = String(form.get("userId") || "");
+    const role = String(form.get("role") || "") as TeamspaceRole;
+    if (!workspaceId || !userId) return { error: "Teamspace and user are required." };
+    if (!TEAMSPACE_ROLES.includes(role)) return { error: `Unknown role "${role}".` };
+
+    updateTeamspaceMemberRole(workspaceId, userId, role);
+    return { success: "Member role updated." };
+  }
+
   return null;
 }
 
@@ -474,6 +535,7 @@ export default function AdminPanel() {
   const [changingPwdId, setChangingPwdId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mergingId, setMergingId] = useState<string | null>(null);
+  const [managingTeamspaceId, setManagingTeamspaceId] = useState<string | null>(null);
   function clearPanels() {
     setEditingId(null);
     setChangingPwdId(null);
@@ -1177,28 +1239,106 @@ export default function AdminPanel() {
                 <span className="w-24 shrink-0 text-center">Members</span>
                 <span className="w-20 shrink-0" />
               </div>
-              {teamspaces.map((ts, i) => (
-                <div
-                  key={ts.id}
-                  className={`group flex items-center px-4 py-2 transition-colors hover:bg-fg/[0.04] ${i > 0 ? "border-t border-fg/[0.06]" : ""}`}
-                >
-                  <a
-                    href={`/t/${ts.id}`}
-                    className="flex flex-1 items-center text-fg no-underline"
-                  >
-                    <span className="flex-1 truncate text-sm font-medium">{ts.name}</span>
-                  </a>
-                  <span className="w-24 shrink-0 text-center text-xs text-fg/50">{ts.member_count}</span>
-                  <div className="flex w-20 shrink-0 items-center justify-end gap-2">
-                    <a
-                      href={`/t/${ts.id}/members`}
-                      className="shrink-0 font-mono text-xs text-fg/30 no-underline opacity-0 transition-opacity hover:text-fg/60 group-hover:opacity-100"
-                    >
-                      members
-                    </a>
+              {teamspaces.map((ts, i) => {
+                const managing = managingTeamspaceId === ts.id;
+                return (
+                  <div key={ts.id} className={i > 0 ? "border-t border-fg/[0.06]" : ""}>
+                    <div className="flex items-center px-4 py-2 transition-colors hover:bg-fg/[0.04]">
+                      <a
+                        href={`/t/${ts.id}`}
+                        className="flex flex-1 items-center text-fg no-underline"
+                      >
+                        <span className="flex-1 truncate text-sm font-medium">{ts.name}</span>
+                      </a>
+                      <span className="w-24 shrink-0 text-center text-xs text-fg/50">{ts.members.length}</span>
+                      <div className="flex w-20 shrink-0 items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setManagingTeamspaceId(managing ? null : ts.id)}
+                          aria-expanded={managing}
+                          className="shrink-0 cursor-pointer border-none bg-transparent font-mono text-xs text-fg/40 transition-colors hover:text-fg/70"
+                        >
+                          {managing ? "close" : "members"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {managing && (
+                      <div className="border-t border-fg/[0.06] bg-fg/[0.02] px-4 py-3">
+                        <Form method="post" className="mb-3 flex items-center gap-3">
+                          <input type="hidden" name="intent" value="add-teamspace-member" />
+                          <input type="hidden" name="workspaceId" value={ts.id} />
+                          <UserAutocomplete
+                            name="email"
+                            placeholder="Add member by name or email…"
+                            required
+                            className="flex-1 rounded-lg border border-fg/15 bg-bg px-3 py-2 text-sm text-fg outline-none placeholder:text-fg/25 focus:border-accent/40"
+                          />
+                          <button
+                            type="submit"
+                            disabled={busy}
+                            className="cursor-pointer rounded-lg border-none bg-accent/15 px-4 py-2 text-xs font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
+                          >
+                            Add
+                          </button>
+                        </Form>
+
+                        {ts.members.map((m) => (
+                          <div
+                            key={m.user_id}
+                            className="group/member flex items-center gap-3 border-t border-fg/[0.06] py-2 first:border-t-0"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm">
+                                {m.name}
+                                {m.user_id === user?.id && (
+                                  <span className="ml-1.5 text-xs text-fg/30">(you)</span>
+                                )}
+                              </div>
+                              <div className="truncate text-xs text-fg/30">{m.email}</div>
+                            </div>
+                            <Form method="post" className="shrink-0">
+                              <input type="hidden" name="intent" value="update-teamspace-member-role" />
+                              <input type="hidden" name="workspaceId" value={ts.id} />
+                              <input type="hidden" name="userId" value={m.user_id} />
+                              <select
+                                name="role"
+                                defaultValue={m.role}
+                                onChange={(e) => e.target.form?.requestSubmit()}
+                                className="cursor-pointer rounded border border-fg/15 bg-bg px-1.5 py-0.5 text-xs text-fg outline-none"
+                              >
+                                <option value="admin">admin</option>
+                                <option value="editor">member</option>
+                                <option value="viewer">viewer</option>
+                              </select>
+                            </Form>
+                            <div className="flex w-8 shrink-0 justify-end">
+                              {/* Removing yourself here would drop your own access from a
+                                  screen that doesn't show the consequence — same guard the
+                                  teamspace's own members page uses. */}
+                              {m.user_id !== user?.id && (
+                                <Form method="post">
+                                  <input type="hidden" name="intent" value="remove-teamspace-member" />
+                                  <input type="hidden" name="workspaceId" value={ts.id} />
+                                  <input type="hidden" name="userId" value={m.user_id} />
+                                  <button
+                                    type="submit"
+                                    onClick={(e) => { if (!confirm(`Remove ${m.name} from ${ts.name}?`)) e.preventDefault(); }}
+                                    className="cursor-pointer rounded border-none bg-transparent p-1.5 text-fg/30 opacity-0 transition-opacity hover:text-fg/70 group-hover/member:opacity-100"
+                                    title="Remove"
+                                  >
+                                    <TrashIcon className="h-3.5 w-3.5" />
+                                  </button>
+                                </Form>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

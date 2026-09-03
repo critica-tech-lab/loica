@@ -145,7 +145,7 @@ export default function Login() {
           {registrationOpen && (
             <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
               No account?{" "}
-              <a href="/signup" style={{ color: "var(--fg)" }}>
+              <a href={`/signup${nextQuery}`} style={{ color: "var(--fg)" }}>
                 Sign up
               </a>
             </p>

@@ -35,6 +35,22 @@ export function initializePersistenceStatements(db: Database.Database) {
       `INSERT INTO document_updates (id, document_id, user_id, user_name, yjs_update, created_at)
        VALUES (@id, @docId, @userId, @userName, @update, @createdAt)`
     ),
+    // A refused save leaves the editor looking healthy while nothing is being
+    // written. These two give it somewhere to surface: the admin panel's
+    // server error log, and the notifications of the person still typing.
+    recordDroppedSave: db.prepare<{ message: string; url: string }>(
+      `INSERT INTO server_errors (source, message, url) VALUES ('ws-server', @message, @url)`
+    ),
+    notifyDroppedSave: db.prepare<{
+      id: string;
+      userId: string;
+      title: string;
+      body: string;
+      link: string;
+    }>(
+      `INSERT INTO notifications (id, user_id, type, title, body, link)
+       VALUES (@id, @userId, 'save_blocked', @title, @body, @link)`
+    ),
   };
 }
 
@@ -186,6 +202,56 @@ function seedCommentsMap(db: Database.Database, doc: Y.Doc, docId: string): void
 }
 
 /**
+ * Documents already reported as oversized. A room retries its debounced save
+ * every few seconds, so without this the error log fills with one row per
+ * attempt. Scoped to the process: a restart reports each affected document
+ * once more, which is the right amount of noise for a condition that does not
+ * fix itself.
+ */
+const reportedOversized = new Set<string>();
+
+/**
+ * A save was refused. Tell both audiences once — the admin, who can raise the
+ * limit or split the document, and the person writing, who otherwise has no
+ * way to know their work stopped being persisted.
+ */
+function reportOversized(
+  stmts: PersistenceStatements,
+  docId: string,
+  bytes: number,
+  updatedBy: string | null
+): void {
+  const mb = (bytes / 1024 / 1024).toFixed(1);
+  const limitMb = (MAX_DOC_BYTES / 1024 / 1024).toFixed(0);
+  console.warn(
+    `[ws-server] Skipping save for doc ${docId}: content is ${mb} MB, over the ${limitMb} MB limit`
+  );
+
+  if (reportedOversized.has(docId)) return;
+  reportedOversized.add(docId);
+
+  const link = `/w/doc/${docId}`;
+  try {
+    stmts.recordDroppedSave.run({
+      message: `Document ${docId} is ${mb} MB, over the ${limitMb} MB limit — edits are no longer being saved.`,
+      url: link,
+    });
+    if (updatedBy) {
+      stmts.notifyDroppedSave.run({
+        id: nanoid(16),
+        userId: updatedBy,
+        title: "A document stopped saving",
+        body: `This document has grown past the ${limitMb} MB limit, so recent changes are not being stored. Split it into smaller documents to keep editing.`,
+        link,
+      });
+    }
+  } catch (e) {
+    // Reporting must never take the save path down with it.
+    console.error(`[ws-server] Failed to report oversized doc ${docId}:`, e);
+  }
+}
+
+/**
  * Save document content and Yjs state to DB if within size limit.
  * Returns true if save succeeded, false if oversized.
  */
@@ -196,13 +262,14 @@ export function saveIfSafe(
   state: Buffer,
   updatedBy: string | null = null
 ): boolean {
-  if (Buffer.byteLength(content, "utf8") > MAX_DOC_BYTES) {
-    console.warn(
-      `[ws-server] Skipping save for doc ${docId}: content exceeds ${MAX_DOC_BYTES} bytes`
-    );
+  const bytes = Buffer.byteLength(content, "utf8");
+  if (bytes > MAX_DOC_BYTES) {
+    reportOversized(stmts, docId, bytes, updatedBy);
     return false;
   }
   stmts.saveDoc.run({ id: docId, content, state, updatedBy });
+  // Back under the limit — a later breach is news again.
+  reportedOversized.delete(docId);
   return true;
 }
 
