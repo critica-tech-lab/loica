@@ -70,13 +70,15 @@ export async function action({ request, params }: Route.ActionArgs) {
   const role = getMembership(teamspace.id, user.id, user.is_admin);
   if (!role) throw new Response("Forbidden", { status: 403 });
 
-  const isTeamAdmin = role === "admin" || user.is_admin;
-
+  // Membership gates *seeing* this page; administering a teamspace is a site
+  // admin's job. delete-teamspace already worked this way — the rest of the
+  // screen didn't, so a teamspace admin could add, remove and rename but not
+  // delete. One rule now, matching /admin.
   const form = await request.formData();
   const intent = form.get("intent");
 
   if (intent === "add-member") {
-    if (!isTeamAdmin) return { error: "Only admins can add members." };
+    if (!user.is_admin) return { error: "Only site admins can add members." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { error: "Email is required." };
     const target = prep<{ id: string }, [string]>("SELECT id FROM users WHERE email = ?")
@@ -99,13 +101,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       removeTeamspaceMember(teamspace.id, user.id);
       throw redirect("/w");
     }
-    if (!isTeamAdmin) return { error: "Only admins can remove members." };
+    if (!user.is_admin) return { error: "Only site admins can remove members." };
     removeTeamspaceMember(teamspace.id, targetId);
     return { success: "Member removed." };
   }
 
   if (intent === "update-role") {
-    if (!isTeamAdmin) return { error: "Only admins can change roles." };
+    if (!user.is_admin) return { error: "Only site admins can change roles." };
     const targetId = String(form.get("userId"));
     const newRole = String(form.get("role")) as "admin" | "editor" | "viewer";
     if (newRole !== "admin" && newRole !== "editor" && newRole !== "viewer") return null;
@@ -115,7 +117,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "rename-teamspace") {
-    if (!isTeamAdmin) return { error: "Only admins can rename the teamspace." };
+    if (!user.is_admin) return { error: "Only site admins can rename the teamspace." };
     const name = String(form.get("name") || "").trim();
     if (!name) return { error: "Name is required." };
     renameTeamspace(teamspace.id, name);
@@ -123,7 +125,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "change-icon") {
-    if (!isTeamAdmin) return { error: "Only admins can change the icon." };
+    if (!user.is_admin) return { error: "Only site admins can change the icon." };
     const icon = String(form.get("icon") || "").trim() || null;
     updateTeamspaceIcon(teamspace.id, icon);
     return { success: "Icon updated." };
@@ -142,7 +144,6 @@ export default function TeamspaceMembers() {
   const { teamspace, role, members, storageBytes, isSiteAdmin, teamspaces, sharedCount, personalWsId, personalWsName, sidebarRootFolders, sidebarRootDocs } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const user = useSessionUser();
-  const isTeamAdmin = role === "admin" || isSiteAdmin;
   const [renaming, setRenaming] = useState(false);
   const addFormRef = useRef<HTMLFormElement>(null);
 
@@ -180,7 +181,7 @@ export default function TeamspaceMembers() {
             <TeamspaceIconPicker
               name={teamspace.name}
               icon={teamspace.icon ?? null}
-              editable={isTeamAdmin}
+              editable={isSiteAdmin}
             />
             {renaming ? (
               <Form method="post" onSubmit={() => setRenaming(false)} className="flex items-center gap-2">
@@ -197,7 +198,7 @@ export default function TeamspaceMembers() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="m-0 text-lg font-bold">{teamspace.name} <span className="font-normal text-fg/40">teamspace</span></h1>
-                  {isTeamAdmin && (
+                  {isSiteAdmin && (
                     <button
                       onClick={() => setRenaming(true)}
                       className="cursor-pointer rounded border-none bg-transparent p-1 text-fg/30 hover:text-fg/70"
@@ -252,7 +253,7 @@ export default function TeamspaceMembers() {
         )}
 
         {/* Add member */}
-        {isTeamAdmin && (
+        {isSiteAdmin && (
           <Form ref={addFormRef} method="post" className="flex items-center gap-3">
             <input type="hidden" name="intent" value="add-member" />
             <UserAutocomplete
@@ -296,7 +297,7 @@ export default function TeamspaceMembers() {
                   <div className="truncate text-xs text-fg/30">{m.email}</div>
                 </div>
                 <div className="w-24 shrink-0 text-center">
-                  {isTeamAdmin && m.user_id !== user?.id ? (
+                  {isSiteAdmin && m.user_id !== user?.id ? (
                     <Form method="post" className="inline">
                       <input type="hidden" name="intent" value="update-role" />
                       <input type="hidden" name="userId" value={m.user_id} />
@@ -316,7 +317,7 @@ export default function TeamspaceMembers() {
                   )}
                 </div>
                 <div className="flex w-16 shrink-0 justify-end">
-                  {isTeamAdmin && m.user_id !== user?.id && (
+                  {isSiteAdmin && m.user_id !== user?.id && (
                     <Form method="post">
                       <input type="hidden" name="intent" value="remove-member" />
                       <input type="hidden" name="userId" value={m.user_id} />

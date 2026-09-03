@@ -250,36 +250,6 @@ export function sendWelcomeEmail(
   sendEmail(toEmail, toName, subject, html, text);
 }
 
-export function sendGroupInviteNotification(
-  toEmail: string,
-  toName: string,
-  groupName: string,
-  invitedByName: string,
-  siteUrl?: string
-): void {
-  const subject = `${invitedByName} invited you to a group`;
-  const inviteLink = siteUrl ? `${siteUrl}/groups` : null;
-  const actionHtml = inviteLink
-    ? `<p style="margin:0;">
-        <a href="${inviteLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">View invitation</a>
-      </p>`
-    : `<p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
-        Log in to accept or decline the invitation.
-      </p>`;
-  const html = wrap(
-    "Group invitation",
-    `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${invitedByName}</strong> invited you to the group <strong>&ldquo;${groupName}&rdquo;</strong> on Loica.
-    </p>
-    ${actionHtml}`
-  );
-  const actionText = inviteLink
-    ? `View your invitation: ${inviteLink}`
-    : "Log in to accept or decline the invitation.";
-  const text = `${invitedByName} invited you to the group "${groupName}" on Loica. ${actionText}`;
-  sendEmail(toEmail, toName, subject, html, text);
-}
-
 export function sendMentionNotification(
   toEmail: string,
   toName: string,
