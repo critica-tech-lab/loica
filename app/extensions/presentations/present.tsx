@@ -1,6 +1,6 @@
 import { redirect, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
-import { getSessionUser } from "~/lib/auth.server";
+import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
 import { getDocument } from "~/lib/document.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
@@ -20,7 +20,7 @@ export async function loader({ request, params }: { request: Request; params: { 
   }
 
   const user = getSessionUser(request);
-  if (!user) throw redirect("/login");
+  if (!user) throw loginRedirect(request);
 
   const document = getDocument(params.id);
   if (!document) throw new Response("Document not found", { status: 404 });
