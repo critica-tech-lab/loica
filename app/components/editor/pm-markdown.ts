@@ -12,9 +12,12 @@ export const loicaMarkdownSerializer = new MarkdownSerializer(
 
     image(state, node) {
       const { src, alt, title } = node.attrs;
+      // The backslash has to be in the same character class as the delimiters:
+      // escaping `)` alone turns `a\)` into `a\\)`, which markdown reads as an
+      // escaped backslash followed by a real `)`, closing the link early.
       state.write(
-        "![" + state.esc(alt || "") + "](" + src.replace(/[()]/g, "\\$&") +
-        (title ? ' "' + title.replace(/"/g, '\\"') + '"' : "") + ")"
+        "![" + state.esc(alt || "") + "](" + src.replace(/[\\()]/g, "\\$&") +
+        (title ? ' "' + title.replace(/[\\"]/g, "\\$&") + '"' : "") + ")"
       );
     },
 
@@ -25,7 +28,8 @@ export const loicaMarkdownSerializer = new MarkdownSerializer(
         row.forEach((cell) => {
           const parts: string[] = [];
           cell.forEach((block) => {
-            parts.push(block.textContent.replace(/\|/g, "\\|").replace(/\n/g, " "));
+            // Backslash first, in the same pass — see the note on `image` above.
+            parts.push(block.textContent.replace(/[\\|]/g, "\\$&").replace(/\n/g, " "));
           });
           cells.push(parts.join(" "));
         });
