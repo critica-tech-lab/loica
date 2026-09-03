@@ -222,6 +222,18 @@ function randomFnId(): string {
   return id;
 }
 
+/**
+ * Escape a value being interpolated into a `new RegExp(...)`.
+ *
+ * Footnote ids are matched as `[\w-]+`, so today only `-` can appear — but that
+ * is a property of the matching regex, not of this function's input, and the
+ * previous `.replace(/-/g, "\\-")` silently became wrong the moment either
+ * changed. Escape the whole metacharacter set instead.
+ */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+}
+
 function cleanupOrphanFootnotes(doc: string): string {
   const refs = new Set<string>();
   for (const m of doc.matchAll(/\[\^([\w-]+)\](?!:)/g)) refs.add(m[1]);
@@ -232,13 +244,13 @@ function cleanupOrphanFootnotes(doc: string): string {
   let result = doc;
   for (const ref of refs) {
     if (!defs.has(ref)) {
-      result = result.replace(new RegExp(`\\[\\^${ref.replace(/-/g, "\\-")}\\](?!:)`, "g"), "");
+      result = result.replace(new RegExp(`\\[\\^${escapeRegExp(ref)}\\](?!:)`, "g"), "");
     }
   }
 
   for (const def of defs) {
     if (!refs.has(def)) {
-      const escaped = def.replace(/-/g, "\\-");
+      const escaped = escapeRegExp(def);
       result = result.replace(new RegExp(`^\\[\\^${escaped}\\]:[ \\t]*[^\\n]*\\n?`, "gm"), "");
     }
   }
