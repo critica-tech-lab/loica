@@ -171,13 +171,13 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
             <>
               <div style={separatorStyle} />
               <a
-                href="/groups"
+                href="/teamspaces"
                 style={itemStyle}
                 onMouseEnter={hoverIn}
                 onMouseLeave={hoverOut}
                 onClick={() => setOpen(false)}
               >
-                Groups
+                Teamspaces
               </a>
               <a
                 href="/admin"
