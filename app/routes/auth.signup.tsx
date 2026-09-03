@@ -2,7 +2,7 @@ import { Form, redirect, useActionData, useNavigation, useLoaderData } from "rea
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/auth.signup";
 import { AuthForm, Field, SubmitButton } from "~/components/AuthForm";
-import { getSessionUser, createUser, createSession, validatePassword } from "~/lib/auth.server";
+import { getSessionUser, createUser, createSession, validatePassword, safeNextPath } from "~/lib/auth.server";
 import { createWorkspace, getUserWorkspaces } from "~/lib/workspace.server";
 import { createDocument, updateDocument } from "~/lib/document.server";
 import { isRegistrationOpen, isLocalLoginEnabled } from "~/lib/db.server";
@@ -80,11 +80,13 @@ Feel free to edit or delete this document. Happy writing!
 export const meta: MetaFunction = () => [{ title: "Sign up — loica" }];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  if (getSessionUser(request)) throw redirect("/");
+  const next = safeNextPath(new URL(request.url).searchParams.get("next"));
+  if (getSessionUser(request)) throw redirect(next ?? "/");
   return {
     registrationOpen: isRegistrationOpen(),
     authProviders: getActiveAuthProviders(),
     localLoginEnabled: isLocalLoginEnabled(),
+    next,
   };
 }
 
@@ -133,12 +135,19 @@ export async function action({ request }: Route.ActionArgs) {
   updateDocument(welcomeDoc.id, { content: WELCOME_CONTENT });
 
   const cookie = createSession(userId);
-  throw redirect("/w", { headers: { "Set-Cookie": cookie } });
+
+  // Honour the page the visitor was trying to reach before signing up.
+  const next =
+    safeNextPath(String(form.get("next") || "")) ??
+    safeNextPath(new URL(request.url).searchParams.get("next"));
+
+  throw redirect(next ?? "/w", { headers: { "Set-Cookie": cookie } });
 }
 
 export default function Signup() {
-  const { registrationOpen, authProviders, localLoginEnabled } =
+  const { registrationOpen, authProviders, localLoginEnabled, next } =
     useLoaderData<typeof loader>();
+  const nextQuery = next ? `?next=${encodeURIComponent(next)}` : "";
   const result = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -162,7 +171,7 @@ export default function Signup() {
           Loica account will be created automatically.
         </p>
         <a
-          href={provider.loginPath}
+          href={`${provider.loginPath}${nextQuery}`}
           style={{
             display: "block",
             width: "100%",
@@ -183,7 +192,7 @@ export default function Signup() {
         </a>
         <p style={{ margin: "1rem 0 0", fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
-          <a href="/login" style={{ color: "var(--fg)" }}>
+          <a href={`/login${nextQuery}`} style={{ color: "var(--fg)" }}>
             Sign in
           </a>
         </p>
@@ -199,7 +208,7 @@ export default function Signup() {
         </p>
         <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
-          <a href="/login" style={{ color: "var(--fg)" }}>
+          <a href={`/login${nextQuery}`} style={{ color: "var(--fg)" }}>
             Sign in
           </a>
         </p>
@@ -210,6 +219,7 @@ export default function Signup() {
   return (
     <AuthForm title="Create an account" error={result?.error}>
       <Form method="post" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        {next && <input type="hidden" name="next" value={next} />}
         <Field label="Name" name="name" autoComplete="name" />
         <Field label="Email" name="email" type="email" autoComplete="email" />
         <Field
@@ -225,7 +235,7 @@ export default function Signup() {
 
         <p style={{ margin: 0, fontSize: "var(--fs-xs)", opacity: 0.5, textAlign: "center" }}>
           Already have an account?{" "}
-          <a href="/login" style={{ color: "var(--fg)" }}>
+          <a href={`/login${nextQuery}`} style={{ color: "var(--fg)" }}>
             Sign in
           </a>
         </p>
