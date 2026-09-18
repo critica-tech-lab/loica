@@ -19,7 +19,7 @@ import {
   formatBytes,
   pruneAutoVersions,
 } from "~/lib/admin.server";
-import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds } from "~/lib/db.server";
+import { isRegistrationOpen, isLocalLoginEnabled, setSetting, db, prep, setEnabledExtensionIds, logAdminAction } from "~/lib/db.server";
 import { extensions } from "~/extensions";
 import { getEnabledExtensionIdSet, ensurePluginsLoaded, serverExtensions, builtinExtensionIds, getCoreExtensionIdSet } from "~/extensions/index.server";
 import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
@@ -325,6 +325,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (!userId) return { error: "User ID is required." };
     const target = prep<{ id: string }, [string]>("SELECT id FROM users WHERE id = ?").get(userId);
     if (!target) return { error: "User not found." };
+    logAdminAction(admin.id, "impersonate", target.id);
     const cookie = createSession(userId);
     return redirect("/w", { headers: { "Set-Cookie": cookie } });
   }

@@ -48,10 +48,10 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
 
-  if (intent === "restore-doc") return handleRestoreDoc(form);
-  if (intent === "restore-folder") return handleRestoreFolder(form);
-  if (intent === "purge-doc") return handlePurgeDoc(form);
-  if (intent === "purge-folder") return handlePurgeFolder(form);
+  if (intent === "restore-doc") return handleRestoreDoc(form, user);
+  if (intent === "restore-folder") return handleRestoreFolder(form, user);
+  if (intent === "purge-doc") return handlePurgeDoc(form, user);
+  if (intent === "purge-folder") return handlePurgeFolder(form, user);
 
   if (intent === "empty-trash") {
     db.transaction(() => {

@@ -108,6 +108,21 @@ async function sendEmail(
   }
 }
 
+// ─── HTML escaping ───────────────────────────────────────
+//
+// User-controlled strings (names, titles, comment/mention bodies) must be
+// escaped before being placed into an HTML email body — every send* function
+// below interpolates such values into `wrap()`'s template literals.
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ─── HTML wrapper ────────────────────────────────────────
 
 function wrap(title: string, body: string): string {
@@ -162,7 +177,7 @@ export function sendFolderShareNotification(
   const html = wrap(
     "Folder shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the folder <strong>&ldquo;${folderName}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the folder <strong>&ldquo;${escapeHtml(folderName)}&rdquo;</strong> with you on Loica.
     </p>
     ${actionHtml}`
   );
@@ -196,7 +211,7 @@ export function sendDocShareNotification(
   const html = wrap(
     "Document shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the document <strong>&ldquo;${docTitle}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the document <strong>&ldquo;${escapeHtml(docTitle)}&rdquo;</strong> with you on Loica.
     </p>
     ${actionHtml}`
   );
@@ -215,7 +230,7 @@ export function sendExternalShareNotification(
   const html = wrap(
     "Document shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the document <strong>&ldquo;${docTitle}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the document <strong>&ldquo;${escapeHtml(docTitle)}&rdquo;</strong> with you on Loica.
     </p>
     <p style="margin:0;">
       <a href="${editLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
@@ -232,7 +247,7 @@ export function sendWelcomeEmail(
 ): void {
   const subject = "Welcome to Loica";
   const html = wrap(
-    `Welcome, ${toName}!`,
+    `Welcome, ${escapeHtml(toName)}!`,
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
       An account has been created for you on Loica.
     </p>
@@ -264,10 +279,10 @@ export function sendMentionNotification(
   const html = wrap(
     "You were mentioned in a comment",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${mentionerName}</strong> mentioned you in a comment on <strong>&ldquo;${documentTitle}&rdquo;</strong>:
+      <strong>${escapeHtml(mentionerName)}</strong> mentioned you in a comment on <strong>&ldquo;${escapeHtml(documentTitle)}&rdquo;</strong>:
     </p>
     <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border-left:3px solid #AF3029;border-radius:4px;font-size:14px;color:#333;line-height:1.6;">
-      ${displayBody}
+      ${escapeHtml(displayBody)}
     </p>
     <p style="margin:0;">
       <a href="${docUrl}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
@@ -290,10 +305,10 @@ export function sendCommentNotification(
   const html = wrap(
     "New comment on your document",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${commenterName}</strong> commented on <strong>&ldquo;${documentTitle}&rdquo;</strong>:
+      <strong>${escapeHtml(commenterName)}</strong> commented on <strong>&ldquo;${escapeHtml(documentTitle)}&rdquo;</strong>:
     </p>
     <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border-left:3px solid #AF3029;border-radius:4px;font-size:14px;color:#333;line-height:1.6;">
-      ${displayBody}
+      ${escapeHtml(displayBody)}
     </p>
     <p style="margin:0;">
       <a href="${docUrl}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
