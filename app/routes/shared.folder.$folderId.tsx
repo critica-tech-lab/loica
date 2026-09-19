@@ -148,7 +148,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const tf = getFolder(targetFolderId);
     if (!tf || tf.workspace_id !== folder.workspace_id) return null;
     if (!hasSharedAccess(targetFolderId, user.id)) return null;
-    moveDocument(docId, targetFolderId);
+    moveDocument(docId, targetFolderId, folder.workspace_id);
     return null;
   }
 
