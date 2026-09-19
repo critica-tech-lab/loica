@@ -54,3 +54,19 @@ mkdirSync(DATA_DIR, { recursive: true });
 export const dbPath = join(DATA_DIR, "app.db");
 export const uploadsDir = join(DATA_DIR, "uploads");
 export const pluginsDir = join(DATA_DIR, "plugins");
+
+/**
+ * Validate a `/api/uploads/<file>` reference — the only form of image src
+ * exporters are allowed to read off disk — and resolve it to the real path.
+ * Rejects anything else, including a bare `..` filename, matching the guard
+ * `api.uploads.$file.ts` applies when serving these files directly. Shared by
+ * every exporter that embeds upload bytes (pdfmake/docx and the presentations
+ * WeasyPrint export) so the traversal guard lives in exactly one place.
+ */
+export function resolveUploadPath(src: string): string | null {
+  const m = /^\/api\/uploads\/([^/\\]+)$/.exec(src);
+  if (!m) return null;
+  const filename = m[1];
+  if (filename.includes("..")) return null;
+  return join(uploadsDir, filename);
+}

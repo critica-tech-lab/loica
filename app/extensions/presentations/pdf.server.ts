@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, extname } from "node:path";
 import { nanoid } from "nanoid";
 import { marked } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 import { stripFrontmatter } from "~/extensions/sdk.server";
+import { resolveUploadPath } from "~/lib/paths.server";
 
 const fontsDir = resolve(process.cwd(), "assets/fonts");
 // Scratch dir for PDF rendering. Use the system temp dir (honors TMPDIR) so it
@@ -80,13 +82,43 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+const IMAGE_MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+};
+
+/**
+ * WeasyPrint fetches every URL it's handed (http, file://, ...) with no
+ * restriction, so slide markdown/frontmatter — user-controlled doc content —
+ * must never reach it as a raw src. Only same-origin `/api/uploads/<file>`
+ * references are allowed (same guard as the other exporters, see
+ * `resolveUploadPath`), and those are inlined as data: URIs read straight off
+ * disk instead of letting WeasyPrint fetch anything itself.
+ */
+function resolveUploadImage(src: string): string | null {
+  const srcPath = resolveUploadPath(src);
+  if (!srcPath || !existsSync(srcPath)) return null;
+
+  const mime = IMAGE_MIME[extname(srcPath).toLowerCase()];
+  if (!mime) return null;
+
+  try {
+    return `data:${mime};base64,${readFileSync(srcPath).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Render a presentation doc to a PDF that mirrors the on-screen reveal.js
  * theme. We render each slide's markdown to HTML, wrap it on a fixed-size page
  * styled with the matching reveal palette (background, foreground, link
- * colors, font family), then run weasyprint — the same engine the spreadsheet
- * PDF route already uses, so no new dependency. Browser is not involved at
- * all, so this is reliable across Firefox/Safari/Chrome.
+ * colors, font family), then run weasyprint. Browser is not involved at all,
+ * so this is reliable across Firefox/Safari/Chrome.
  */
 export function generatePresentationPdf(
   rawContent: string,
@@ -103,13 +135,27 @@ export function generatePresentationPdf(
   marked.setOptions({ gfm: true, breaks: false });
 
   const slideSections = slides.map((slide) => {
-    const html = marked.parse(slide.bodyMd) as string;
+    const rawHtml = marked.parse(slide.bodyMd) as string;
+    // Strip any raw HTML the markdown smuggled in (link/iframe/object/style
+    // can all trigger WeasyPrint fetches of their own), then rewrite every
+    // remaining <img src> to an inlined data: URI or drop it — never let
+    // WeasyPrint fetch a src straight from doc content (see resolveUploadImage).
+    const sanitized = DOMPurify.sanitize(rawHtml);
+    const html = sanitized.replace(
+      /<img([^>]*?)\ssrc="([^"]*)"([^>]*)>/gi,
+      (_match, pre, src, post) => {
+        const resolved = resolveUploadImage(src);
+        return resolved ? `<img${pre} src="${resolved}"${post}>` : "";
+      },
+    );
     // Per-slide background overrides via <!-- .slide: data-background="..." -->.
     const bg = slide.attrs["data-background"] ?? slide.attrs["data-background-color"];
-    const bgImage = slide.attrs["data-background-image"];
+    const bgImageResolved = slide.attrs["data-background-image"]
+      ? resolveUploadImage(slide.attrs["data-background-image"])
+      : null;
     const styleParts: string[] = [];
     if (bg) styleParts.push(`background:${bg}`);
-    if (bgImage) styleParts.push(`background-image:url(${esc(bgImage)})`, "background-size:cover", "background-position:center");
+    if (bgImageResolved) styleParts.push(`background-image:url(${bgImageResolved})`, "background-size:cover", "background-position:center");
     const styleAttr = styleParts.length ? ` style="${styleParts.join(";")}"` : "";
     const classAttr = slide.attrs.class ? ` class="slide ${esc(slide.attrs.class)}"` : ` class="slide"`;
     return `<section${classAttr}${styleAttr}>${html}</section>`;
