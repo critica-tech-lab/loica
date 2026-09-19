@@ -408,40 +408,46 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
     }
     // Clean up room if empty (after a grace period so reconnects don't re-init)
     if (room.connections.size === 0) {
-      setTimeout(() => {
-        // Skip if room was already destroyed (e.g. by /reset after a version restore)
-        if (!rooms.has(docId) || rooms.get(docId) !== room) return;
-        if (room.connections.size === 0) {
-          const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
-          const content = getDocContent(room.doc);
-          if (room.saveTimer) {
-            clearTimeout(room.saveTimer);
-          }
-          // Final save (skip if oversized)
-          if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
-            // Force an auto-version on room teardown, regardless of interval —
-            // this captures the final edits of a short session.
-            room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor, true);
-          }
-          // Persist comments
-          try {
-            const commentsMap = room.doc.getMap("comments");
-            saveCommentsFromYjs(db, docId, commentsMap);
-          } catch (e) {
-            console.error("[ws] error persisting comments on room close:", e);
-          }
-          // Flush pending updates for this room
-          const keysToFlush = Array.from(pendingUpdates.keys()).filter(k => k.startsWith(`${docId}:`));
-          for (const key of keysToFlush) {
-            const timer = updateFlushTimers.get(key);
-            if (timer) clearTimeout(timer);
-            flushPendingUpdate(key);
-          }
-          rooms.delete(docId);
-        }
-      }, 30_000);
+      setTimeout(() => teardownEmptyRoom(docId, room), 30_000);
     }
   });
+}
+
+/**
+ * Runs 30s after a room's last connection drops (scheduled above). Bails if
+ * the room was already torn down in the meantime — e.g. by /reset after a
+ * version restore — or if a client reconnected during the grace period.
+ */
+function teardownEmptyRoom(docId: string, room: Room) {
+  if (!rooms.has(docId) || rooms.get(docId) !== room) return;
+  if (room.connections.size !== 0) return;
+
+  const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
+  const content = getDocContent(room.doc);
+  if (room.saveTimer) {
+    clearTimeout(room.saveTimer);
+  }
+  // Final save (skip if oversized)
+  if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
+    // Force an auto-version on room teardown, regardless of interval —
+    // this captures the final edits of a short session.
+    room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor, true);
+  }
+  // Persist comments
+  try {
+    const commentsMap = room.doc.getMap("comments");
+    saveCommentsFromYjs(db, docId, commentsMap);
+  } catch (e) {
+    console.error("[ws] error persisting comments on room close:", e);
+  }
+  // Flush pending updates for this room
+  const keysToFlush = Array.from(pendingUpdates.keys()).filter(k => k.startsWith(`${docId}:`));
+  for (const key of keysToFlush) {
+    const timer = updateFlushTimers.get(key);
+    if (timer) clearTimeout(timer);
+    flushPendingUpdate(key);
+  }
+  rooms.delete(docId);
 }
 
 // ─── HTTP + WS server ─────────────────────────────────────────────────────────
