@@ -204,6 +204,7 @@ export async function handleCallback(request: Request): Promise<CallbackResult> 
 
   const sub = typeof claims.sub === "string" ? claims.sub : "";
   const email = typeof claims.email === "string" ? claims.email : "";
+  const emailVerified = claims.email_verified === true || claims.email_verified === "true";
   const name =
     (typeof claims.name === "string" && claims.name) ||
     (typeof claims.preferred_username === "string" && claims.preferred_username) ||
@@ -211,7 +212,15 @@ export async function handleCallback(request: Request): Promise<CallbackResult> 
     "User";
   if (!sub || !email) return { ok: false, error: "incomplete_claims" };
 
-  const userId = findOrCreateUserViaExternalAuth({ provider: PROVIDER_ID, sub, email, name });
+  let userId: string;
+  try {
+    userId = findOrCreateUserViaExternalAuth({ provider: PROVIDER_ID, sub, email, emailVerified, name });
+  } catch (err) {
+    if (err instanceof Error && err.message === "email_verification_required") {
+      return { ok: false, error: "email_verification_required" };
+    }
+    throw err;
+  }
   const sessionCookie = createSession(userId);
   // Re-validate on the way out — the Tx cookie is signed, but defense in depth.
   return { ok: true, sessionCookie, clearTx, next: safeNextPath(tx.next) ?? undefined };
