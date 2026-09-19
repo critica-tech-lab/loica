@@ -741,10 +741,12 @@ export async function restoreDocumentVersion(
   ).run(version.title, version.content, version.yjs_state ?? null, docId);
 
   // Notify ws-server to reset the room — await so the room is destroyed
-  // before the client reloads and reconnects
-  const wsPort = process.env.WS_PORT ?? "4001";
+  // before the client reloads and reconnects. Uses the loopback-only admin
+  // port (see ws-server.ts), not the public WS_PORT.
+  const wsPort = Number(process.env.WS_PORT ?? 4001);
+  const wsAdminPort = process.env.WS_ADMIN_PORT ?? String(wsPort + 1);
   try {
-    await fetch(`http://localhost:${wsPort}/reset/${docId}`, { method: "POST", signal: AbortSignal.timeout(5000) });
+    await fetch(`http://127.0.0.1:${wsAdminPort}/reset/${docId}`, { method: "POST", signal: AbortSignal.timeout(5000) });
   } catch {
     // ws-server may not be running; restore still succeeded in DB
   }

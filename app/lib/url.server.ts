@@ -9,6 +9,26 @@
  *   2. `X-Forwarded-Proto` + `X-Forwarded-Host` (Caddy/reverse proxies)
  *   3. The raw request URL's origin (last resort; works in local dev)
  */
+/**
+ * Origin to use for links inside outbound email — content addressed to a
+ * different principal than whoever triggered the request (a share or
+ * mention recipient). Never derived from per-request headers, which the
+ * sender fully controls: `SITE_URL` only, so a forged Host/X-Forwarded-Host
+ * can't redirect a genuine notification email to an attacker's domain.
+ * Falls back to a fixed local origin outside production so emails logged
+ * to the console during development still show a usable link; in
+ * production with no `SITE_URL` set, returns null and callers omit the
+ * link rather than guess at one.
+ */
+export function getEmailOrigin(): string | null {
+  const envUrl = process.env.SITE_URL;
+  if (envUrl) return envUrl.replace(/\/+$/, "");
+  if (process.env.NODE_ENV !== "production") {
+    return `http://localhost:${process.env.PORT ?? 3000}`;
+  }
+  return null;
+}
+
 export function getPublicOrigin(request: Request): string {
   const envUrl = process.env.SITE_URL;
   if (envUrl) return envUrl.replace(/\/+$/, "");
