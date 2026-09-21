@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData, useFetcher, Link } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/teamspace";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
@@ -21,27 +21,14 @@ import { getUserPersonalWorkspaces } from "~/lib/workspace.server";
 import { getTeamspacesForUser } from "~/lib/teamspace.server";
 import { getSharedFoldersForUser } from "~/lib/sharing.server";
 import { getSharedDocsForUser } from "~/lib/doc-sharing.server";
-import { db, prep } from "~/lib/db.server";
+import { prep } from "~/lib/db.server";
 import { AppShell } from "~/components/AppShell";
-import { ConfirmModal } from "~/components/ConfirmModal";
-import { MoveDialog } from "~/components/MoveDialog";
-import { ShareDialog } from "~/components/ShareDialog";
 import { DndProvider } from "~/components/dnd/DndProvider";
 import { useDndMove } from "~/components/dnd/useDndMove";
 import { UserMenu } from "~/components/UserMenu";
-import { ImportDropZone } from "~/components/ImportDropZone";
 import { FolderTreeSidebar } from "~/components/FolderTreeSidebar";
-import { NewButton } from "~/components/NewButton";
-import { armUndoCreate } from "~/lib/undoCreate";
-import { FolderRow } from "~/components/FolderRow";
-import { DocRow } from "~/components/DocRow";
-import { NewFolderRow } from "~/components/NewFolderRow";
-import { BulkActionBar } from "~/components/BulkActionBar";
 import { useSessionUser } from "~/root";
-import { useMemo } from "react";
-import { useImport } from "~/components/hooks/useImport";
-import { useSortState } from "~/components/hooks/useSortState";
-import { useDocListState } from "~/components/hooks/useDocListState";
+import { WorkspaceListView } from "~/components/WorkspaceListView";
 import { TeamspaceIconPicker } from "~/components/TeamspaceIconPicker";
 
 
@@ -124,30 +111,10 @@ export default function TeamspaceDashboard() {
   const canEdit = role === "owner" || role === "admin" || role === "editor";
   const isOwner = role === "owner" || role === "admin";
   const { handleMove } = useDndMove();
-  const sharedSet = new Set(sharedFolderIds);
-  const starredSet = useMemo(() => new Set(starredDocs.map((d) => d.id)), [starredDocs]);
-  const directlySharedSet = useMemo(() => new Set(directlySharedDocIds), [directlySharedDocIds]);
-  const { handleImport, handleUploadFile, handleUploadFiles, duplicatePrompt, confirmDuplicate, cancelDuplicate } = useImport();
-  const createDocFetcher = useFetcher();
-  const duplicateFetcher = useFetcher();
-  const { sortCol, sortDir, toggleSort, sortedFolders, sortedDocuments } = useSortState(folders, documents, starredSet);
-  const totalPages = Math.ceil(totalDocs / pageSize);
-  const hasNextPage = page < totalPages;
-  const hasPrevPage = page > 1;
-  const {
-    selectedIds, setSelectedIds, selectedDocIds, renamingItem, setRenamingItem, shareItem, setShareItem,
-    moveItem, setMoveItem, creatingNewFolder, setCreatingNewFolder,
-    confirmAction, setConfirmAction, confirmFetcher, starFetcher, bulkFetcher, listRef,
-    hasSelectedDocs, hasPublicInSelection,
-    handleRowClick, handleCheckboxToggle, handleContainerClick,
-  } = useDocListState(documents);
-  const selectedDocs = documents.filter((d) => selectedDocIds.includes(d.id));
 
   const navActions = (
     <UserMenu userName={user?.name ?? ""} isAdmin={user?.is_admin} />
   );
-
-  const isEmpty = folders.length === 0 && documents.length === 0;
 
   const sidebar = (
     <FolderTreeSidebar
@@ -162,282 +129,42 @@ export default function TeamspaceDashboard() {
     />
   );
 
+  const headerContent = (
+    <div className="flex items-center gap-3">
+      <TeamspaceIconPicker
+        name={workspace.name}
+        icon={workspace.icon ?? null}
+        editable={isOwner}
+        size="md"
+      />
+      <h1 className="section-header">{workspace.name} <span className="font-normal">teamspace</span></h1>
+    </div>
+  );
+
   return (
     <DndProvider onMove={handleMove} allFolders={allFolders}>
-    <AppShell navActions={navActions} scrollable sidebar={sidebar} tone="drive">
-      <ImportDropZone onImport={handleImport} onUploadFile={handleUploadFile} onUploadFiles={handleUploadFiles}>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6" onClick={handleContainerClick}>
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <TeamspaceIconPicker
-              name={workspace.name}
-              icon={workspace.icon ?? null}
-              editable={isOwner}
-              size="md"
-            />
-            <h1 className="section-header">{workspace.name} <span className="font-normal">teamspace</span></h1>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {canEdit && (
-              <NewButton
-                onCreateDoc={() => {
-                  armUndoCreate("doc", location.pathname);
-                  const form = new FormData();
-                  form.set("intent", "create");
-                  createDocFetcher.submit(form, { method: "post" });
-                }}
-                onCreateFromTemplate={(templateId) => {
-                  armUndoCreate(templateId, location.pathname);
-                  const form = new FormData();
-                  form.set("intent", "create");
-                  form.set("template", templateId);
-                  createDocFetcher.submit(form, { method: "post" });
-                }}
-                onCreateFolder={() => setCreatingNewFolder(true)}
-                onImport={handleImport}
-                onUploadFile={handleUploadFile}
-                onUploadFiles={handleUploadFiles}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Content — unified list */}
-        {isEmpty && !creatingNewFolder ? (
-          <div className="archive-empty" data-clear-selection>
-            <p>No documents or folders yet.</p>
-            {canEdit && <p>Create one above to get started.</p>}
-          </div>
-        ) : (
-          <div ref={listRef} className="archive-list">
-            {/* Sortable header */}
-            <div className="archive-header">
-              <span className="w-3.5 shrink-0" />
-              <button
-                type="button"
-                onClick={() => toggleSort("name")}
-                className="flex flex-1 cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-left text-xs font-medium text-fg/40 hover:text-fg/70"
-              >
-                Name {sortCol === "name" && (sortDir === "asc" ? "\u2191" : "\u2193")}
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleSort("created")}
-                className="hidden w-20 shrink-0 cursor-pointer items-center justify-end gap-1 border-none bg-transparent p-0 text-right text-xs font-medium text-fg/40 hover:text-fg/70 sm:flex"
-              >
-                Created {sortCol === "created" && (sortDir === "asc" ? "\u2191" : "\u2193")}
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleSort("modified")}
-                className="flex w-20 shrink-0 cursor-pointer items-center justify-end gap-1 border-none bg-transparent p-0 text-right text-xs font-medium text-fg/40 hover:text-fg/70"
-              >
-                Modified {sortCol === "modified" && (sortDir === "asc" ? "\u2191" : "\u2193")}
-              </button>
-              <span className="w-10 shrink-0" />
-            </div>
-
-            {/* New folder inline row */}
-            {creatingNewFolder && (
-              <NewFolderRow onDone={() => setCreatingNewFolder(false)} />
-            )}
-
-            {/* Folders */}
-            {sortedFolders.map((f, i) => (
-              <FolderRow
-                key={f.id}
-                folder={f}
-                href={`/t/${workspace.id}/folder/${f.id}`}
-                canEdit={canEdit}
-                isOwner={isOwner}
-                isShared={sharedSet.has(f.id)}
-                isSelected={selectedIds.has(`folder-${f.id}`)}
-                isRenaming={renamingItem?.type === "folder" && renamingItem.id === f.id}
-                showBorder={i > 0 || creatingNewFolder}
-                showCheckbox
-                onRename={() => setRenamingItem({ type: "folder", id: f.id })}
-                onRenameCancel={() => setRenamingItem(null)}
-                onMove={() => setMoveItem({ type: "folder", id: f.id, currentFolderId: f.parent_id })}
-                onShare={() => setShareItem({ type: "folder", id: f.id })}
-                onDelete={() => setConfirmAction({ type: "delete-folder", id: f.id, title: f.name })}
-                onUnshare={() => setConfirmAction({ type: "unshare-folder", id: f.id, title: f.name })}
-                onCheckboxToggle={(e) => handleCheckboxToggle(e as React.MouseEvent, `folder-${f.id}`)}
-                onClick={(e) => handleRowClick(e, `/t/${workspace.id}/folder/${f.id}`)}
-              />
-            ))}
-
-            {/* Documents */}
-            {sortedDocuments.map((doc) => (
-              <DocRow
-                key={doc.id}
-                doc={doc}
-                href={`/t/${workspace.id}/doc/${doc.id}`}
-                canEdit={canEdit}
-                isOwner={isOwner}
-                pdfFile={doc.pdf_file}
-                isStarred={starredSet.has(doc.id)}
-                isDirectlyShared={directlySharedSet.has(doc.id)}
-                isSelected={selectedIds.has(`doc-${doc.id}`)}
-                isRenaming={renamingItem?.type === "doc" && renamingItem.id === doc.id}
-                showCheckbox
-                onRename={() => setRenamingItem({ type: "doc", id: doc.id })}
-                onRenameCancel={() => setRenamingItem(null)}
-                onMove={() => setMoveItem({ type: "doc", id: doc.id, currentFolderId: doc.folder_id })}
-                onShare={() => setShareItem({ type: "doc", id: doc.id })}
-                onDelete={() => setConfirmAction({ type: "delete-doc", id: doc.id, title: doc.title })}
-                onUnshare={() => setConfirmAction({ type: "unshare-doc", id: doc.id, title: doc.title })}
-                onToggleStar={() => starFetcher.submit({ intent: "toggle-star", docId: doc.id }, { method: "post" })}
-                onDuplicate={() => duplicateFetcher.submit({ intent: "duplicate-doc", docId: doc.id }, { method: "post" })}
-                onCheckboxToggle={(e) => handleCheckboxToggle(e as React.MouseEvent, `doc-${doc.id}`)}
-                onClick={(e) => handleRowClick(e, `/t/${workspace.id}/doc/${doc.id}`)}
-              />
-            ))}
-
-            {/* Pagination */}
-            {(totalDocs > 0) && (
-              <div className="pagination">
-                <span className="flex-1">Page {page} of {totalPages}</span>
-                <div className="flex items-center gap-2">
-                  {hasPrevPage && (
-                    <Link to={`/t/${workspace.id}?page=${page - 1}`} className="pagination-link">Previous</Link>
-                  )}
-                  {hasNextPage && (
-                    <Link to={`/t/${workspace.id}?page=${page + 1}`} className="pagination-link">Next</Link>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Move dialog */}
-        {moveItem && (
-          <MoveDialog
-            itemType={moveItem.type}
-            itemId={moveItem.id}
-            currentFolderId={moveItem.currentFolderId}
-            allFolders={allFolders}
-            onClose={() => setMoveItem(null)}
-            currentWorkspace={{ id: workspace.id, name: workspace.name, icon: workspace.icon, type: "team" }}
-            otherWorkspaces={[
-              { id: personalWsId, name: personalWsName || "My workspace", type: "personal" as const },
-              ...teamspaces.filter((t) => t.id !== workspace.id).map((t) => ({ id: t.id, name: t.name, icon: t.icon, type: "team" as const })),
-            ]}
-          />
-        )}
-
-        {/* Share dialog */}
-        {shareItem?.type === "folder" && isOwner && (
-          <ShareDialog
-            itemType="folder"
-            itemId={shareItem.id}
-            onClose={() => setShareItem(null)}
-          />
-        )}
-        {shareItem?.type === "doc" && canEdit && (() => {
-          const shareDoc = documents.find((d) => d.id === shareItem.id);
-          return (
-            <ShareDialog
-              itemType="doc"
-              itemId={shareItem.id}
-              publicToken={shareDoc?.public_token}
-              editToken={shareDoc?.edit_token}
-              shareExpiresAt={shareDoc?.share_expires_at}
-              hasPassword={!!shareDoc?.share_password_hash}
-              onClose={() => setShareItem(null)}
-            />
-          );
-        })()}
-
-        {/* Bulk action bar */}
-        {hasSelectedDocs && canEdit && (
-          <BulkActionBar
-            selectedCount={selectedDocs.length}
-            hasPublicInSelection={hasPublicInSelection}
-            disabled={bulkFetcher.state !== "idle"}
-            onDelete={() => {
-              setConfirmAction({
-                type: "delete-doc",
-                id: selectedDocIds.join(","),
-                title: `${selectedDocs.length} document${selectedDocs.length > 1 ? "s" : ""}`,
-              });
-            }}
-            onUnshare={() => {
-              const sharedDocs = selectedDocs.filter((d) => d.public_token || d.edit_token);
-              setConfirmAction({
-                type: "unshare-doc",
-                id: sharedDocs.map((d) => d.id).join(","),
-                title: `${sharedDocs.length} document${sharedDocs.length > 1 ? "s" : ""}`,
-              });
-            }}
-            onClear={() => setSelectedIds(new Set())}
-          />
-        )}
-
-        {/* Confirm modal */}
-        {confirmAction && (
-          <ConfirmModal
-            title={
-              confirmAction.type === "delete-doc" ? "Move to trash" :
-              confirmAction.type === "delete-folder" ? "Move folder to trash" :
-              confirmAction.type === "unshare-doc" ? "Remove public access" :
-              "Remove all shares"
-            }
-            message={
-              confirmAction.type === "delete-doc"
-                ? `Move "${confirmAction.title}" to trash? You can restore it within 30 days.`
-                : confirmAction.type === "delete-folder"
-                ? `Move "${confirmAction.title}" and all its contents to trash? You can restore it within 30 days.`
-                : confirmAction.type === "unshare-doc"
-                ? `Remove public access from "${confirmAction.title}"? Anyone with the link will lose access.`
-                : `Remove all shares from "${confirmAction.title}"? Shared users will lose access.`
-            }
-            confirmLabel={
-              confirmAction.type.startsWith("delete") ? "Move to trash" : "Unshare"
-            }
-            danger
-            onCancel={() => setConfirmAction(null)}
-            onConfirm={() => {
-              const { type, id } = confirmAction;
-              if (type === "delete-doc") {
-                if (id.includes(",")) {
-                  confirmFetcher.submit({ intent: "bulk-delete", docIds: id }, { method: "post" });
-                } else {
-                  confirmFetcher.submit({ intent: "delete", docId: id }, { method: "post" });
-                }
-              } else if (type === "delete-folder") {
-                confirmFetcher.submit({ intent: "delete-folder", folderId: id }, { method: "post" });
-              } else if (type === "unshare-doc") {
-                if (id.includes(",")) {
-                  confirmFetcher.submit({ intent: "bulk-unshare", docIds: id }, { method: "post" });
-                } else {
-                  confirmFetcher.submit({ intent: "unshare-doc", docId: id }, { method: "post" });
-                }
-              } else if (type === "unshare-folder") {
-                confirmFetcher.submit({ intent: "unshare-all-folder", folderId: id }, { method: "post" });
-              }
-              setConfirmAction(null);
-              setSelectedIds(new Set());
-            }}
-          />
-        )}
-
-        {/* Duplicate PDF modal */}
-        {duplicatePrompt && (
-          <ConfirmModal
-            title="Duplicate PDF"
-            message={`A PDF named "${duplicatePrompt}" already exists in this folder. Upload anyway? The new file will be renamed automatically.`}
-            confirmLabel="Upload anyway"
-            onConfirm={confirmDuplicate}
-            onCancel={cancelDuplicate}
-          />
-        )}
-
-      </div>
-      </ImportDropZone>
-    </AppShell>
+      <AppShell navActions={navActions} scrollable sidebar={sidebar} tone="drive">
+        <WorkspaceListView
+          basePath={`/t/${workspace.id}`}
+          headerContent={headerContent}
+          documents={documents}
+          folders={folders}
+          allFolders={allFolders}
+          sharedFolderIds={sharedFolderIds}
+          starredDocs={starredDocs}
+          directlySharedDocIds={directlySharedDocIds}
+          canEdit={canEdit}
+          isOwner={isOwner}
+          page={page}
+          pageSize={pageSize}
+          totalDocs={totalDocs}
+          currentWorkspace={{ id: workspace.id, name: workspace.name, icon: workspace.icon, type: "team" }}
+          otherWorkspaces={[
+            { id: personalWsId, name: personalWsName || "My workspace", type: "personal" as const },
+            ...teamspaces.filter((t) => t.id !== workspace.id).map((t) => ({ id: t.id, name: t.name, icon: t.icon, type: "team" as const })),
+          ]}
+        />
+      </AppShell>
     </DndProvider>
   );
 }
