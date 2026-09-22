@@ -662,4 +662,23 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS document_updates (
   yjs_update  BLOB NOT NULL,
   created_at  INTEGER NOT NULL DEFAULT (unixepoch())
 )`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+// ─── Admin action audit log ──────────────────────────────
+try { db.exec(`CREATE TABLE IF NOT EXISTS admin_actions (
+  id          TEXT PRIMARY KEY,
+  admin_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action      TEXT NOT NULL,
+  target_id   TEXT,
+  created_at  INTEGER NOT NULL DEFAULT (unixepoch())
+)`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+try { db.exec("CREATE INDEX idx_admin_actions_admin ON admin_actions(admin_id, created_at DESC)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+const stmtInsertAdminAction = db.prepare(
+  "INSERT INTO admin_actions (id, admin_id, action, target_id) VALUES (?, ?, ?, ?)"
+);
+
+/** Durable audit record for a site admin's privileged action (e.g. impersonation). */
+export function logAdminAction(adminId: string, action: string, targetId?: string | null) {
+  stmtInsertAdminAction.run(nanoid(16), adminId, action, targetId ?? null);
+}
 try { db.exec("CREATE INDEX IF NOT EXISTS idx_doc_updates ON document_updates(document_id, created_at DESC)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }

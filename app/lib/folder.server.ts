@@ -10,6 +10,7 @@ export type Folder = {
   name: string;
   created_by: string;
   created_at: number;
+  deleted_at?: number | null;
 };
 
 export type FolderSummary = Pick<Folder, "id" | "name" | "parent_id" | "created_at" | "created_by">;
@@ -100,7 +101,7 @@ export function getFolder(id: string): Folder | null {
 export function getFolderIncludingTrashed(id: string): Folder | null {
   return (
     prep<Folder, [string]>(
-        `SELECT id, workspace_id, parent_id, name, created_by, created_at
+        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at
          FROM folders WHERE id = ?`
       )
       .get(id) ?? null
@@ -287,31 +288,31 @@ export function trashFolder(id: string, userId: string): void {
   trashTx();
 }
 
-export function restoreFolder(id: string): void {
+export function restoreFolder(id: string, workspaceId: string): void {
   const restoreTx = db.transaction(() => {
     // If parent was permanently deleted, move to workspace root
-    const folder = prep<{ parent_id: string | null }, [string]>(
-      "SELECT parent_id FROM folders WHERE id = ?"
-    ).get(id);
+    const folder = prep<{ parent_id: string | null }, [string, string]>(
+      "SELECT parent_id FROM folders WHERE id = ? AND workspace_id = ?"
+    ).get(id, workspaceId);
     if (folder?.parent_id) {
       const parentExists = prep<{ id: string }, [string]>(
         "SELECT id FROM folders WHERE id = ?"
       ).get(folder.parent_id);
       if (!parentExists) {
-        db.prepare("UPDATE folders SET parent_id = NULL WHERE id = ?").run(id);
+        db.prepare("UPDATE folders SET parent_id = NULL WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
       }
     }
 
-    // Collect all descendant folder IDs (including self)
-    const descendantIds = prep<{ id: string }, [string]>(
+    // Collect all descendant folder IDs (including self), anchored to this workspace
+    const descendantIds = prep<{ id: string }, [string, string]>(
         `WITH RECURSIVE descendants(id) AS (
-           SELECT id FROM folders WHERE id = ?
+           SELECT id FROM folders WHERE id = ? AND workspace_id = ?
            UNION ALL
            SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
          )
          SELECT id FROM descendants`
       )
-      .all(id)
+      .all(id, workspaceId)
       .map((r) => r.id);
 
     // Restore all folders (batch)
@@ -334,8 +335,8 @@ export function restoreFolder(id: string): void {
   restoreTx();
 }
 
-export function permanentlyDeleteFolder(id: string): void {
-  deleteFolder(id);
+export function permanentlyDeleteFolder(id: string, workspaceId: string): void {
+  deleteFolder(id, workspaceId);
 }
 
 export type TrashedFolder = {
@@ -375,18 +376,18 @@ export function getTrashedFolders(userId: string): TrashedFolder[] {
 
 // ─── Delete (permanent) ─────────────────────────────────
 
-export function deleteFolder(id: string): void {
+export function deleteFolder(id: string, workspaceId: string): void {
   const deleteTx = db.transaction(() => {
-    // Collect all descendant folder IDs (including self) in one query
-    const descendantIds = prep<{ id: string }, [string]>(
+    // Collect all descendant folder IDs (including self), anchored to this workspace
+    const descendantIds = prep<{ id: string }, [string, string]>(
         `WITH RECURSIVE descendants(id) AS (
-           SELECT id FROM folders WHERE id = ?
+           SELECT id FROM folders WHERE id = ? AND workspace_id = ?
            UNION ALL
            SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
          )
          SELECT id FROM descendants`
       )
-      .all(id)
+      .all(id, workspaceId)
       .map((r) => r.id);
 
     // Delete documents in all descendant folders (batch with IN clause)
@@ -398,7 +399,7 @@ export function deleteFolder(id: string): void {
     }
 
     // Delete the root folder — CASCADE handles subfolder rows
-    db.prepare("DELETE FROM folders WHERE id = ?").run(id);
+    db.prepare("DELETE FROM folders WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
   });
 
   deleteTx();

@@ -156,16 +156,12 @@ export function shareDocWithUser(
   return id;
 }
 
-export function unshareDoc(shareId: string, workspaceId?: string): void {
-  if (workspaceId) {
-    db.prepare(
-      `DELETE FROM document_shares WHERE id = ? AND document_id IN (
-        SELECT id FROM documents WHERE workspace_id = ?
-      )`
-    ).run(shareId, workspaceId);
-  } else {
-    db.prepare("DELETE FROM document_shares WHERE id = ?").run(shareId);
-  }
+export function unshareDoc(shareId: string, workspaceId: string): void {
+  db.prepare(
+    `DELETE FROM document_shares WHERE id = ? AND document_id IN (
+      SELECT id FROM documents WHERE workspace_id = ?
+    )`
+  ).run(shareId, workspaceId);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

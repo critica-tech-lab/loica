@@ -195,7 +195,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "unshare-doc") {
     const shareId = String(form.get("shareId") || "");
     if (!shareId) throw new Response("Missing shareId", { status: 400 });
-    unshareDoc(shareId);
+    unshareDoc(shareId, doc.workspace_id);
     return { ok: true };
   }
 
@@ -209,7 +209,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "unshare-doc-group") {
     const shareId = String(form.get("shareId") || "");
     if (!shareId) throw new Response("Missing shareId", { status: 400 });
-    unshareDoc(shareId);
+    unshareDoc(shareId, doc.workspace_id);
     return { ok: true };
   }
 

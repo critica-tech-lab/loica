@@ -625,6 +625,8 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
 
 // ── Import ───────────────────────────────────────────────────
 
+const IMPORT_MAX_FILES = 500;
+
 export function handleImport(ctx: ActionContext, defaultFolderId: string | null) {
   const json = ctx.form.get("files");
   if (!json || typeof json !== "string") return null;
@@ -634,9 +636,12 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
   } catch {
     return null;
   }
+  if (!Array.isArray(files)) return null;
+  files = files.slice(0, IMPORT_MAX_FILES);
   const folderMap = new Map<string, string>();
   let imported = 0;
   for (const file of files) {
+    if (!contentSchema.safeParse(file.content).success) continue; // skip oversized content silently in batch
     const parts = file.path.split("/");
     let parentFolderId: string | null = defaultFolderId;
     if (parts.length > 1) {
@@ -750,7 +755,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
 export function handleUnshareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to remove shares." };
   const shareId = String(ctx.form.get("shareId"));
-  unshareFolder(shareId);
+  unshareFolder(shareId, ctx.workspace.id);
   return { success: "Share removed." };
 }
 
