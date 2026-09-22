@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext } from "react";
+import { useState, useCallback, useEffect, useRef, createContext, useContext } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -6,6 +6,10 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  rectIntersection,
+  MeasuringStrategy,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
@@ -76,8 +80,47 @@ function isDropValid(
 
 export { isDropValid };
 
+// Default measuring only happens once, at drag start. Sidebar content can
+// still be settling then (async folder-children fetches, a just-completed
+// re-render), so a target's cached rect can go stale for the rest of that
+// drag — symptoms: hover only registers over part of a row, or not at all.
+// Re-measuring continuously keeps every droppable's rect current.
+const measuringConfig = {
+  droppable: { strategy: MeasuringStrategy.Always },
+};
+
+// pointerWithin requires the pointer to be strictly inside a droppable's
+// measured rect. If a droppable's rect measurement is off for any reason
+// (a nested interactive element, a rect that lags a layout change),
+// pointerWithin misses it, but rectIntersection — a separately computed
+// check against the dragged item's rect — often still catches it.
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
+  if (pointerHits.length > 0) return pointerHits;
+  return rectIntersection(args);
+};
+
 export function DndProvider({ onMove, allFolders, children }: DndProviderProps) {
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
+
+  // Many drag sources and drop targets (rows, sidebar links, breadcrumb
+  // links) are real <a>/<Link> elements. Releasing the pointer after any
+  // real drag — successful move, invalid target, or dropped on empty space
+  // — can still trigger the browser's native click-on-release, navigating
+  // wherever the pointer landed. Suppress exactly one click, app-wide,
+  // whenever a drag actually started (past the activation threshold, so a
+  // plain click never sets this).
+  const justDroppedRef = useRef(false);
+  useEffect(() => {
+    function suppressClickAfterDrop(e: MouseEvent) {
+      if (!justDroppedRef.current) return;
+      justDroppedRef.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    document.addEventListener("click", suppressClickAfterDrop, true);
+    return () => document.removeEventListener("click", suppressClickAfterDrop, true);
+  }, []);
 
   const pointerSensor = useSensor(PointerSensor, {
     activationConstraint: { distance: 8 },
@@ -90,6 +133,7 @@ export function DndProvider({ onMove, allFolders, children }: DndProviderProps) 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as DragItem | undefined;
     if (data) setActiveItem(data);
+    justDroppedRef.current = true;
   }, []);
 
   const handleDragEnd = useCallback(
@@ -116,6 +160,8 @@ export function DndProvider({ onMove, allFolders, children }: DndProviderProps) 
       <DndContext
         id="main-dnd"
         sensors={sensors}
+        collisionDetection={collisionDetection}
+        measuring={measuringConfig}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}

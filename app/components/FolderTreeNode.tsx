@@ -193,6 +193,8 @@ export function FolderTreeNode({
                   depth={depth + 1}
                   isActive={activeItemId === doc.id}
                   urlPrefix={urlPrefix}
+                  folderId={folder.id}
+                  crossWorkspaceId={crossWorkspaceId}
                 />
               ))}
             </>
@@ -208,21 +210,35 @@ function DocTreeItem({
   depth,
   isActive,
   urlPrefix = "/w",
+  folderId,
+  crossWorkspaceId,
 }: {
   doc: { id: string; title: string; pdf_file: string | null };
   depth: number;
   isActive: boolean;
   urlPrefix?: string;
+  /** Parent folder id — lets dropping onto a doc's row move into that doc's folder. */
+  folderId: string;
+  crossWorkspaceId?: string;
 }) {
   const indent = docIndent(depth);
   const isPdf = doc.pdf_file?.toLowerCase().endsWith(".pdf");
   const isFile = !!doc.pdf_file && !isPdf;
-  return (
+  const { enabled: dndEnabled } = useDndState();
+
+  const docLink = (
+    dropRef?: (el: HTMLElement | null) => void,
+    isOver?: boolean,
+    isInvalid?: boolean,
+  ) => (
     <Link
+      ref={dropRef}
       to={`${urlPrefix}/doc/${doc.id}`}
       target="_blank"
       rel="noopener"
-      className={`sidebar-item ${isActive ? "sidebar-item-active" : ""}`}
+      className={`sidebar-item ${isActive ? "sidebar-item-active" : ""}${
+        isOver && !isInvalid ? " sidebar-drop-over" : ""
+      }${isInvalid ? " sidebar-drop-invalid" : ""}`}
       style={{ paddingLeft: `${indent}rem` }}
       data-tree-item={doc.id}
     >
@@ -235,6 +251,14 @@ function DocTreeItem({
       )}
       <span className="truncate">{doc.title || "Untitled"}</span>
     </Link>
+  );
+
+  if (!dndEnabled) return docLink();
+
+  return (
+    <Droppable target={{ type: "folder", id: folderId, ...(crossWorkspaceId ? { workspaceId: crossWorkspaceId } : {}) }}>
+      {({ dropRef, isOver, isInvalid }) => docLink(dropRef, isOver, isInvalid)}
+    </Droppable>
   );
 }
 
