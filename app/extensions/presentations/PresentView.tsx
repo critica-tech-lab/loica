@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router";
 import { marked } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 import { parseFrontmatter } from "~/extensions/sdk";
 
 // Reveal core CSS — loaded via `<link>` injection on mount so it doesn't bleed
@@ -133,12 +134,14 @@ function renderSlidesHTML(content: string): string {
     return `<section${attrPart}>${html}${notesHtml}</section>`;
   };
 
-  return columns
+  const html = columns
     .map((column) => {
       if (column.length === 1) return renderSlide(column[0]);
       return `<section>${column.map(renderSlide).join("")}</section>`;
     })
     .join("");
+
+  return DOMPurify.sanitize(html);
 }
 
 // ─── Component ────────────────────────────────────────────

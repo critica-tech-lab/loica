@@ -18,14 +18,11 @@ import { LinkModal } from "~/components/LinkModal";
 import { PresenceIndicator } from "~/components/PresenceIndicator";
 import { SidePanel } from "~/components/SidePanel";
 import { CommentIcon, ShareIcon, StarIcon, ClockIcon, DocIcon, TrashIcon } from "~/components/icons";
-import { useDocument, userColor } from "~/lib/DocumentContext";
+import { useDocument, userColor, USE_PM } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { diffWords } from "diff";
 
-// ProseMirror is the default editor on this branch. Set VITE_PM_EDITOR=0 to
-// fall back to the legacy CodeMirror editor.
-const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 export type { DocumentProps as DocEditorViewProps };
 
 export function DocEditorView(_props: DocumentProps) {

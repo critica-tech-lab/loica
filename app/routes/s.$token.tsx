@@ -144,6 +144,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Handle password verification
   if (intent === "verify-password") {
+    const ip = getClientIp(request);
+    // Keyed by IP and, separately, by token — so a distributed attacker
+    // rotating source IPs can't bypass the limit by spreading guesses
+    // against one link across many addresses.
+    const ipLimit = checkRateLimit(ip, { windowMs: 15 * 60 * 1000, max: 10, prefix: "share-pwd-ip" });
+    const tokenLimit = checkRateLimit(String(params.token), { windowMs: 15 * 60 * 1000, max: 30, prefix: "share-pwd-token" });
+    if (!ipLimit.allowed || !tokenLimit.allowed) {
+      return { ok: false, error: "Too many attempts. Try again later." };
+    }
+
     const password = String(form.get("password") || "");
     const result = getDocumentByToken(params.token);
     if (!result) throw appError("link_invalid");
