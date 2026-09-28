@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import DOMPurify from "dompurify";
+import DOMPurify from "isomorphic-dompurify";
 import { useFocusTrap } from "~/components/hooks/useFocusTrap";
 import { popoverSurface } from "~/lib/popover-styles";
 

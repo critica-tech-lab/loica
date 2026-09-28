@@ -33,7 +33,9 @@ The script is interactive and walks you through the setup. Afterwards, edit `.en
 
 ```env
 NODE_ENV=production
+SITE_URL=https://your-domain.com
 WS_URL=wss://your-domain.com/ws
+TRUST_PROXY_HOPS=1
 ```
 
 ## Docker
@@ -61,6 +63,7 @@ and set:
 SITE_URL=https://your-domain.com
 WS_URL=wss://your-domain.com/ws
 SECURE_COOKIE=true
+TRUST_PROXY_HOPS=1
 ```
 
 To run the two processes without compose:
@@ -227,11 +230,13 @@ cp .env.example .env
 | `NODE_ENV` | Yes | — | Set to `production` for secure cookies |
 | `PORT` | No | `3000` | Web server port |
 | `WS_PORT` | No | `4001` | WebSocket server port |
+| `WS_ADMIN_PORT` | No | `WS_PORT + 1` | Loopback-only port for internal `/reset` and `/status` — never proxy this |
 | `WS_URL` | Production | Auto-detect | Public WebSocket URL (`wss://your-domain.com/ws`) |
 | `WS_HOST` | No | `127.0.0.1` (prod) / `0.0.0.0` (dev) | WebSocket bind address |
 | `SECURE_COOKIE` | No | `true` in prod | Set `false` for local HTTP |
+| `TRUST_PROXY_HOPS` | Behind a proxy | `0` | Number of reverse proxies in front of the app. **Set to `1`** for the Caddy/nginx setups below — otherwise login rate-limiting and the WS connection cap fall back to one shared bucket for every client instead of one per IP |
 | `ALLOWED_ORIGINS` | No | Derived from `WS_URL` | Comma-separated allowed origins |
-| `SITE_URL` | No | Auto-detect | Public base URL, used to build links in outbound email |
+| `SITE_URL` | Production | `localhost` in dev, none in prod | Public base URL used to build links in outbound email. Never derived from request headers (they're attacker-controlled) — without it, share/invite emails in production omit the link rather than guess at one |
 | `DISABLE_LOCAL_LOGIN` | No | `false` | `true` for an SSO-only install: hides the password login form and signup |
 | `REGISTRATION_OPEN` | No | `true` | `false` closes signups while keeping password login enabled |
 | `MAILGUN_API_KEY` | No | — | Mailgun API key (emails are logged without this) |

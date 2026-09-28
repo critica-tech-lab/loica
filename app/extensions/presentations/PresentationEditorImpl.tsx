@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { marked } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 import { ProseMirrorEditor } from "~/components/ProseMirrorEditor";
 import { PMToolbar } from "~/components/PMToolbar";
 import type { EditorApi } from "~/lib/DocumentContext";
@@ -163,7 +164,7 @@ function SlidePreview({ markdown }: { markdown: string }) {
       </div>
       {slides.map((slide, i) => {
         const { body, attrs } = parseSlide(slide);
-        const html = marked.parse(body || "&nbsp;") as string;
+        const html = DOMPurify.sanitize(marked.parse(body || "&nbsp;") as string);
         // Honour a per-slide data-background color so the thumbnail matches.
         const bgMatch = attrs.match(/data-background(?:-color)?=["']?(#[0-9a-fA-F]{3,8}|[a-z]+)["']?/);
         const bg = bgMatch ? bgMatch[1] : undefined;
