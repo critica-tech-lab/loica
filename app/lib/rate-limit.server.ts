@@ -25,14 +25,24 @@ setInterval(() => {
 // raw socket address here to fall back on — see docs/deployment.md.
 const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? 0);
 
+/**
+ * Pick the client hop out of an X-Forwarded-For header, counted from the
+ * right so a client can't defeat it by prepending a fake entry — the last
+ * `trustProxyHops` entries are the proxies we actually trust, the one before
+ * them is the real client. Returns null when there aren't enough hops to
+ * trust (header shorter than expected, or trustProxyHops <= 0).
+ */
+export function pickForwardedHop(forwarded: string, trustProxyHops: number): string | null {
+  if (trustProxyHops <= 0) return null;
+  const hops = forwarded.split(",").map((h) => h.trim()).filter(Boolean);
+  return hops[hops.length - trustProxyHops] ?? null;
+}
+
 export function getClientIp(request: Request): string {
   if (TRUST_PROXY_HOPS > 0) {
     const forwarded = request.headers.get("x-forwarded-for");
-    if (forwarded) {
-      const hops = forwarded.split(",").map((h) => h.trim()).filter(Boolean);
-      const clientHop = hops[hops.length - TRUST_PROXY_HOPS];
-      if (clientHop) return clientHop;
-    }
+    const clientHop = forwarded ? pickForwardedHop(forwarded, TRUST_PROXY_HOPS) : null;
+    if (clientHop) return clientHop;
   }
   // No trusted proxy configured, or too few hops in the header — don't
   // trust attacker-suppliable input. Every such request shares one bucket

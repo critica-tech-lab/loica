@@ -387,20 +387,27 @@ export function purgeExpiredTrash(): void {
   db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
 }
 
-export function moveDocument(docId: string, folderId: string | null): void {
+/** `workspaceId` scopes the update at the SQL level — callers already check
+ *  membership, but the query itself must not trust that alone (see Fase 1's
+ *  restoreDocument/permanentlyDeleteDocument for the same pattern). */
+export function moveDocument(docId: string, folderId: string | null, workspaceId: string): void {
   db.prepare(
-    "UPDATE documents SET folder_id = ?, updated_at = unixepoch() WHERE id = ?"
-  ).run(folderId, docId);
+    "UPDATE documents SET folder_id = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?"
+  ).run(folderId, docId, workspaceId);
 }
 
+/** `sourceWorkspaceId` is the doc's workspace before the move — scopes the
+ *  update so it can only ever move a doc out of the workspace the caller
+ *  actually verified it belongs to. */
 export function moveDocumentToWorkspace(
   docId: string,
+  sourceWorkspaceId: string,
   targetWorkspaceId: string,
   targetFolderId: string | null,
 ): void {
   db.prepare(
-    "UPDATE documents SET workspace_id = ?, folder_id = ?, updated_at = unixepoch() WHERE id = ?"
-  ).run(targetWorkspaceId, targetFolderId, docId);
+    "UPDATE documents SET workspace_id = ?, folder_id = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?"
+  ).run(targetWorkspaceId, targetFolderId, docId, sourceWorkspaceId);
 }
 
 // ─── Public sharing ───────────────────────────────────────
