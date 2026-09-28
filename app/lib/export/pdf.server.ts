@@ -30,64 +30,111 @@ const fonts = {
 };
 
 type Margins = [number, number, number, number];
-type Six = [number, number, number, number, number, number];
+
+const PAGE_WIDTH = { A4: [595, 842], LETTER: [612, 792] } as const;
+
+export interface PdfHeadingStyle {
+  fontSize?: number;
+  bold?: boolean;
+  italics?: boolean;
+  /** Render the heading text uppercase. */
+  caps?: boolean;
+  color?: string;
+  characterSpacing?: number;
+  /** Space [above, below] in pt. */
+  margin?: [number, number];
+}
 
 /** House-style overrides for `renderPdf`. Omitted fields use the core defaults. */
 export interface PdfStyle {
+  pageSize?: keyof typeof PAGE_WIDTH;
   fontSize?: number;
   lineHeight?: number;
   /** [left, top, right, bottom] in pt. */
   pageMargins?: Margins;
-  /** h1..h6 font sizes in pt. */
-  headingSizes?: Six;
-  /** h1..h6 space above / below in pt. */
-  headingMargins?: { top: Six; bottom: Six };
+  /** Margins for `orientation: landscape` docs. Defaults to `pageMargins`. */
+  landscapePageMargins?: Margins;
+  /** h1..h6, each merged over the core default for that level. */
+  headings?: PdfHeadingStyle[];
   colors?: {
     body?: string;
     link?: string;
+    /** Inline code + mono dates. */
     codeBg?: string;
+    codeBlockBg?: string;
     codeFg?: string;
     quote?: string;
     footnote?: string;
     rule?: string;
+    /** "Source…" captions and page numbers. */
+    caption?: string;
   };
+  linkUnderline?: boolean;
+  /** Inline code + mono dates. */
   codeFontSize?: number;
-  /** Render date-like text (2026-03-02, 03/02/2026, March 2 2026…) in monospace. */
+  codeBlockFontSize?: number;
+  quote?: { italics?: boolean; /** [left, right] indent in pt. */ indent?: [number, number] };
+  /** "lines": light rule under every row. "booktabs": top, below-header and bottom rules only. */
+  tableLayout?: "lines" | "booktabs";
+  /** Render date-like text (2026-03-02, 03/02/2026, March 2 2026…) like inline code. */
   dateInMono?: boolean;
   /** Render paragraphs starting with "Source" as small, muted captions. */
   sourceCaptions?: boolean;
+  footnoteRefs?: "bracket" | "superscript";
   pageNumbers?: false | "left" | "center" | "right";
 }
 
-type Style = Required<Omit<PdfStyle, "colors">> & { colors: Required<NonNullable<PdfStyle["colors"]>> };
+type Style = Required<Omit<PdfStyle, "colors" | "quote" | "headings" | "landscapePageMargins">> & {
+  colors: Required<NonNullable<PdfStyle["colors"]>>;
+  quote: Required<NonNullable<PdfStyle["quote"]>>;
+  headings: PdfHeadingStyle[];
+  landscapePageMargins: Margins;
+};
 
-const DEFAULT_STYLE: Style = {
+const DEFAULT_HEADINGS: PdfHeadingStyle[] = [22, 18, 15, 13, 12, 11].map((fontSize, i) => ({
+  fontSize,
+  bold: true,
+  margin: [i < 2 ? 12 : 8, 4],
+}));
+
+const DEFAULT_STYLE: Omit<Style, "landscapePageMargins"> = {
+  pageSize: "A4",
   fontSize: 11,
   lineHeight: 1.35,
   pageMargins: [50, 50, 50, 50],
-  headingSizes: [22, 18, 15, 13, 12, 11],
-  headingMargins: { top: [12, 12, 8, 8, 8, 8], bottom: [4, 4, 4, 4, 4, 4] },
+  headings: DEFAULT_HEADINGS,
   colors: {
     body: "#000000",
     link: "#0b62d6",
     codeBg: "#f4f4f4",
+    codeBlockBg: "#f4f4f4",
     codeFg: "#000000",
     quote: "#555555",
     footnote: "#333333",
     rule: "#cccccc",
+    caption: "#737373",
   },
+  linkUnderline: true,
   codeFontSize: 9,
+  codeBlockFontSize: 9,
+  quote: { italics: true, indent: [12, 0] },
+  tableLayout: "lines",
   dateInMono: false,
   sourceCaptions: false,
+  footnoteRefs: "bracket",
   pageNumbers: false,
 };
 
 function resolveStyle(style: PdfStyle = {}): Style {
+  const pageMargins = style.pageMargins ?? DEFAULT_STYLE.pageMargins;
   return {
     ...DEFAULT_STYLE,
     ...style,
-    headingMargins: style.headingMargins ?? DEFAULT_STYLE.headingMargins,
+    pageMargins,
+    landscapePageMargins: style.landscapePageMargins ?? pageMargins,
+    headings: DEFAULT_HEADINGS.map((h, i) => ({ ...h, ...style.headings?.[i] })),
     colors: { ...DEFAULT_STYLE.colors, ...style.colors },
+    quote: { ...DEFAULT_STYLE.quote, ...style.quote },
   };
 }
 
@@ -109,14 +156,25 @@ type Inline = { text: string } & Record<string, unknown>;
 
 // ── Inline rendering ─────────────────────────────────────────────────────────
 
-/** A plain text run, split so date-like substrings print in mono when enabled. */
+function codeRun(text: string, base: Partial<Inline>, s: Style): Inline {
+  return {
+    text,
+    font: "IBMPlexMono",
+    fontSize: s.codeFontSize,
+    color: s.colors.codeFg,
+    background: s.colors.codeBg,
+    ...base,
+  };
+}
+
+/** A plain text run, split so date-like substrings print as code when enabled. */
 function textRuns(text: string, base: Partial<Inline>, s: Style): Inline[] {
   if (!s.dateInMono) return [{ text, ...base }];
   const out: Inline[] = [];
   let last = 0;
   for (const m of text.matchAll(DATE_RE)) {
     if (m.index > last) out.push({ text: text.slice(last, m.index), ...base });
-    out.push({ text: m[0].replace(/–/g, "-"), ...base, font: "IBMPlexMono" });
+    out.push(codeRun(m[0].replace(/–/g, "-"), base, s));
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ text: text.slice(last), ...base });
@@ -146,18 +204,11 @@ function renderInline(tokens: Token[] | undefined, s: Style, base: Partial<Inlin
         out.push(...renderInline((t as Tokens.Del).tokens, s, { ...base, decoration: "lineThrough" }));
         break;
       case "codespan":
-        out.push({
-          text: (t as Tokens.Codespan).text,
-          font: "IBMPlexMono",
-          fontSize: s.codeFontSize,
-          color: s.colors.codeFg,
-          background: s.colors.codeBg,
-          ...base,
-        });
+        out.push(codeRun((t as Tokens.Codespan).text, base, s));
         break;
       case "link": {
         const lk = t as Tokens.Link;
-        const runs = renderInline(lk.tokens, s, { ...base, color: s.colors.link, decoration: "underline" });
+        const runs = renderInline(lk.tokens, s, { ...base, color: s.colors.link, ...(s.linkUnderline && { decoration: "underline" }) });
         for (const r of runs) (r as Record<string, unknown>).link = lk.href;
         out.push(...runs);
         break;
@@ -165,9 +216,15 @@ function renderInline(tokens: Token[] | undefined, s: Style, base: Partial<Inlin
       case "br":
         out.push({ text: "\n", ...base });
         break;
-      case "footnoteRef":
-        out.push({ text: ` [${(t as Tokens.Generic).id}]`, fontSize: 8, ...base });
+      case "footnoteRef": {
+        const id = (t as Tokens.Generic).id;
+        out.push(
+          s.footnoteRefs === "superscript"
+            ? { text: String(id), sup: true, fontSize: 7.5, ...base }
+            : { text: ` [${id}]`, fontSize: 8, ...base },
+        );
         break;
+      }
       default: {
         const txt = (t as Tokens.Generic).text;
         if (typeof txt === "string") out.push({ text: txt, ...base });
@@ -189,12 +246,18 @@ function renderBlocks(tokens: Token[], images: Map<string, ResolvedImage>, conte
     switch (t.type) {
       case "heading": {
         const h = t as Tokens.Heading;
-        const i = h.depth - 1;
+        const hs = s.headings[h.depth - 1] ?? s.headings[5];
+        let runs = renderInline(h.tokens, s);
+        if (hs.caps) runs = runs.map((r) => ({ ...r, text: r.text.toUpperCase() }));
+        const [above, below] = hs.margin ?? [8, 4];
         out.push({
-          text: renderInline(h.tokens, s),
-          fontSize: s.headingSizes[i] ?? s.fontSize,
-          bold: true,
-          margin: [0, s.headingMargins.top[i] ?? 8, 0, s.headingMargins.bottom[i] ?? 4],
+          text: runs,
+          fontSize: hs.fontSize ?? s.fontSize,
+          bold: !!hs.bold,
+          italics: !!hs.italics,
+          color: hs.color,
+          characterSpacing: hs.characterSpacing,
+          margin: [0, above, 0, below],
         });
         break;
       }
@@ -204,12 +267,7 @@ function renderBlocks(tokens: Token[], images: Map<string, ResolvedImage>, conte
         if (p.tokens?.length === 1 && p.tokens[0].type === "image") {
           out.push(...renderImage(p.tokens[0] as Tokens.Image, images, contentWidth));
         } else if (s.sourceCaptions && isSourceCaption(p)) {
-          out.push({
-            text: renderInline(p.tokens, s),
-            fontSize: Math.round(s.fontSize * 0.8 * 10) / 10,
-            color: "#737373",
-            margin: [0, -4, 0, 8],
-          });
+          out.push({ text: renderInline(p.tokens, s), fontSize: 9, color: s.colors.caption, margin: [0, 2, 0, 8] });
         } else {
           out.push({ text: renderInline(p.tokens, s), margin: [0, 0, 0, 8] });
         }
@@ -226,24 +284,38 @@ function renderBlocks(tokens: Token[], images: Map<string, ResolvedImage>, conte
         // A callout prints as a plain quote; matchCallout only strips its
         // `[!NOTE]` marker so it doesn't land on the page as literal text.
         const body = matchCallout(bq)?.tokens ?? bq.tokens;
+        const [left, right] = s.quote.indent;
         out.push({
-          margin: [12, 0, 0, 8],
-          stack: renderBlocks(body, images, contentWidth - 12, s),
+          margin: [left, 0, right, 8],
+          stack: renderBlocks(body, images, contentWidth - left - right, s),
           color: s.colors.quote,
-          italics: true,
+          italics: s.quote.italics,
         });
         break;
       }
       case "code": {
         const c = t as Tokens.Code;
+        // A one-cell table so the background fills a padded box, not just the text lines.
         out.push({
-          text: c.text,
-          font: "IBMPlexMono",
-          fontSize: s.codeFontSize,
-          color: s.colors.codeFg,
-          margin: [0, 0, 0, 8],
-          background: s.colors.codeBg,
-          preserveLeadingSpaces: true,
+          table: {
+            widths: ["*"],
+            body: [[{
+              text: c.text,
+              font: "IBMPlexMono",
+              fontSize: s.codeBlockFontSize,
+              color: s.colors.codeFg,
+              preserveLeadingSpaces: true,
+            }]],
+          },
+          layout: {
+            defaultBorder: false,
+            fillColor: () => s.colors.codeBlockBg,
+            paddingLeft: () => 8,
+            paddingRight: () => 8,
+            paddingTop: () => 6,
+            paddingBottom: () => 6,
+          },
+          margin: [0, 2, 0, 9],
         });
         break;
       }
@@ -287,12 +359,27 @@ function renderList(t: Tokens.List, images: Map<string, ResolvedImage>, contentW
 function renderTable(t: Tokens.Table, s: Style): Content {
   const header = t.header.map((c) => ({ text: renderInline(c.tokens, s), bold: true }));
   const body = t.rows.map((row) => row.map((c) => ({ text: renderInline(c.tokens, s) })));
-  return {
-    table: { headerRows: 1, widths: t.header.map(() => "*"), body: [header, ...body] },
-    layout: "lightHorizontalLines",
-    margin: [0, 0, 0, 10],
-    fontSize: Math.min(10, s.fontSize),
-  };
+  const table = { headerRows: 1, widths: t.header.map(() => "*"), body: [header, ...body] };
+  if (s.tableLayout === "booktabs") {
+    const cols = t.header.length;
+    return {
+      table,
+      layout: {
+        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+          i === 0 || i === 1 || i === node.table.body.length ? 0.4 : 0,
+        vLineWidth: () => 0,
+        hLineColor: () => s.colors.rule,
+        paddingTop: () => 4,
+        paddingBottom: () => 4,
+        paddingLeft: (i: number) => (i === 0 ? 0 : 6),
+        paddingRight: () => 6,
+      },
+      // Shrink wide tables so they fit the text column.
+      fontSize: cols >= 8 ? 7.5 : cols >= 6 ? 8.5 : 9,
+      margin: [0, 2, 0, 11],
+    };
+  }
+  return { table, layout: "lightHorizontalLines", margin: [0, 0, 0, 10], fontSize: Math.min(10, s.fontSize) };
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -302,9 +389,10 @@ export async function renderPdf(markdown: string, title: string, landscape = fal
   const { tokens, footnotes } = lexDoc(markdown);
   const images = await resolveImages(tokens);
 
-  // A4 content box width in pt: page width minus left/right margins.
-  const [ml, , mr] = s.pageMargins;
-  const contentWidth = (landscape ? 842 : 595) - ml - mr;
+  // Content box width in pt: page width minus left/right margins.
+  const pageMargins = landscape ? s.landscapePageMargins : s.pageMargins;
+  const [ml, , mr] = pageMargins;
+  const contentWidth = PAGE_WIDTH[s.pageSize][landscape ? 1 : 0] - ml - mr;
   const content = renderBlocks(tokens, images, contentWidth, s);
 
   if (footnotes.length) {
@@ -321,17 +409,18 @@ export async function renderPdf(markdown: string, title: string, landscape = fal
 
   const pageNumbers = s.pageNumbers;
   const docDefinition: TDocumentDefinitions = {
-    pageSize: "A4",
+    pageSize: s.pageSize,
     pageOrientation: landscape ? "landscape" : "portrait",
-    pageMargins: s.pageMargins,
+    pageMargins,
     info: { title },
     defaultStyle: { font: "IBMPlexSans", fontSize: s.fontSize, lineHeight: s.lineHeight, color: s.colors.body },
     footer: pageNumbers
       ? (currentPage: number) => ({
           text: String(currentPage),
           alignment: pageNumbers,
-          fontSize: 8.5,
-          margin: [ml, 20, mr, 0],
+          fontSize: 8,
+          color: s.colors.caption,
+          margin: [ml, 16, mr, 0],
         })
       : undefined,
     content,

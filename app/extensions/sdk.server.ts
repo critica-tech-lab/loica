@@ -48,4 +48,4 @@ export type { ExternalAuthProfile } from "~/lib/auth.server";
 // For `globalExporters.pdf` implementations that want the core pure-JS
 // renderer with a house style rather than a whole new pipeline.
 export { renderPdf } from "~/lib/export/pdf.server";
-export type { PdfStyle } from "~/lib/export/pdf.server";
+export type { PdfStyle, PdfHeadingStyle } from "~/lib/export/pdf.server";
