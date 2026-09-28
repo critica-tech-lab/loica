@@ -131,7 +131,7 @@ export function handleMoveDoc(ctx: ActionContext) {
     const tf = getFolder(target);
     if (!tf || tf.workspace_id !== ctx.workspace.id) return null;
   }
-  moveDocument(docId, target);
+  moveDocument(docId, target, ctx.workspace.id);
   return null;
 }
 
@@ -186,7 +186,7 @@ export function handleMoveDocToWorkspace(ctx: ActionContext) {
     if (!tf || tf.workspace_id !== targetWorkspaceId) return null;
   }
 
-  moveDocumentToWorkspace(docId, targetWorkspaceId, target);
+  moveDocumentToWorkspace(docId, ctx.workspace.id, targetWorkspaceId, target);
   return null;
 }
 
