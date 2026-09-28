@@ -1,13 +1,13 @@
 import { Form, useLoaderData, useActionData, useNavigation, redirect } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/admin";
-import { requireAdmin, validatePassword, createSession } from "~/lib/auth.server";
+import { requireAdmin, createSession } from "~/lib/auth.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import {
   listAllUsers,
   adminCreateUser,
+  adminResetPassword,
   adminUpdateUser,
-  adminChangePassword,
   adminDeleteUser,
   adminToggleAdmin,
   adminTransferAndDeleteUser,
@@ -193,13 +193,10 @@ export async function action({ request }: Route.ActionArgs) {
     if (!rl.allowed) return { error: "Too many requests. Try again later." };
     const name = String(form.get("name") || "").trim();
     const email = String(form.get("email") || "").trim();
-    const password = String(form.get("password") || "");
-    if (!name || !email || !password) return { error: "All fields are required." };
-    const pwError = validatePassword(password);
-    if (pwError) return { error: pwError };
+    if (!name || !email) return { error: "Name and email are required." };
     try {
-      await adminCreateUser(email, name, password);
-      return { success: "User created." };
+      await adminCreateUser(email, name);
+      return { success: "User created. They'll get an email to set their password." };
     } catch (e: unknown) {
       if (e instanceof Error && e.message === "email_taken") return { error: "Email already in use." };
       return { error: "Failed to create user." };
@@ -220,15 +217,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
-  if (intent === "change-password") {
+  if (intent === "reset-password") {
     const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 10, prefix: "admin" });
     if (!rl.allowed) return { error: "Too many requests. Try again later." };
     const userId = String(form.get("userId"));
-    const password = String(form.get("password") || "");
-    const pwError = validatePassword(password);
-    if (pwError) return { error: pwError };
-    await adminChangePassword(userId, password);
-    return { success: "Password changed." };
+    await adminResetPassword(userId);
+    return { success: "Password reset. They'll get an email to set a new one." };
   }
 
   if (intent === "delete-user") {
@@ -481,7 +475,7 @@ function UserRowMenu({
             Edit
           </button>
           <button type="button" onClick={() => { setOpen(false); onChangePwd(); }} className={itemClass}>
-            Change password
+            Reset password
           </button>
           <Form method="post" onSubmit={() => setOpen(false)}>
             <input type="hidden" name="intent" value="toggle-admin" />
@@ -978,17 +972,6 @@ export default function AdminPanel() {
                   placeholder="jane@example.com"
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs text-fg/50">
-                Password
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  className="rounded-lg border border-fg/15 bg-bg px-2.5 py-1.5 font-mono text-xs text-fg outline-none placeholder:text-fg/25 focus:border-accent/40"
-                  placeholder="min 8 chars"
-                />
-              </label>
               <button
                 type="submit"
                 disabled={busy}
@@ -1061,24 +1044,17 @@ export default function AdminPanel() {
                     className={`flex items-center gap-2 px-4 py-2 ${i > 0 ? "border-t border-fg/[0.06]" : ""}`}
                     onSubmit={() => setChangingPwdId(null)}
                   >
-                    <input type="hidden" name="intent" value="change-password" />
+                    <input type="hidden" name="intent" value="reset-password" />
                     <input type="hidden" name="userId" value={u.id} />
-                    <span className="flex-1 truncate text-sm font-medium">{u.name}</span>
-                    <input
-                      name="password"
-                      type="password"
-                      autoFocus
-                      required
-                      minLength={8}
-                      placeholder="New password (min 8)"
-                      className="w-48 shrink-0 rounded border border-fg/15 bg-fg/5 px-2 py-1 font-mono text-xs text-fg outline-none focus:border-fg/30"
-                    />
+                    <span className="flex-1 truncate text-sm font-medium">
+                      Reset {u.name}&rsquo;s password? They&rsquo;ll get an email to set a new one.
+                    </span>
                     <button
                       type="submit"
                       disabled={busy}
                       className="rounded bg-fg px-3 py-1 font-mono text-xs text-bg disabled:opacity-40"
                     >
-                      Set
+                      Reset
                     </button>
                     <button
                       type="button"

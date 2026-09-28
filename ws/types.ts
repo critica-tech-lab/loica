@@ -11,6 +11,14 @@ import { WebSocket } from "ws";
 export const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB
 export const MAX_MESSAGE_BYTES = MAX_DOC_BYTES * 2; // 10 MB raw WS message
 
+// Applies both when seeding a spreadsheet doc's Y.Maps from persisted
+// content and, live, on every collaborative edit — see ws-server.ts's
+// capMapSize(). ss-cells/ss-styles are keyed by cell coordinate (same
+// cardinality domain); ss-colWidths/ss-rowHeights are keyed by column/row
+// index, bounded by grid dimensions, so a smaller cap is generous.
+export const MAX_SPREADSHEET_CELLS = 10_000;
+export const MAX_SPREADSHEET_DIMENSIONS = 5_000;
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface AuthResult {

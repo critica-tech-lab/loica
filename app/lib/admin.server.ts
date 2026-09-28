@@ -1,13 +1,13 @@
-import { hash } from "@node-rs/argon2";
 import { nanoid } from "nanoid";
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { db, prep } from "./db.server";
 import { dbPath } from "./paths.server";
-import { invalidateOtherSessions } from "./auth.server";
-import { sendWelcomeEmail, sendPasswordChangedNotification } from "./email.server";
+import { createPasswordResetToken } from "./auth.server";
+import { sendWelcomeEmail, sendPasswordResetNotification } from "./email.server";
 import { createWorkspace, getUserWorkspaces } from "./workspace.server";
+import { getEmailOrigin } from "./url.server";
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -372,23 +372,26 @@ export function listAllUsers(): AdminUser[] {
 
 export async function adminCreateUser(
   email: string,
-  name: string,
-  password: string
+  name: string
 ): Promise<string> {
   const existing = prep<{ id: string }, [string]>("SELECT id FROM users WHERE email = ?")
     .get(email);
   if (existing) throw new Error("email_taken");
 
   const id = nanoid(16);
-  const passwordHash = await hash(password);
+  // Unmatchable placeholder — never a valid argon2 hash. The user sets
+  // their own password via the welcome email's reset link.
+  const randomHash = nanoid(64);
   db.prepare(
     "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (?, ?, ?, ?, 0)"
-  ).run(id, email, name, passwordHash);
+  ).run(id, email, name, randomHash);
 
   // Create personal workspace (mirrors signup flow)
   createWorkspace("My documents", id);
 
-  sendWelcomeEmail(email, name, password);
+  const token = await createPasswordResetToken(id);
+  const origin = getEmailOrigin();
+  sendWelcomeEmail(email, name, origin ? `${origin}/reset-password/${token}` : null);
 
   return id;
 }
@@ -418,21 +421,16 @@ export function adminUpdateUser(
   }
 }
 
-export async function adminChangePassword(
-  userId: string,
-  newPassword: string
-): Promise<void> {
-  const passwordHash = await hash(newPassword);
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, userId);
-  invalidateOtherSessions(userId); // No keepSessionId — force logout from all sessions
-
+export async function adminResetPassword(userId: string): Promise<void> {
   const user = prep<{ email: string; name: string }, [string]>(
       "SELECT email, name FROM users WHERE id = ?"
     )
     .get(userId);
-  if (user) {
-    sendPasswordChangedNotification(user.email, user.name, newPassword);
-  }
+  if (!user) return;
+
+  const token = await createPasswordResetToken(userId); // also invalidates the old password + sessions
+  const origin = getEmailOrigin();
+  sendPasswordResetNotification(user.email, user.name, origin ? `${origin}/reset-password/${token}` : null);
 }
 
 export function adminDeleteUser(userId: string): void {
