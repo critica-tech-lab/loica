@@ -23,6 +23,7 @@ export type Document = {
   updated_at: number;
   share_expires_at: number | null;
   share_password_hash: string | null;
+  deleted_at?: number | null;
 };
 
 export type DocumentSummary = Pick<
@@ -105,7 +106,7 @@ export function getDocumentIncludingTrashed(id: string): Document | null {
     prep<Document, [string]>(
         `SELECT id, workspace_id, created_by, updated_by, title, content,
                 visibility, public_token, edit_token, folder_id, pdf_file, created_at, updated_at,
-                share_expires_at, share_password_hash
+                share_expires_at, share_password_hash, deleted_at
          FROM documents WHERE id = ?`
       )
       .get(id) ?? null
@@ -306,7 +307,7 @@ export function trashDocument(id: string, userId: string): void {
   ).run(userId, id);
 }
 
-export function restoreDocument(id: string): void {
+export function restoreDocument(id: string, workspaceId: string): void {
   // If parent folder was permanently deleted (no longer exists), move to workspace root
   const doc = prep<{ folder_id: string | null }, [string]>(
     "SELECT folder_id FROM documents WHERE id = ?"
@@ -316,22 +317,23 @@ export function restoreDocument(id: string): void {
       "SELECT id FROM folders WHERE id = ?"
     ).get(doc.folder_id);
     if (!folderExists) {
-      db.prepare("UPDATE documents SET folder_id = NULL WHERE id = ?").run(id);
+      db.prepare("UPDATE documents SET folder_id = NULL WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
     }
   }
   db.prepare(
-    "UPDATE documents SET deleted_at = NULL, deleted_by = NULL WHERE id = ?"
-  ).run(id);
+    "UPDATE documents SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND workspace_id = ?"
+  ).run(id, workspaceId);
 }
 
-export function permanentlyDeleteDocument(id: string): void {
-  const doc = prep<{ pdf_file: string | null }, [string]>(
-    "SELECT pdf_file FROM documents WHERE id = ?"
-  ).get(id);
-  if (doc?.pdf_file) {
+export function permanentlyDeleteDocument(id: string, workspaceId: string): void {
+  const doc = prep<{ pdf_file: string | null }, [string, string]>(
+    "SELECT pdf_file FROM documents WHERE id = ? AND workspace_id = ?"
+  ).get(id, workspaceId);
+  if (!doc) return;
+  if (doc.pdf_file) {
     try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
-  db.prepare("DELETE FROM documents WHERE id = ?").run(id);
+  db.prepare("DELETE FROM documents WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
 }
 
 // Keep legacy name as alias
@@ -739,10 +741,12 @@ export async function restoreDocumentVersion(
   ).run(version.title, version.content, version.yjs_state ?? null, docId);
 
   // Notify ws-server to reset the room — await so the room is destroyed
-  // before the client reloads and reconnects
-  const wsPort = process.env.WS_PORT ?? "4001";
+  // before the client reloads and reconnects. Uses the loopback-only admin
+  // port (see ws-server.ts), not the public WS_PORT.
+  const wsPort = Number(process.env.WS_PORT ?? 4001);
+  const wsAdminPort = process.env.WS_ADMIN_PORT ?? String(wsPort + 1);
   try {
-    await fetch(`http://localhost:${wsPort}/reset/${docId}`, { method: "POST", signal: AbortSignal.timeout(5000) });
+    await fetch(`http://127.0.0.1:${wsAdminPort}/reset/${docId}`, { method: "POST", signal: AbortSignal.timeout(5000) });
   } catch {
     // ws-server may not be running; restore still succeeded in DB
   }

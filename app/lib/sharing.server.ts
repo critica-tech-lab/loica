@@ -96,8 +96,12 @@ export function shareFolder(
   return id;
 }
 
-export function unshareFolder(shareId: string): void {
-  db.prepare("DELETE FROM folder_shares WHERE id = ?").run(shareId);
+export function unshareFolder(shareId: string, workspaceId: string): void {
+  db.prepare(
+    `DELETE FROM folder_shares WHERE id = ? AND folder_id IN (
+      SELECT id FROM folders WHERE workspace_id = ?
+    )`
+  ).run(shareId, workspaceId);
 }
 
 /** Remove a specific user's direct share on a folder (user "leaves" the shared folder). */

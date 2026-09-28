@@ -34,7 +34,7 @@ import { unshareAllFolder, shareFolder, unshareFolder, leaveFolderShare } from "
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
-import { getPublicOrigin } from "~/lib/url.server";
+import { getEmailOrigin } from "~/lib/url.server";
 import { randomDocName } from "~/lib/ui-utils";
 import { TEMPLATES } from "~/lib/templates";
 import { templateOwners } from "~/extensions";
@@ -291,8 +291,8 @@ export async function handleShareDoc(ctx: ActionContext) {
   ).get(email);
   if (!targetUser) {
     const { token: inviteToken } = shareDocWithExternal(docId, email, ctx.user.id);
-    const origin = getPublicOrigin(ctx.request);
-    const editUrl = `${origin}/s/${inviteToken}`;
+    const origin = getEmailOrigin();
+    const editUrl = origin ? `${origin}/s/${inviteToken}` : null;
     const doc = getDocument(docId);
     const sharerName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(ctx.user.id)?.name ?? "Someone";
     sendExternalShareNotification(email, doc?.title ?? "Untitled", sharerName, editUrl);
@@ -300,7 +300,7 @@ export async function handleShareDoc(ctx: ActionContext) {
   }
   if (targetUser.id === ctx.user.id) return { ok: false, error: "Cannot share with yourself" };
   const targetName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(targetUser.id)?.name ?? email;
-  shareDocWithUser(docId, targetUser.id, ctx.user.id, getPublicOrigin(ctx.request));
+  shareDocWithUser(docId, targetUser.id, ctx.user.id, getEmailOrigin() ?? undefined);
   return { ok: true, sharedWith: targetName };
 }
 
@@ -312,7 +312,7 @@ export function handleShareDocGroup(ctx: ActionContext) {
   if (!groupId) return { ok: false, error: "Please select a group first" };
   const doc = getDocument(docId);
   if (!doc || doc.workspace_id !== ctx.workspace.id) throw new Response("Not found", { status: 404 });
-  shareDocWithGroup(docId, groupId, ctx.user.id, getPublicOrigin(ctx.request));
+  shareDocWithGroup(docId, groupId, ctx.user.id, getEmailOrigin() ?? undefined);
   return { ok: true };
 }
 
@@ -625,6 +625,8 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
 
 // ── Import ───────────────────────────────────────────────────
 
+const IMPORT_MAX_FILES = 500;
+
 export function handleImport(ctx: ActionContext, defaultFolderId: string | null) {
   const json = ctx.form.get("files");
   if (!json || typeof json !== "string") return null;
@@ -634,9 +636,12 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
   } catch {
     return null;
   }
+  if (!Array.isArray(files)) return null;
+  files = files.slice(0, IMPORT_MAX_FILES);
   const folderMap = new Map<string, string>();
   let imported = 0;
   for (const file of files) {
+    if (!contentSchema.safeParse(file.content).success) continue; // skip oversized content silently in batch
     const parts = file.path.split("/");
     let parentFolderId: string | null = defaultFolderId;
     if (parts.length > 1) {
@@ -728,7 +733,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
   const f = getFolder(targetFolderId);
   if (!f || f.workspace_id !== ctx.workspace.id) return null;
   const shareType = String(ctx.form.get("shareType"));
-  const origin = getPublicOrigin(ctx.request);
+  const origin = getEmailOrigin() ?? undefined;
   if (shareType === "group") {
     const groupId = String(ctx.form.get("groupId") || "").trim();
     if (!groupId) return { error: "Select a group." };
@@ -750,7 +755,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
 export function handleUnshareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to remove shares." };
   const shareId = String(ctx.form.get("shareId"));
-  unshareFolder(shareId);
+  unshareFolder(shareId, ctx.workspace.id);
   return { success: "Share removed." };
 }
 

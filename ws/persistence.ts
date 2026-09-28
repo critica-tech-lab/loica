@@ -10,7 +10,7 @@ import { sendCommentNotification } from "../app/lib/email.server.ts";
 import { schema as pmSchema } from "../app/components/editor/schema.ts";
 import { loicaMarkdownSerializer, parseMarkdownWithFootnotes } from "../app/components/editor/pm-markdown.ts";
 import { splitFrontmatter } from "../app/lib/markdown.ts";
-import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL } from "./types.ts";
+import { MAX_DOC_BYTES, AUTO_VERSION_INTERVAL, MAX_SPREADSHEET_CELLS, MAX_SPREADSHEET_DIMENSIONS } from "./types.ts";
 
 /**
  * Initialize document persistence statements.
@@ -465,29 +465,34 @@ function seedSpreadsheetMaps(doc: Y.Doc, content: string): void {
     const rowHeights = doc.getMap("ss-rowHeights");
     const styles = doc.getMap("ss-styles");
 
-    const MAX_CELLS = 10_000;
     doc.transact(() => {
       meta.set("cols", data.cols ?? 6);
       meta.set("rows", data.rows ?? 20);
       if (data.cells) {
         let count = 0;
         for (const [k, v] of Object.entries(data.cells)) {
-          if (++count > MAX_CELLS) break;
+          if (++count > MAX_SPREADSHEET_CELLS) break;
           if (v) cells.set(k, v as string);
         }
       }
       if (data.colWidths) {
+        let count = 0;
         for (const [k, v] of Object.entries(data.colWidths)) {
+          if (++count > MAX_SPREADSHEET_DIMENSIONS) break;
           if (v) colWidths.set(k, v as number);
         }
       }
       if (data.rowHeights) {
+        let count = 0;
         for (const [k, v] of Object.entries(data.rowHeights)) {
+          if (++count > MAX_SPREADSHEET_DIMENSIONS) break;
           if (v) rowHeights.set(String(k), v as number);
         }
       }
       if (data.styles) {
+        let count = 0;
         for (const [k, v] of Object.entries(data.styles)) {
+          if (++count > MAX_SPREADSHEET_CELLS) break;
           if (v && typeof v === "object") styles.set(k, JSON.stringify(v));
         }
       }

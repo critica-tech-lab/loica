@@ -108,6 +108,21 @@ async function sendEmail(
   }
 }
 
+// ─── HTML escaping ───────────────────────────────────────
+//
+// User-controlled strings (names, titles, comment/mention bodies) must be
+// escaped before being placed into an HTML email body — every send* function
+// below interpolates such values into `wrap()`'s template literals.
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ─── HTML wrapper ────────────────────────────────────────
 
 function wrap(title: string, body: string): string {
@@ -162,7 +177,7 @@ export function sendFolderShareNotification(
   const html = wrap(
     "Folder shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the folder <strong>&ldquo;${folderName}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the folder <strong>&ldquo;${escapeHtml(folderName)}&rdquo;</strong> with you on Loica.
     </p>
     ${actionHtml}`
   );
@@ -196,7 +211,7 @@ export function sendDocShareNotification(
   const html = wrap(
     "Document shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the document <strong>&ldquo;${docTitle}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the document <strong>&ldquo;${escapeHtml(docTitle)}&rdquo;</strong> with you on Loica.
     </p>
     ${actionHtml}`
   );
@@ -209,44 +224,50 @@ export function sendExternalShareNotification(
   toEmail: string,
   docTitle: string,
   sharedByName: string,
-  editLink: string
+  editLink: string | null
 ): void {
   const subject = `${sharedByName} shared a document with you`;
+  const actionHtml = editLink
+    ? `<p style="margin:0;">
+        <a href="${editLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
+      </p>`
+    : `<p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
+        Ask ${escapeHtml(sharedByName)} for a link, or contact an administrator.
+      </p>`;
   const html = wrap(
     "Document shared with you",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${sharedByName}</strong> shared the document <strong>&ldquo;${docTitle}&rdquo;</strong> with you on Loica.
+      <strong>${escapeHtml(sharedByName)}</strong> shared the document <strong>&ldquo;${escapeHtml(docTitle)}&rdquo;</strong> with you on Loica.
     </p>
-    <p style="margin:0;">
-      <a href="${editLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
-    </p>`
+    ${actionHtml}`
   );
-  const text = `${sharedByName} shared the document "${docTitle}" with you on Loica. Open the document: ${editLink}`;
+  const actionText = editLink ? `Open the document: ${editLink}` : `Ask ${sharedByName} for a link, or contact an administrator.`;
+  const text = `${sharedByName} shared the document "${docTitle}" with you on Loica. ${actionText}`;
   sendEmail(toEmail, toEmail, subject, html, text);
 }
 
 export function sendWelcomeEmail(
   toEmail: string,
   toName: string,
-  temporaryPassword: string
+  resetLink: string | null
 ): void {
   const subject = "Welcome to Loica";
+  const actionHtml = resetLink
+    ? `<p style="margin:0;">
+        <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Set your password</a>
+      </p>`
+    : `<p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
+        Ask an administrator for a link to set your password.
+      </p>`;
   const html = wrap(
-    `Welcome, ${toName}!`,
+    `Welcome, ${escapeHtml(toName)}!`,
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      An account has been created for you on Loica.
+      An account has been created for you on Loica. Set a password to get started — this link expires in 1 hour.
     </p>
-    <p style="margin:0 0 8px;color:#333;font-size:14px;line-height:1.6;">
-      Your temporary password is:
-    </p>
-    <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:16px;color:#1a1a1a;">
-      ${temporaryPassword}
-    </p>
-    <p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
-      Please log in and change your password in Settings.
-    </p>`
+    ${actionHtml}`
   );
-  const text = `Welcome to Loica, ${toName}! Your temporary password is: ${temporaryPassword} — Please log in and change your password in Settings.`;
+  const actionText = resetLink ? `Set your password: ${resetLink}` : "Ask an administrator for a link to set your password.";
+  const text = `Welcome to Loica, ${toName}! An account has been created for you. ${actionText}`;
   sendEmail(toEmail, toName, subject, html, text);
 }
 
@@ -264,10 +285,10 @@ export function sendMentionNotification(
   const html = wrap(
     "You were mentioned in a comment",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${mentionerName}</strong> mentioned you in a comment on <strong>&ldquo;${documentTitle}&rdquo;</strong>:
+      <strong>${escapeHtml(mentionerName)}</strong> mentioned you in a comment on <strong>&ldquo;${escapeHtml(documentTitle)}&rdquo;</strong>:
     </p>
     <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border-left:3px solid #AF3029;border-radius:4px;font-size:14px;color:#333;line-height:1.6;">
-      ${displayBody}
+      ${escapeHtml(displayBody)}
     </p>
     <p style="margin:0;">
       <a href="${docUrl}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
@@ -290,10 +311,10 @@ export function sendCommentNotification(
   const html = wrap(
     "New comment on your document",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      <strong>${commenterName}</strong> commented on <strong>&ldquo;${documentTitle}&rdquo;</strong>:
+      <strong>${escapeHtml(commenterName)}</strong> commented on <strong>&ldquo;${escapeHtml(documentTitle)}&rdquo;</strong>:
     </p>
     <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border-left:3px solid #AF3029;border-radius:4px;font-size:14px;color:#333;line-height:1.6;">
-      ${displayBody}
+      ${escapeHtml(displayBody)}
     </p>
     <p style="margin:0;">
       <a href="${docUrl}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open document</a>
@@ -303,27 +324,27 @@ export function sendCommentNotification(
   sendEmail(toEmail, toName, subject, html, text);
 }
 
-export function sendPasswordChangedNotification(
+export function sendPasswordResetNotification(
   toEmail: string,
   toName: string,
-  newPassword: string
+  resetLink: string | null
 ): void {
-  const subject = "Your Loica password has been changed";
+  const subject = "Reset your Loica password";
+  const actionHtml = resetLink
+    ? `<p style="margin:0;">
+        <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background:#AF3029;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Set a new password</a>
+      </p>`
+    : `<p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
+        Ask an administrator for a link to set a new password.
+      </p>`;
   const html = wrap(
-    "Password changed",
+    "Password reset",
     `<p style="margin:0 0 12px;color:#333;font-size:14px;line-height:1.6;">
-      An administrator has changed your password on Loica.
+      An administrator has reset your password on Loica. Your old password no longer works — use the link below to set a new one. This link expires in 1 hour.
     </p>
-    <p style="margin:0 0 8px;color:#333;font-size:14px;line-height:1.6;">
-      Your new password is:
-    </p>
-    <p style="margin:0 0 16px;padding:12px 16px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:16px;color:#1a1a1a;">
-      ${newPassword}
-    </p>
-    <p style="margin:0;color:#333;font-size:14px;line-height:1.6;">
-      Please log in and change your password in Settings.
-    </p>`
+    ${actionHtml}`
   );
-  const text = `Your Loica password has been changed by an administrator. Your new password is: ${newPassword} — Please log in and change it in Settings.`;
+  const actionText = resetLink ? `Set a new password: ${resetLink}` : "Ask an administrator for a link to set a new password.";
+  const text = `An administrator has reset your Loica password. Your old password no longer works. ${actionText}`;
   sendEmail(toEmail, toName, subject, html, text);
 }

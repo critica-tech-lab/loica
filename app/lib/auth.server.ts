@@ -220,6 +220,56 @@ export async function changeOwnPassword(
   invalidateOtherSessions(userId, currentSessionId);
 }
 
+// ─── Password reset tokens ───────────────────────────────
+//
+// Used by the admin panel's "reset password" / "create user" flows instead
+// of emailing a directly-usable password: a single-use, time-limited link
+// lets the account holder set their own password.
+
+const PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
+
+/** Invalidate the target account's current password and issue a reset token for it. */
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  // Unmatchable placeholder — never a valid argon2 hash — so the old
+  // password stops working the moment a reset is issued, not just once
+  // the link is used.
+  const randomHash = nanoid(64);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(randomHash, userId);
+  invalidateOtherSessions(userId);
+
+  const token = nanoid(32);
+  const expiresAt = Math.floor(Date.now() / 1000) + PASSWORD_RESET_TOKEN_TTL_SECONDS;
+  db.prepare(
+    "INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)"
+  ).run(token, userId, expiresAt);
+  return token;
+}
+
+/** Look up a reset token without consuming it — for the reset-password page's loader. */
+export function getPasswordResetTokenUser(token: string): { userId: string; email: string; name: string } | null {
+  const row = prep<{ user_id: string; expires_at: number; used_at: number | null; email: string; name: string }, [string]>(
+    `SELECT prt.user_id, prt.expires_at, prt.used_at, u.email, u.name
+     FROM password_reset_tokens prt JOIN users u ON u.id = prt.user_id
+     WHERE prt.token = ?`
+  ).get(token);
+  if (!row || row.used_at != null || row.expires_at < Math.floor(Date.now() / 1000)) return null;
+  return { userId: row.user_id, email: row.email, name: row.name };
+}
+
+/** Consume a reset token, setting the new password. Single-use. */
+export async function consumePasswordResetToken(token: string, newPassword: string): Promise<boolean> {
+  const row = prep<{ user_id: string; expires_at: number; used_at: number | null }, [string]>(
+    "SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token = ?"
+  ).get(token);
+  if (!row || row.used_at != null || row.expires_at < Math.floor(Date.now() / 1000)) return false;
+
+  const newHash = await hash(newPassword);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, row.user_id);
+  db.prepare("UPDATE password_reset_tokens SET used_at = unixepoch() WHERE token = ?").run(token);
+  invalidateOtherSessions(row.user_id);
+  return true;
+}
+
 export function updateProfile(
   userId: string,
   fields: { name?: string; email?: string }
@@ -261,7 +311,16 @@ export async function verifyCredentials(
     return null;
   }
 
-  const valid = await verify(row.password_hash, password);
+  // password_hash may be an unmatchable random placeholder (OIDC-only
+  // accounts, or a local account mid password-reset) rather than a real
+  // argon2 hash — verify() throws on a malformed hash instead of just
+  // returning false, so treat that the same as a wrong password.
+  let valid: boolean;
+  try {
+    valid = await verify(row.password_hash, password);
+  } catch {
+    valid = false;
+  }
   if (!valid) return null;
 
   return { id: row.id, email: row.email, name: row.name, is_admin: !!row.is_admin };
@@ -277,6 +336,16 @@ export interface ExternalAuthProfile {
   sub: string;
   /** Email claim (used for fallback matching when no link exists). */
   email: string;
+  /**
+   * Whether the IdP itself verified mailbox ownership for `email` (its
+   * `email_verified` claim). Only an IdP-verified email may be used to
+   * auto-link to an existing local account — otherwise an attacker who
+   * can register at the IdP with someone else's email, unverified, would
+   * be logged in as that person's existing Loica account. Defaults to
+   * `false` (unverified) when omitted — the safe default for an extension
+   * that hasn't been updated to pass it.
+   */
+  emailVerified?: boolean;
   /** Display name (always populated; provider derives a sensible value). */
   name: string;
 }
@@ -300,9 +369,15 @@ export function findOrCreateUserViaExternalAuth(profile: ExternalAuthProfile): s
     return bySub.id;
   }
 
-  // 2. Match by email (link existing local-only user to provider)
+  // 2. Match by email (link existing local-only user to provider) — only
+  // when the IdP itself verified the email. An unverified match can't fall
+  // through to "create new" either: email is UNIQUE, so it would collide
+  // with the very account it must not silently take over.
   const byEmail = prep<{ id: string }, [string]>("SELECT id FROM users WHERE email = ?")
     .get(profile.email);
+  if (byEmail && !profile.emailVerified) {
+    throw new Error("email_verification_required");
+  }
   if (byEmail) {
     db.prepare(
       "INSERT OR REPLACE INTO auth_links (user_id, provider, sub) VALUES (?, ?, ?)",
