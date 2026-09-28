@@ -245,7 +245,7 @@ you care about.
 | `authProvider` | `AuthProvider` | When the extension contributes a sign-in option (Google OAuth, SAML, generic OIDC). |
 | `exporters.pdf` | function | When PDF export of this doc type needs custom rendering. Falls back to core markdown→PDF when absent. |
 | `exporters.docx` | function | Same, for DOCX. Falls back to core markdown→DOCX. |
-| `globalExporters.pdf` / `.docx` | function | Replaces the core pure-JS renderer for every doc without its own `exporters` override. The escape hatch for a self-hosted install to swap in its own pipeline (pandoc/tectonic, a remote service). The first enabled extension declaring one wins. |
+| `globalExporters.pdf` / `.docx` | function | Replaces the core pure-JS renderer for every doc without its own `exporters` override. The escape hatch for a self-hosted install to swap in its own pipeline (pandoc/tectonic, a remote service). The first enabled extension declaring one wins. To keep the core renderer and only restyle it, call `renderPdf(markdown, title, landscape, style)` from `~/extensions/sdk.server` with a `PdfStyle` (font sizes, margins, heading scale, colors, mono dates, source captions, page numbers). |
 | `previewHtml` | function | Server hook for `api/doc-preview/:id`. Return a `Response` to take over the print/share preview, or `null` to use core's markdown render. |
 
 See `app/extensions/types.ts` for the full type definitions.

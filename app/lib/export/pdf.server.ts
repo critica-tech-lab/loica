@@ -92,7 +92,7 @@ function resolveStyle(style: PdfStyle = {}): Style {
 }
 
 const MONTH = "(?:January|February|March|April|May|June|July|August|September|October|November|December)";
-// Same patterns as critica-pdf's date-code.lua: ISO, slash, dot, and spelled-out months.
+// Date-like text: ISO, slash, dot, and spelled-out English months.
 const DATE_RE = new RegExp(
   [
     "\\d{4}[-–]\\d{2}[-–]\\d{2}",
