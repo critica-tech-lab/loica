@@ -12,10 +12,9 @@ import { useDocTypeExtension } from "~/extensions/hooks";
 import { marked } from "marked";
 import { useToast } from "~/components/Toast";
 
-// ProseMirror is the default editor; mirrors DocEditorView's USE_PM. When on,
-// `documents.content` is a ws-server-owned projection — the client must not
-// post it (see `save`).
-const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
+// ProseMirror is the default editor. When on, `documents.content` is a
+// ws-server-owned projection — the client must not post it (see `save`).
+export const USE_PM = import.meta.env.VITE_PM_EDITOR !== "0";
 
 // ─── Types ────────────────────────────────────────────────────
 
