@@ -7,6 +7,7 @@ export const contentSchema = z.string().max(5_000_000);
 export const emailSchema = z.string().email().max(254);
 export const folderIdSchema = z.string().min(1).max(64);
 export const permissionSchema = z.enum(["editor", "viewer"]);
+export const sharePasswordSchema = z.string().min(8).max(200);
 
 // Helper function to parse and validate form data
 export async function parseForm<T>(

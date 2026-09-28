@@ -47,6 +47,8 @@ import {
   MESSAGE_SYNC,
   MESSAGE_AWARENESS,
   CLEANUP_INTERVAL,
+  MAX_SPREADSHEET_CELLS,
+  MAX_SPREADSHEET_DIMENSIONS,
   type Room,
 } from "./ws/types.ts";
 
@@ -203,8 +205,60 @@ function getOrCreateRoom(docId: string): Room {
     updateFlushTimers.set(key, setTimeout(() => flushPendingUpdate(key), 1000));
   });
 
+  // A comments-map entry's userId is client-supplied CRDT data — an
+  // anonymous edit-token guest can craft one claiming to be any real user
+  // (their id is visible to guests via the awareness broadcast). Bind each
+  // new comment's stored author to the authenticated identity of the WS
+  // connection whose transaction actually created it; never trust the
+  // client-asserted value. Only re-bind on creation, not on later edits
+  // (e.g. another collaborator resolving the thread), so legitimate
+  // updates by a different user don't get misattributed.
+  const commentsMap = doc.getMap("comments");
+  commentsMap.observe((event, transaction) => {
+    const origin = transaction.origin;
+    if (!(origin instanceof Object) || !room.wsUserMap.has(origin as WebSocket)) return;
+    const authorId = room.wsUserMap.get(origin as WebSocket) ?? "guest";
+    for (const [key, change] of event.changes.keys) {
+      if (change.action !== "add") continue;
+      const entry = commentsMap.get(key) as Record<string, unknown> | undefined;
+      if (!entry || typeof entry !== "object" || entry.userId === authorId) continue;
+      doc.transact(() => {
+        commentsMap.set(key, { ...entry, userId: authorId });
+      }, origin);
+    }
+  });
+
+  // Spreadsheet Y.Maps are only capped when seeding from persisted content
+  // (see seedSpreadsheetMaps) — nothing re-checked their size on the live
+  // collaborative-edit path, so a sustained stream of small updates could
+  // grow any of them unbounded. Revert overflow keys a transaction just
+  // added, keeping each map at its cap. No-op for non-spreadsheet docs,
+  // whose ss-* maps just stay empty.
+  capMapSize(doc, doc.getMap("ss-cells"), MAX_SPREADSHEET_CELLS);
+  capMapSize(doc, doc.getMap("ss-styles"), MAX_SPREADSHEET_CELLS);
+  capMapSize(doc, doc.getMap("ss-colWidths"), MAX_SPREADSHEET_DIMENSIONS);
+  capMapSize(doc, doc.getMap("ss-rowHeights"), MAX_SPREADSHEET_DIMENSIONS);
+
   rooms.set(docId, room);
   return room;
+}
+
+function capMapSize(doc: Y.Doc, map: Y.Map<unknown>, max: number): void {
+  map.observe((event, transaction) => {
+    let overflow = map.size - max;
+    if (overflow <= 0) return;
+    const toRemove: string[] = [];
+    for (const [key, change] of event.changes.keys) {
+      if (overflow <= 0) break;
+      if (change.action !== "add") continue;
+      toRemove.push(key);
+      overflow--;
+    }
+    if (toRemove.length === 0) return;
+    doc.transact(() => {
+      for (const key of toRemove) map.delete(key);
+    }, transaction.origin);
+  });
 }
 
 function scheduleSave(docId: string, room: Room) {
@@ -412,18 +466,37 @@ function flushAndDestroyRoom(docId: string) {
 }
 
 const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("loica yjs ws server");
+});
+
+// ─── Admin HTTP endpoints (/reset, /status) ────────────────────────────────
+//
+// These are internal-only: the sole legitimate caller is this same host's
+// web process (document.server.ts's restoreDocumentVersion), over loopback.
+// They live on their own server bound to 127.0.0.1, on a port no reverse
+// proxy is ever configured to forward to — a `remoteAddress` check alone
+// isn't sufficient here, because a same-host reverse proxy that strips a
+// path prefix (e.g. Caddy's `handle_path /ws/*`) makes its own loopback
+// connection to ws-server look local for any path that survives the strip.
+
+function isLoopback(req: import("http").IncomingMessage): boolean {
+  const remote = req.socket.remoteAddress ?? "";
+  return remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+}
+
+const adminServer = http.createServer((req, res) => {
+  if (!isLoopback(req)) {
+    res.writeHead(403, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Forbidden" }));
+    return;
+  }
+
   const { pathname } = new URL(req.url ?? "/", "http://localhost");
 
-  // POST /reset/:docId — used after restoring a version (localhost only)
+  // POST /reset/:docId — used after restoring a version
   const resetMatch = pathname.match(/^\/reset\/(.+)$/);
   if (req.method === "POST" && resetMatch) {
-    const remote = req.socket.remoteAddress ?? "";
-    const isLocal = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
-    if (!isLocal) {
-      res.writeHead(403, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Forbidden" }));
-      return;
-    }
     const docId = resetMatch[1];
     flushAndDestroyRoom(docId);
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -431,16 +504,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET /status — active rooms + connected users (localhost only)
+  // GET /status — active rooms + connected users
   if (req.method === "GET" && pathname === "/status") {
-    const remote = req.socket.remoteAddress ?? "";
-    const isLocal = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
-    if (!isLocal) {
-      res.writeHead(403, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Forbidden" }));
-      return;
-    }
-
     const stmtDocTitle = db.prepare("SELECT title FROM documents WHERE id = ?");
     const activeRooms: Array<{
       docId: string;
@@ -471,8 +536,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  res.writeHead(200);
-  res.end("loica yjs ws server");
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Not found" }));
 });
 
 // Build allowed origins from WS_URL or ALLOWED_ORIGINS env var
@@ -511,6 +576,25 @@ const wss = new WebSocketServer({
 const MAX_CONNECTIONS_PER_IP = 50;
 const connectionsByIp = new Map<string, number>();
 
+// Same trusted-hop-count contract as app/lib/rate-limit.server.ts's
+// getClientIp() — keep TRUST_PROXY_HOPS consistent across both processes.
+const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+
+function getClientIp(req: import("http").IncomingMessage): string {
+  if (TRUST_PROXY_HOPS > 0) {
+    const forwarded = req.headers["x-forwarded-for"];
+    const header = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (header) {
+      const hops = header.split(",").map((h) => h.trim()).filter(Boolean);
+      const clientHop = hops[hops.length - TRUST_PROXY_HOPS];
+      if (clientHop) return clientHop;
+    }
+  }
+  // No trusted proxy configured: this process has direct access to the raw
+  // socket, so fall back to that instead of trusting attacker input.
+  return req.socket.remoteAddress ?? "unknown";
+}
+
 // Heartbeat: server-initiated WS ping every 20s. If a client hasn't ponged
 // within 45s we treat the socket as dead and terminate it, freeing the slot
 // and letting the client's y-websocket auto-reconnect fire immediately
@@ -539,8 +623,7 @@ wss.on("connection", (ws, req) => {
     (ws as WebSocket & { lastPong?: number }).lastPong = Date.now();
   });
 
-  const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()
-    ?? req.socket.remoteAddress ?? "unknown";
+  const ip = getClientIp(req);
   const count = connectionsByIp.get(ip) ?? 0;
   if (count >= MAX_CONNECTIONS_PER_IP) {
     ws.close(1008, "Too many connections");
@@ -654,4 +737,9 @@ setTimeout(() => {
 const WS_HOST = process.env.WS_HOST ?? "0.0.0.0";
 server.listen(PORT, WS_HOST, () => {
   console.log(`[ws-server] Yjs WebSocket server listening on ws://${WS_HOST}:${PORT}`);
+});
+
+const WS_ADMIN_PORT = Number(process.env.WS_ADMIN_PORT ?? PORT + 1);
+adminServer.listen(WS_ADMIN_PORT, "127.0.0.1", () => {
+  console.log(`[ws-server] Admin endpoints listening on http://127.0.0.1:${WS_ADMIN_PORT} (loopback only)`);
 });

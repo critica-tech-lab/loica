@@ -47,7 +47,6 @@
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.15",
     "isbot": "^5.2.2",
     "isomorphic-dompurify": "^4.2.0",
     "jose": "^6.2.12",

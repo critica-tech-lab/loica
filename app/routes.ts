@@ -6,6 +6,7 @@ export default [
   route("login", "routes/auth.login.tsx"),
   route("signup", "routes/auth.signup.tsx"),
   route("logout", "routes/auth.logout.tsx"),
+  route("reset-password/:token", "routes/reset-password.$token.tsx"),
   route("auth/oidc", "routes/auth.oidc.ts"),
   route("auth/oidc/callback", "routes/auth.oidc.callback.ts"),
   route("w", "routes/workspace.tsx"),

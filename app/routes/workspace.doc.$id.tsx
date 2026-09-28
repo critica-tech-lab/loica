@@ -4,7 +4,7 @@ import type { Route } from "./+types/workspace.doc.$id";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getWorkspace, getMembership, getWorkspaceOwnerName } from "~/lib/workspace.server";
 import { appError } from "~/lib/errors";
-import { getPublicOrigin, getWebSocketUrl } from "~/lib/url.server";
+import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.server";
 import {
   getDocument,
   updateDocument,
@@ -24,7 +24,7 @@ import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { getUserGroups } from "~/lib/group.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
-import { emailSchema } from "~/lib/validation.server";
+import { emailSchema, sharePasswordSchema } from "~/lib/validation.server";
 import { getFolderPath } from "~/lib/folder.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
 import { DocEditorView } from "~/components/DocEditorView";
@@ -201,8 +201,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!targetUser) {
       // External user — create per-invite token
       const { token: inviteToken } = shareDocWithExternal(params.id, email, user.id);
-      const origin = getPublicOrigin(request);
-      const editUrl = `${origin}/s/${inviteToken}`;
+      const origin = getEmailOrigin();
+      const editUrl = origin ? `${origin}/s/${inviteToken}` : null;
       const doc = getDocument(params.id);
       const sharerName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(user.id)?.name ?? "Someone";
       sendExternalShareNotification(email, doc?.title ?? "Untitled", sharerName, editUrl);
@@ -210,14 +210,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
     if (targetUser.id === user.id) return { ok: false, error: "Cannot share with yourself" };
     const targetName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(targetUser.id)?.name ?? email;
-    shareDocWithUser(params.id, targetUser.id, user.id, getPublicOrigin(request));
+    shareDocWithUser(params.id, targetUser.id, user.id, getEmailOrigin() ?? undefined);
     return { ok: true, sharedWith: targetName };
   }
 
   if (intent === "unshare-doc") {
     const shareId = String(form.get("shareId") || "");
     if (!shareId) throw new Response("Missing shareId", { status: 400 });
-    unshareDoc(shareId);
+    unshareDoc(shareId, workspace.id);
     return { ok: true };
   }
 
@@ -226,14 +226,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
     const groupId = String(form.get("groupId") || "").trim();
     if (!groupId) throw new Response("Missing groupId", { status: 400 });
-    shareDocWithGroup(params.id, groupId, user.id, getPublicOrigin(request));
+    shareDocWithGroup(params.id, groupId, user.id, getEmailOrigin() ?? undefined);
     return { ok: true };
   }
 
   if (intent === "unshare-doc-group") {
     const shareId = String(form.get("shareId") || "");
     if (!shareId) throw new Response("Missing shareId", { status: 400 });
-    unshareDoc(shareId);
+    unshareDoc(shareId, workspace.id);
     return { ok: true };
   }
 
@@ -294,10 +294,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const password = form.get("sharePassword");
     const clearPassword = form.get("clearPassword") === "true";
+    const newPassword = clearPassword ? null : (password ? String(password) : undefined);
+    if (newPassword && !sharePasswordSchema.safeParse(newPassword).success) {
+      return { ok: false, error: "Share password must be at least 8 characters." };
+    }
 
     await updateShareSettings(docId, {
       expiresAt,
-      password: clearPassword ? null : (password ? String(password) : undefined),
+      password: newPassword,
     });
 
     const updated = getDocument(docId);
