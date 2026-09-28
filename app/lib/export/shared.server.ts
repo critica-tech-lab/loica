@@ -9,9 +9,9 @@
 import { Marked, type Token, type Tokens } from "marked";
 import markedFootnote, { type Footnote } from "marked-footnote";
 import { existsSync } from "node:fs";
-import { join, extname } from "node:path";
+import { extname } from "node:path";
 import sharp from "sharp";
-import { uploadsDir } from "../paths.server";
+import { resolveUploadPath } from "../paths.server";
 
 export interface LexedDoc {
   tokens: Token[];
@@ -59,16 +59,8 @@ export interface ResolvedImage {
  * probed for dimensions. Returns null when the file is missing or unreadable.
  */
 export async function resolveImage(src: string): Promise<ResolvedImage | null> {
-  const m = /^\/api\/uploads\/(.+)$/.exec(src);
-  if (!m) return null;
-
-  // Same traversal guard the serving route applies (api.uploads.$file.ts): the
-  // src comes from document markdown, so it is user input.
-  const filename = m[1];
-  if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) return null;
-
-  const srcPath = join(uploadsDir, filename);
-  if (!existsSync(srcPath)) return null;
+  const srcPath = resolveUploadPath(src);
+  if (!srcPath || !existsSync(srcPath)) return null;
 
   try {
     const ext = extname(srcPath).toLowerCase();
