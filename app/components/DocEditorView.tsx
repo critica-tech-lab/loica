@@ -21,6 +21,7 @@ import { CommentIcon, ShareIcon, StarIcon, ClockIcon, DocIcon, TrashIcon } from 
 import { useDocument, userColor, USE_PM } from "~/lib/DocumentContext";
 import type { DocumentProps } from "~/lib/DocumentContext";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useExtensionStatus } from "~/extensions/status";
 import { diffWords } from "diff";
 
 export type { DocumentProps as DocEditorViewProps };
@@ -1216,6 +1217,8 @@ function TopbarBadge({ count }: { count: number }) {
  */
 function DocFooterLeft() {
   const { connectionStatus, saving } = useDocument();
+  // A short message an extension published (e.g. "Check unavailable"), if any.
+  const extensionStatus = useExtensionStatus();
 
   // Stoplight palette: green (all good) → yellow (in progress) → red (broken).
   // Flexoki's sage (#66800B) and green-400 (#879A39) are olive-leaning and read grey
@@ -1255,6 +1258,22 @@ function DocFooterLeft() {
         }}
       />
       {showLabel && <span>{label}</span>}
+      {extensionStatus && (
+        <span
+          role="status"
+          title={extensionStatus.title}
+          style={{
+            marginLeft: "0.5rem",
+            maxWidth: "42ch",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            color: extensionStatus.tone === "error" ? "var(--color-danger)" : undefined,
+          }}
+        >
+          {extensionStatus.text}
+        </span>
+      )}
     </span>
   );
 }

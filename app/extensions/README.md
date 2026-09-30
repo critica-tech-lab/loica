@@ -331,6 +331,28 @@ to expand the SDK — not to bypass it. Open a discussion.
 
 ---
 
+## Footer messages
+
+An extension can show a short message in the editor footer (next to the
+saved/offline dot) with a browser event; the footer removes it again. No host
+import is needed, and a host without this feature ignores the event. See
+`status.ts` for the full contract.
+
+```ts
+const event = new CustomEvent("loica:status", {
+  cancelable: true,
+  detail: { id: "my-ext", text: "Check unavailable", title: "Why…", tone: "error" },
+});
+window.dispatchEvent(event);
+const shown = event.defaultPrevented; // true when the footer displayed it
+```
+
+One message per `id`; publish `text: null` to clear it, or pass `ttlMs` to make
+it disappear by itself. Errors stay visible over info messages. If `shown` is
+false, fall back to your own notice.
+
+---
+
 ## Server-side vs client-side
 
 An extension can have either or both. The split is enforced by file naming:
