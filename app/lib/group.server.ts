@@ -80,6 +80,36 @@ export function searchUsers(
     .all(pattern, pattern);
 }
 
+/**
+ * Search users scoped to those who share a workspace OR a group with the
+ * searcher. This is the default non-admin search (no explicit groupId/scope
+ * given) — unlike searchUsers, it never exposes the full user table.
+ */
+export function searchUsersSharingContext(
+  userId: string,
+  query: string
+): Array<{ id: string; name: string; email: string }> {
+  const pattern = `%${query}%`;
+  return prep<{ id: string; name: string; email: string }, [string, string, string, string]>(
+      `SELECT DISTINCT u.id, u.name, u.email FROM users u
+       WHERE (u.name LIKE ? OR u.email LIKE ?)
+         AND (
+           u.id IN (
+             SELECT wm2.user_id FROM workspace_members wm2
+             WHERE wm2.workspace_id IN (SELECT workspace_id FROM workspace_members WHERE user_id = ?)
+           )
+           OR u.id IN (
+             SELECT gm2.user_id FROM group_members gm2
+             WHERE gm2.status = 'accepted' AND gm2.group_id IN (
+               SELECT group_id FROM group_members WHERE user_id = ? AND status = 'accepted'
+             )
+           )
+         )
+       ORDER BY u.name ASC LIMIT 10`
+    )
+    .all(pattern, pattern, userId, userId);
+}
+
 /** Search users scoped to those who share at least one group with the searcher */
 export function searchUsersInMyGroups(
   userId: string,
