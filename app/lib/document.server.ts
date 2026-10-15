@@ -24,6 +24,7 @@ export type Document = {
   share_expires_at: number | null;
   share_password_hash: string | null;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type DocumentSummary = Pick<
@@ -106,7 +107,7 @@ export function getDocumentIncludingTrashed(id: string): Document | null {
     prep<Document, [string]>(
         `SELECT id, workspace_id, created_by, updated_by, title, content,
                 visibility, public_token, edit_token, folder_id, pdf_file, created_at, updated_at,
-                share_expires_at, share_password_hash, deleted_at
+                share_expires_at, share_password_hash, deleted_at, deleted_by
          FROM documents WHERE id = ?`
       )
       .get(id) ?? null

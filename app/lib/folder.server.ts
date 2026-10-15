@@ -11,6 +11,7 @@ export type Folder = {
   created_by: string;
   created_at: number;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type FolderSummary = Pick<Folder, "id" | "name" | "parent_id" | "created_at" | "created_by">;
@@ -101,7 +102,7 @@ export function getFolder(id: string): Folder | null {
 export function getFolderIncludingTrashed(id: string): Folder | null {
   return (
     prep<Folder, [string]>(
-        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at
+        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at, deleted_by
          FROM folders WHERE id = ?`
       )
       .get(id) ?? null
