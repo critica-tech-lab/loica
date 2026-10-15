@@ -22,7 +22,7 @@ import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc, 
 import { hasSharedAccess } from "~/lib/sharing.server";
 import { userHasDocAccess } from "~/lib/doc-access.server";
 import { capMentionBody } from "~/lib/doc-mention-authz.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { getUserGroups } from "~/lib/group.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
@@ -190,7 +190,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
     if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { ok: false, error: "Missing email" };
@@ -224,7 +224,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc-group") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
     if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
     const groupId = String(form.get("groupId") || "").trim();
     if (!groupId) throw new Response("Missing groupId", { status: 400 });
@@ -240,7 +240,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "send-mentions") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
     const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;

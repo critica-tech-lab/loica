@@ -19,7 +19,7 @@ import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.serv
 import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { emailSchema, sharePasswordSchema } from "~/lib/validation.server";
@@ -168,6 +168,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc") {
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { ok: false, error: "Missing email" };
     if (!emailSchema.safeParse(email).success) {
@@ -214,7 +216,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "send-mentions") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
     const body = String(form.get("body") || "");
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;

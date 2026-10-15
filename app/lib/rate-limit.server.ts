@@ -25,6 +25,18 @@ setInterval(() => {
 // raw socket address here to fall back on — see docs/deployment.md.
 const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS ?? 0);
 
+// A production deploy behind a reverse proxy with TRUST_PROXY_HOPS unset
+// collapses every client into the "unproxied" bucket above — IP-keyed limits
+// (login, signup, share password) then rate-limit the whole user base as one
+// caller instead of one each. Warned once at startup, not per-request.
+if (process.env.NODE_ENV === "production" && TRUST_PROXY_HOPS <= 0) {
+  console.warn(
+    "[rate-limit] TRUST_PROXY_HOPS is 0 or unset. If this deployment sits " +
+      "behind a reverse proxy, IP-keyed rate limits share one bucket across " +
+      "all clients. Set TRUST_PROXY_HOPS to the number of trusted proxy hops."
+  );
+}
+
 /**
  * Pick the client hop out of an X-Forwarded-For header, counted from the
  * right so a client can't defeat it by prepending a fake entry — the last
@@ -48,6 +60,16 @@ export function getClientIp(request: Request): string {
   // trust attacker-suppliable input. Every such request shares one bucket
   // rather than each forged header value getting its own.
   return "unproxied";
+}
+
+/**
+ * Key a rate-limit bucket by the authenticated user when one exists, falling
+ * back to IP for anonymous callers. A plain IP key behind a proxy (see
+ * TRUST_PROXY_HOPS above) puts every user in one shared bucket; keying by
+ * user id instead gives each account its own.
+ */
+export function getRateLimitKey(request: Request, userId?: string | null): string {
+  return userId ? `user:${userId}` : `ip:${getClientIp(request)}`;
 }
 
 export function checkRateLimit(

@@ -9,7 +9,7 @@ import { sendMentionNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { userHasDocAccess } from "~/lib/doc-access.server";
 import { capMentionBody } from "~/lib/doc-mention-authz.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getClientIp, getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { signSharePasswordCookie, verifySharePasswordCookie } from "~/lib/share-password.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
@@ -202,7 +202,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   // guests never reach this branch with a valid mention.
   if (intent === "send-mentions") {
     if (!sessionUser) return { ok: false };
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, sessionUser.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
     const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
