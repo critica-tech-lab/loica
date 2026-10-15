@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
+import { kickAccess } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -160,6 +161,10 @@ export function removeTeamspaceMember(
       "DELETE FROM group_members WHERE group_id = ? AND user_id = ?"
     ).run(group.id, userId);
   })();
+
+  // A removed member can still have the teamspace's docs open in a live WS
+  // room — kick them (see ws-notify.server.ts).
+  void kickAccess({ userId, reason: "Removed from teamspace" });
 }
 
 export function updateTeamspaceMemberRole(
@@ -183,6 +188,11 @@ export function updateTeamspaceMemberRole(
       "UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?"
     ).run(groupRole, group.id, userId);
   })();
+
+  // Re-check this user's open connections so an editor -> viewer downgrade
+  // (or the reverse) takes effect without waiting for the next heartbeat
+  // sweep (see ws-notify.server.ts).
+  void kickAccess({ userId, reason: "Workspace role changed" });
 }
 
 // ─── Update ─────────────────────────────────────────────

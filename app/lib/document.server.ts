@@ -6,6 +6,7 @@ import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
+import { kickAccess } from "./ws-notify.server";
 
 export type Document = {
   id: string;
@@ -423,6 +424,10 @@ export async function setViewShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET public_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // The view-link's guests are anonymous (no userId to target) — re-check
+    // everyone currently in this doc's room so the now-invalid token stops
+    // working immediately instead of at the next heartbeat sweep.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ public_token: string | null }, [string]>(
@@ -449,6 +454,9 @@ export async function setEditShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // Same as setViewShare: the edit-link's guests are anonymous, so kick
+    // everyone in the room rather than a specific user.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ edit_token: string | null }, [string]>(
@@ -474,6 +482,7 @@ export function unshareDocument(id: string): void {
   db.prepare(
     "UPDATE documents SET public_token = NULL, edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
   ).run(id);
+  void kickAccess({ docId: id, reason: "Share link disabled" });
 }
 
 /** Update share settings (expiration and/or password) for an existing share. */
