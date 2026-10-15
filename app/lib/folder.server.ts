@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
+import { notifyDocUnavailable } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -256,6 +257,8 @@ export function moveFolderToWorkspace(
 // ─── Trash (soft-delete) ─────────────────────────────────
 
 export function trashFolder(id: string, userId: string): void {
+  let affectedDocIds: string[] = [];
+
   const trashTx = db.transaction(() => {
     // Collect all descendant folder IDs (including self)
     const descendantIds = prep<{ id: string }, [string]>(
@@ -280,6 +283,11 @@ export function trashFolder(id: string, userId: string): void {
     // Soft-delete all docs in those folders
     if (descendantIds.length > 0) {
       const placeholders = descendantIds.map(() => "?").join(",");
+      affectedDocIds = prep<{ id: string }, [...string[]]>(
+          `SELECT id FROM documents WHERE folder_id IN (${placeholders}) AND deleted_at IS NULL`
+        )
+        .all(...descendantIds)
+        .map((r) => r.id);
       db.prepare(
         `UPDATE documents SET deleted_at = unixepoch(), deleted_by = ?
          WHERE folder_id IN (${placeholders}) AND deleted_at IS NULL`
@@ -287,6 +295,13 @@ export function trashFolder(id: string, userId: string): void {
     }
   });
   trashTx();
+
+  // A live room on any of these docs has no idea its folder (or an
+  // ancestor) was just trashed — tell it (see document.server.ts's
+  // trashDocument for the single-document version of this call).
+  for (const docId of affectedDocIds) {
+    void notifyDocUnavailable(docId, "This document's folder was moved to trash.");
+  }
 }
 
 export function restoreFolder(id: string, workspaceId: string): void {

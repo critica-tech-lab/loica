@@ -2,6 +2,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { appError } from "~/lib/errors";
 import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
@@ -233,6 +234,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const content = form.get("content");
   if (content != null) {
+    // See workspace.doc.$id.tsx's identical guard — a live Yjs room owns
+    // this doc's content, so a direct write here would just be lost to the
+    // room's next debounced save.
+    if (shouldRejectContentWrite(true, await isRoomLive(result.document.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     updateDocument(result.document.id, { content: String(content) }, sessionUser?.id ?? "guest");
   }
   return { ok: true };

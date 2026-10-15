@@ -7,6 +7,7 @@ import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
 import { buildFtsQuery, MIN_SEARCH_QUERY_LENGTH } from "./search-query.server";
+import { kickAccess, notifyDocUnavailable } from "./ws-notify.server";
 
 export type Document = {
   id: string;
@@ -351,6 +352,10 @@ export function trashDocument(id: string, userId: string): void {
   db.prepare(
     "UPDATE documents SET deleted_at = unixepoch(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL"
   ).run(userId, id);
+  // A live room has no idea its document just moved to trash — the editor
+  // would otherwise keep accepting edits that saveDoc silently stops
+  // persisting once the doc is gone for good (see permanentlyDeleteDocument).
+  void notifyDocUnavailable(id, "This document was moved to trash.");
 }
 
 export function restoreDocument(id: string, workspaceId: string): void {
@@ -379,6 +384,10 @@ export function permanentlyDeleteDocument(id: string, workspaceId: string): void
   if (doc.pdf_file) {
     try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
+  // Notify before deleting the row: once it's gone, any live room's next
+  // scheduleSave() flush is a 0-row saveDoc UPDATE that drops its edits
+  // without a trace (see persistence.ts's saveIfSafe row-count warning).
+  void notifyDocUnavailable(id, "This document was permanently deleted.");
   db.prepare("DELETE FROM documents WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
 }
 
@@ -465,6 +474,10 @@ export function moveDocumentToWorkspace(
   db.prepare(
     "UPDATE documents SET workspace_id = ?, folder_id = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?"
   ).run(targetWorkspaceId, targetFolderId, docId, sourceWorkspaceId);
+  // A live room's URL/breadcrumbs are now stale (the doc belongs to a
+  // different workspace) — tell anyone with it open rather than leaving
+  // them editing under a now-wrong path.
+  void notifyDocUnavailable(docId, "This document was moved to another workspace.");
 }
 
 // ─── Public sharing ───────────────────────────────────────
@@ -480,6 +493,10 @@ export async function setViewShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET public_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // The view-link's guests are anonymous (no userId to target) — re-check
+    // everyone currently in this doc's room so the now-invalid token stops
+    // working immediately instead of at the next heartbeat sweep.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ public_token: string | null }, [string]>(
@@ -506,6 +523,9 @@ export async function setEditShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // Same as setViewShare: the edit-link's guests are anonymous, so kick
+    // everyone in the room rather than a specific user.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ edit_token: string | null }, [string]>(
@@ -531,6 +551,7 @@ export function unshareDocument(id: string): void {
   db.prepare(
     "UPDATE documents SET public_token = NULL, edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
   ).run(id);
+  void kickAccess({ docId: id, reason: "Share link disabled" });
 }
 
 /** Update share settings (expiration and/or password) for an existing share. */

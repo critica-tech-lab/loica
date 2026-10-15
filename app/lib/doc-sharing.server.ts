@@ -4,6 +4,7 @@ import { sendDocShareNotification } from "./email.server";
 import { createNotification } from "./notification.server";
 import { getGroup, isGroupMember } from "./group.server";
 import { canShareDocWithGroup } from "./doc-share-authz.server";
+import { kickAccess } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -159,11 +160,29 @@ export function shareDocWithUser(
 }
 
 export function unshareDoc(shareId: string, workspaceId: string): void {
+  const share = prep<{ document_id: string; user_id: string | null; group_id: string | null }, [string]>(
+    "SELECT document_id, user_id, group_id FROM document_shares WHERE id = ?"
+  ).get(shareId);
+
   db.prepare(
     `DELETE FROM document_shares WHERE id = ? AND document_id IN (
       SELECT id FROM documents WHERE workspace_id = ?
     )`
   ).run(shareId, workspaceId);
+
+  // Open WS connections don't learn a revoked share on their own (see
+  // ws-notify.server.ts) — kick whoever just lost access to this doc.
+  if (!share) return;
+  const affectedUsers = share.user_id
+    ? [share.user_id]
+    : share.group_id
+      ? prep<{ user_id: string }, [string]>(
+          "SELECT user_id FROM group_members WHERE group_id = ? AND status = 'accepted'"
+        ).all(share.group_id).map((r) => r.user_id)
+      : [];
+  for (const userId of affectedUsers) {
+    void kickAccess({ docId: share.document_id, userId, reason: "Document access revoked" });
+  }
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
