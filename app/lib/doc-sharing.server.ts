@@ -2,6 +2,8 @@ import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
 import { sendDocShareNotification } from "./email.server";
 import { createNotification } from "./notification.server";
+import { getGroup, isGroupMember } from "./group.server";
+import { canShareDocWithGroup } from "./doc-share-authz.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -218,6 +220,23 @@ export function shareDocWithGroup(
   createdBy: string,
   siteUrl?: string
 ): string {
+  // Fetched up front: both the "already shared" short-circuit and the
+  // group-ownership check below need the doc's workspace.
+  const docMeta = prep<{ title: string; workspace_id: string }, [string]>(
+      "SELECT title, workspace_id FROM documents WHERE id = ?"
+    )
+    .get(docId);
+  if (!docMeta) throw new Response("Not found", { status: 404 });
+
+  // Reject a group that isn't actually available to this doc — either it
+  // belongs to the doc's own workspace, or the sharer is a member of it.
+  // Without this, any groupId would do, handing the whole group access.
+  const group = getGroup(groupId);
+  const callerIsGroupMember = isGroupMember(groupId, createdBy);
+  if (!canShareDocWithGroup({ group, docWorkspaceId: docMeta.workspace_id, callerIsGroupMember })) {
+    throw new Response("Group not available for this document", { status: 403 });
+  }
+
   // Check if already shared with this group
   const existing = prep<{ id: string }, [string, string]>(
       "SELECT id FROM document_shares WHERE document_id = ? AND group_id = ?"
@@ -233,10 +252,6 @@ export function shareDocWithGroup(
 
   // Notify each accepted group member (except the sharer themselves).
   // Members who are already in the doc's workspace get a direct link.
-  const docMeta = prep<{ title: string; workspace_id: string }, [string]>(
-      "SELECT title, workspace_id FROM documents WHERE id = ?"
-    )
-    .get(docId);
   const sharer = prep<{ name: string }, [string]>(
       "SELECT name FROM users WHERE id = ?"
     )
