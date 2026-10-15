@@ -24,6 +24,7 @@ export type Document = {
   share_expires_at: number | null;
   share_password_hash: string | null;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type DocumentSummary = Pick<
@@ -106,7 +107,7 @@ export function getDocumentIncludingTrashed(id: string): Document | null {
     prep<Document, [string]>(
         `SELECT id, workspace_id, created_by, updated_by, title, content,
                 visibility, public_token, edit_token, folder_id, pdf_file, created_at, updated_at,
-                share_expires_at, share_password_hash, deleted_at
+                share_expires_at, share_password_hash, deleted_at, deleted_by
          FROM documents WHERE id = ?`
       )
       .get(id) ?? null
@@ -346,19 +347,30 @@ export type TrashedDocument = {
   folder_id: string | null;
   deleted_at: number;
   deleted_by: string;
+  /** Display name of the deleter — null if that user no longer exists. */
+  deleted_by_name?: string | null;
 };
 
-export function getTrashedDocumentsForWorkspace(userId: string, workspaceId: string): TrashedDocument[] {
-  return prep<TrashedDocument, [string, string]>(
-      `SELECT d.id, d.title, f.name AS folder_name, d.folder_id, d.deleted_at, d.deleted_by
+/**
+ * All trashed documents in a team/shared workspace, regardless of who
+ * deleted them — any non-viewer member needs to see the whole team's trash,
+ * not just their own (otherwise a departed member's deletions become
+ * invisible to everyone else). Personal workspaces keep the per-user
+ * `getTrashedDocuments` below instead.
+ */
+export function getTrashedDocumentsForWorkspace(workspaceId: string): TrashedDocument[] {
+  return prep<TrashedDocument, [string]>(
+      `SELECT d.id, d.title, f.name AS folder_name, d.folder_id, d.deleted_at, d.deleted_by,
+              u.name AS deleted_by_name
        FROM documents d
        LEFT JOIN folders f ON f.id = d.folder_id
-       WHERE d.deleted_by = ? AND d.deleted_at IS NOT NULL AND d.workspace_id = ?
+       LEFT JOIN users u ON u.id = d.deleted_by
+       WHERE d.deleted_at IS NOT NULL AND d.workspace_id = ?
          AND (d.folder_id IS NULL
               OR NOT EXISTS (SELECT 1 FROM folders p WHERE p.id = d.folder_id AND p.deleted_at IS NOT NULL))
        ORDER BY d.deleted_at DESC`
     )
-    .all(userId, workspaceId);
+    .all(workspaceId);
 }
 
 export function getTrashedDocuments(userId: string): TrashedDocument[] {

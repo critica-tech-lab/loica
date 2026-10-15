@@ -15,7 +15,7 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from "node:fs";
+import { readdirSync, renameSync, mkdirSync, appendFileSync, statSync, unlinkSync } from "node:fs";
 import { STALE_AGE_SECS, MIN_CONTENT_LEN, RING_BUFFER_SIZE } from "./types.ts";
 import { uploadsDir } from "../app/lib/paths.server.ts";
 
@@ -259,6 +259,29 @@ export function deleteOldNotifications(db: Database.Database): void {
   if (result.changes > 0) {
     console.log(`[ws-server] Cleaned up ${result.changes} old notification(s)`);
   }
+}
+
+/**
+ * Permanently delete trash older than 30 days — documents and folders.
+ *
+ * Duplicated from app/lib/document.server.ts's purgeExpiredTrash rather than
+ * imported: that module (via templates.ts → ~/extensions) pulls in .tsx
+ * files that only Vite/Bun's bundler can load. ws-server.ts runs under
+ * plain `node`, which can't resolve the `~/` alias or JSX, so this file's
+ * convention (see cleanupStaleDocs/pruneAutoVersions above) is to keep its
+ * own copy of the SQL instead. Previously this only ran when a trash page
+ * loaded; this gives it a schedule independent of that.
+ */
+export function purgeExpiredTrash(db: Database.Database): void {
+  const cutoff = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+  const pdfDocs = db.prepare(
+    "SELECT pdf_file FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ? AND pdf_file IS NOT NULL"
+  ).all(cutoff) as { pdf_file: string }[];
+  for (const doc of pdfDocs) {
+    try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
+  }
+  db.prepare("DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
+  db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
 }
 
 /**

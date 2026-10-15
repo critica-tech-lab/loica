@@ -11,6 +11,7 @@ export type Folder = {
   created_by: string;
   created_at: number;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type FolderSummary = Pick<Folder, "id" | "name" | "parent_id" | "created_at" | "created_by">;
@@ -101,7 +102,7 @@ export function getFolder(id: string): Folder | null {
 export function getFolderIncludingTrashed(id: string): Folder | null {
   return (
     prep<Folder, [string]>(
-        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at
+        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at, deleted_by
          FROM folders WHERE id = ?`
       )
       .get(id) ?? null
@@ -346,19 +347,27 @@ export type TrashedFolder = {
   parent_id: string | null;
   deleted_at: number;
   deleted_by: string;
+  /** Display name of the deleter — null if that user no longer exists. */
+  deleted_by_name?: string | null;
 };
 
-export function getTrashedFoldersForWorkspace(userId: string, workspaceId: string): TrashedFolder[] {
-  return prep<TrashedFolder, [string, string]>(
-      `SELECT f.id, f.name, p.name AS parent_name, f.parent_id, f.deleted_at, f.deleted_by
+/**
+ * All trashed folders in a team/shared workspace, regardless of who deleted
+ * them — see getTrashedDocumentsForWorkspace for why this isn't per-user.
+ */
+export function getTrashedFoldersForWorkspace(workspaceId: string): TrashedFolder[] {
+  return prep<TrashedFolder, [string]>(
+      `SELECT f.id, f.name, p.name AS parent_name, f.parent_id, f.deleted_at, f.deleted_by,
+              u.name AS deleted_by_name
        FROM folders f
        LEFT JOIN folders p ON p.id = f.parent_id
-       WHERE f.deleted_by = ? AND f.deleted_at IS NOT NULL AND f.workspace_id = ?
+       LEFT JOIN users u ON u.id = f.deleted_by
+       WHERE f.deleted_at IS NOT NULL AND f.workspace_id = ?
          AND (f.parent_id IS NULL
               OR NOT EXISTS (SELECT 1 FROM folders pp WHERE pp.id = f.parent_id AND pp.deleted_at IS NOT NULL))
        ORDER BY f.deleted_at DESC`
     )
-    .all(userId, workspaceId);
+    .all(workspaceId);
 }
 
 export function getTrashedFolders(userId: string): TrashedFolder[] {
