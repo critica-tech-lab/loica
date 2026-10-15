@@ -164,7 +164,7 @@ export function unshareDoc(shareId: string, workspaceId: string): void {
     "SELECT document_id, user_id, group_id FROM document_shares WHERE id = ?"
   ).get(shareId);
 
-  db.prepare(
+  const deleted = db.prepare(
     `DELETE FROM document_shares WHERE id = ? AND document_id IN (
       SELECT id FROM documents WHERE workspace_id = ?
     )`
@@ -172,7 +172,9 @@ export function unshareDoc(shareId: string, workspaceId: string): void {
 
   // Open WS connections don't learn a revoked share on their own (see
   // ws-notify.server.ts) — kick whoever just lost access to this doc.
-  if (!share) return;
+  // Nothing deleted means the share belongs to another workspace: kicking
+  // its users would act on a document this caller has no rights over.
+  if (!share || deleted.changes === 0) return;
   const affectedUsers = share.user_id
     ? [share.user_id]
     : share.group_id

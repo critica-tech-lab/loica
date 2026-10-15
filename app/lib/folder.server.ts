@@ -362,6 +362,8 @@ export type TrashedFolder = {
   parent_id: string | null;
   deleted_at: number;
   deleted_by: string;
+  /** Needed by the purge rule (canPurgeTrashItem), which also allows the creator. */
+  created_by?: string;
   /** Display name of the deleter — null if that user no longer exists. */
   deleted_by_name?: string | null;
 };
@@ -373,7 +375,7 @@ export type TrashedFolder = {
 export function getTrashedFoldersForWorkspace(workspaceId: string): TrashedFolder[] {
   return prep<TrashedFolder, [string]>(
       `SELECT f.id, f.name, p.name AS parent_name, f.parent_id, f.deleted_at, f.deleted_by,
-              u.name AS deleted_by_name
+              f.created_by, u.name AS deleted_by_name
        FROM folders f
        LEFT JOIN folders p ON p.id = f.parent_id
        LEFT JOIN users u ON u.id = f.deleted_by

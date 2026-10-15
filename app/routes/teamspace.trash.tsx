@@ -14,6 +14,7 @@ import { getSharedFoldersForUser } from "~/lib/sharing.server";
 import { getSharedDocsForUser } from "~/lib/doc-sharing.server";
 import { db, prep } from "~/lib/db.server";
 import { handleRestoreDoc, handleRestoreFolder, handlePurgeDoc, handlePurgeFolder } from "~/lib/actions/trash-actions.server";
+import { canPurgeTrashItem } from "~/lib/actions/trash-authz.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
 import { FolderTreeSidebar } from "~/components/FolderTreeSidebar";
@@ -38,14 +39,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const canManageAll = role === "owner" || role === "admin";
 
   purgeExpiredTrash();
-  const canDelete = (deletedBy: string) => canManageAll || deletedBy === user.id;
+  // Same rule the purge action enforces, so the button shows exactly when
+  // the server would accept the request.
+  const canDelete = (item: { created_by?: string; deleted_by: string }) =>
+    canPurgeTrashItem(role, user.id, { created_by: item.created_by ?? "", deleted_by: item.deleted_by });
   const documents = getTrashedDocumentsForWorkspace(teamspace.id).map((d) => ({
     ...d,
-    canDelete: canDelete(d.deleted_by),
+    canDelete: canDelete(d),
   }));
   const folders = getTrashedFoldersForWorkspace(teamspace.id).map((f) => ({
     ...f,
-    canDelete: canDelete(f.deleted_by),
+    canDelete: canDelete(f),
   }));
   const storageBytes = getWorkspaceStorageBytes(teamspace.id);
   const personalWorkspaces = getUserPersonalWorkspaces(user.id);
