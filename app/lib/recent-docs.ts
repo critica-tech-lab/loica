@@ -39,7 +39,14 @@ export function buildRecentList(
       continue;
     }
     const base = access === "member" ? MEMBER_ROUTE : SHARED_ROUTE;
-    items.push({ ...candidate, href: `${base}/${candidate.id}` });
+    // Copy only the fields the client shows; the row may carry internal ids.
+    items.push({
+      id: candidate.id,
+      title: candidate.title,
+      workspace_name: candidate.workspace_name,
+      viewed_at: candidate.viewed_at,
+      href: `${base}/${candidate.id}`,
+    });
   }
   return items;
 }

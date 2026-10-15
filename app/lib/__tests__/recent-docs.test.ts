@@ -17,6 +17,12 @@ describe("buildRecentList", () => {
     expect(list[0].href).toBe("/shared/doc/a");
   });
 
+  test("does not pass through extra fields of the source row", () => {
+    const withInternals = { ...row("a"), workspace_id: "w1", folder_id: "f1" } as RecentCandidate;
+    const list = buildRecentList([withInternals], () => "member", 8);
+    expect(Object.keys(list[0]).sort().join(",")).toBe("href,id,title,viewed_at,workspace_name");
+  });
+
   test("drops docs the user can no longer open", () => {
     const list = buildRecentList([row("a"), row("b")], (r) => (r.id === "a" ? null : "member"), 8);
     expect(list.length).toBe(1);
