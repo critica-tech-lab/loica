@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Form } from "react-router";
+import { useState, useEffect, useMemo } from "react";
+import { useSubmit } from "react-router";
+import { Menu, MenuAlign, type MenuEntry } from "~/components/Menu";
+import { GroupIcon, LogOutIcon, MoonIcon, SettingsIcon, ShieldIcon, SunIcon } from "~/components/icons";
 import { currentTheme, toggleTheme, type Theme } from "~/lib/theme";
 
 const AVATAR_COLORS = [
@@ -19,51 +21,6 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-const menuStyle: React.CSSProperties = {
-  position: "absolute",
-  right: 0,
-  top: "calc(100% + 6px)",
-  minWidth: "160px",
-  background: "var(--bg)",
-  border: "1px solid color-mix(in srgb, var(--fg) 15%, transparent)",
-  borderRadius: "var(--radius-lg)",
-  padding: "4px 0",
-  boxShadow: "var(--shadow-md)",
-  zIndex: "var(--z-panel)",
-};
-
-const itemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  width: "100%",
-  padding: "6px 12px",
-  fontSize: "var(--fs-xs)",
-  color: "var(--fg)",
-  textDecoration: "none",
-  background: "none",
-  border: "none",
-  textAlign: "left" as const,
-  cursor: "pointer",
-  opacity: 0.6,
-  transition: "opacity var(--ease-out), background var(--ease-out)",
-};
-
-const separatorStyle: React.CSSProperties = {
-  height: "1px",
-  margin: "4px 0",
-  background: "color-mix(in srgb, var(--fg) 8%, transparent)",
-};
-
-function hoverIn(e: React.MouseEvent<HTMLElement>) {
-  e.currentTarget.style.opacity = "1";
-  e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)";
-}
-
-function hoverOut(e: React.MouseEvent<HTMLElement>) {
-  e.currentTarget.style.opacity = "0.6";
-  e.currentTarget.style.background = "none";
-}
-
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -78,8 +35,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ userName, isAdmin }: UserMenuProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const submit = useSubmit();
 
   // Read on mount only — localStorage/matchMedia are client-only, so reading
   // during render would mismatch the SSR markup. null until hydrated.
@@ -89,120 +45,86 @@ export function UserMenu({ userName, isAdmin }: UserMenuProps) {
   const color = useMemo(() => avatarColor(userName), [userName]);
   const initials = getInitials(userName);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+  const iconClass = "h-4 w-4";
+
+  const entries: MenuEntry[] = [
+    {
+      kind: "header",
+      label: userName,
+      leading: (
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[length:var(--fs-xs)] font-semibold"
+          style={{ background: color, color: "#fff" /* allow-hex: avatar initials on colored fill */ }}
+        >
+          {initials}
+        </span>
+      ),
+    },
+    { kind: "separator" },
+    { kind: "item", label: "Settings", icon: <SettingsIcon className={iconClass} />, href: "/settings" },
+  ];
+
+  if (theme !== null) {
+    const toDark = theme !== "dark";
+    entries.push({
+      kind: "item",
+      label: toDark ? "Dark mode" : "Light mode",
+      hint: toDark ? "Switch to the Dracula theme" : "Switch to the light theme",
+      icon: toDark ? <MoonIcon className={iconClass} /> : <SunIcon className={iconClass} />,
+      onSelect: () => setThemeState(toggleTheme()),
+    });
+  }
+
+  if (isAdmin) {
+    entries.push(
+      { kind: "separator" },
+      { kind: "item", label: "Teamspaces", icon: <GroupIcon className={iconClass} />, href: "/teamspaces" },
+      { kind: "item", label: "Admin panel", icon: <ShieldIcon className={iconClass} />, href: "/admin" },
+    );
+  }
+
+  entries.push(
+    { kind: "separator" },
+    {
+      kind: "item",
+      label: "Sign out",
+      icon: <LogOutIcon className={iconClass} />,
+      tone: "quiet",
+      onSelect: () => submit(null, { method: "post", action: "/logout" }),
+    },
+  );
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "50%",
-          border: "none",
-          background: color,
-          color: "#fff", // allow-hex: avatar initials on colored fill
-          fontSize: initials.length > 1 ? "0.6rem" : "0.75rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          lineHeight: 1,
-          opacity: open ? 1 : 0.85,
-          transition: "opacity 0.15s",
-        }}
-        title={userName}
-      >
-        {initials}
-      </button>
-      {open && (
-        <div style={menuStyle}>
-          {/* Header with name */}
-          <div style={{
-            padding: "8px 12px 6px",
-            fontSize: "var(--fs-xs)",
+    <Menu
+      align={MenuAlign.End}
+      entries={entries}
+      renderTrigger={({ ref, ...triggerProps }, open) => (
+        <button
+          ref={ref}
+          type="button"
+          {...triggerProps}
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "50%",
+            border: "none",
+            background: color,
+            color: "#fff", // allow-hex: avatar initials on colored fill
+            fontSize: initials.length > 1 ? "0.6rem" : "0.75rem",
             fontWeight: 600,
-            color: "var(--fg)",
-            opacity: 0.5,
-            borderBottom: "none",
-          }}>
-            {userName}
-          </div>
-          <div style={separatorStyle} />
-          <a
-            href="/settings"
-            style={itemStyle}
-            onMouseEnter={hoverIn}
-            onMouseLeave={hoverOut}
-            onClick={() => setOpen(false)}
-          >
-            Settings
-          </a>
-          {theme !== null && (
-            <button
-              type="button"
-              style={itemStyle}
-              onMouseEnter={hoverIn}
-              onMouseLeave={hoverOut}
-              onClick={() => setThemeState(toggleTheme())}
-            >
-              {theme === "dark" ? "Light mode" : "Dark mode"}
-            </button>
-          )}
-          {isAdmin && (
-            <>
-              <div style={separatorStyle} />
-              <a
-                href="/teamspaces"
-                style={itemStyle}
-                onMouseEnter={hoverIn}
-                onMouseLeave={hoverOut}
-                onClick={() => setOpen(false)}
-              >
-                Teamspaces
-              </a>
-              <a
-                href="/admin"
-                style={itemStyle}
-                onMouseEnter={hoverIn}
-                onMouseLeave={hoverOut}
-                onClick={() => setOpen(false)}
-              >
-                Admin panel
-              </a>
-            </>
-          )}
-          <div style={separatorStyle} />
-          <Form method="post" action="/logout">
-            <button
-              type="submit"
-              style={{ ...itemStyle, color: "var(--fg)", opacity: 0.45 }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; e.currentTarget.style.background = "color-mix(in srgb, var(--fg) 5%, transparent)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.45"; e.currentTarget.style.background = "none"; }}
-            >
-              Sign out
-            </button>
-          </Form>
-        </div>
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1,
+            opacity: open ? 1 : 0.85,
+            transition: "opacity 0.15s",
+          }}
+          title={userName}
+        >
+          {initials}
+        </button>
       )}
-    </div>
+    />
   );
 }
