@@ -31,7 +31,7 @@ import {
 import { getMembership } from "~/lib/workspace.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc as unshareDocShare } from "~/lib/doc-sharing.server";
 import { unshareAllFolder, shareFolder, unshareFolder, leaveFolderShare } from "~/lib/sharing.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { getEmailOrigin } from "~/lib/url.server";
@@ -267,7 +267,7 @@ export function handleTrashFolder(
 // ── Share handlers ───────────────────────────────────────────
 
 export async function handleShareDoc(ctx: ActionContext) {
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
   if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
   const email = String(ctx.form.get("email") || "").trim().toLowerCase();
   const docId = String(ctx.form.get("docId") || "");
@@ -305,7 +305,7 @@ export async function handleShareDoc(ctx: ActionContext) {
 }
 
 export function handleShareDocGroup(ctx: ActionContext) {
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
   if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
   const docId = String(ctx.form.get("docId") || "");
   const groupId = String(ctx.form.get("groupId") || "").trim();
@@ -470,6 +470,8 @@ function getAllowedExtension(filename: string): string | null {
 }
 
 export async function handleUploadFile(ctx: ActionContext, folderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 30, prefix: "upload" });
+  if (!rl.allowed) throw new Response("Too many uploads. Try again later.", { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
   const file = ctx.form.get("file");
   if (!file || !(file instanceof File)) throw new Response("Missing file", { status: 400 });
   if (file.size > UPLOAD_MAX_SIZE) throw new Response("File too large (max 20MB)", { status: 400 });
@@ -547,6 +549,8 @@ export async function handleUploadFile(ctx: ActionContext, folderId: string | nu
 }
 
 export async function handleUploadFiles(ctx: ActionContext, folderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 30, prefix: "upload" });
+  if (!rl.allowed) throw new Response("Too many uploads. Try again later.", { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
   const files = ctx.form.getAll("files");
   const paths = ctx.form.getAll("paths");
   if (files.length === 0) throw new Response("No files provided", { status: 400 });
@@ -628,6 +632,13 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
 const IMPORT_MAX_FILES = 500;
 
 export function handleImport(ctx: ActionContext, defaultFolderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "import" });
+  if (!rl.allowed) {
+    throw new Response("Too many import requests. Try again later.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
   const json = ctx.form.get("files");
   if (!json || typeof json !== "string") return null;
   let files: { path: string; title: string; content: string }[];
@@ -727,7 +738,7 @@ export function dispatchAction(
 
 export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to share folders." };
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
   if (!rl.allowed) return { error: "Too many share requests. Try again later." };
   const targetFolderId = String(ctx.form.get("folderId"));
   const f = getFolder(targetFolderId);

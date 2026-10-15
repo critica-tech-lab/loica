@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { getSessionUser } from "~/lib/auth.server";
 import { uploadsDir as UPLOAD_DIR } from "~/lib/paths.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES: Record<string, string> = {
   "image/png": ".png",
@@ -16,6 +17,14 @@ const ALLOWED_TYPES: Record<string, string> = {
 export async function action({ request }: { request: Request }) {
   const user = getSessionUser(request);
   if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 30, prefix: "upload" });
+  if (!rl.allowed) {
+    return new Response("Too many uploads. Try again later.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.includes("multipart/form-data")) {

@@ -7,7 +7,7 @@ import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
 import { sendMentionNotification } from "~/lib/email.server";
 import { prep } from "~/lib/db.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getClientIp, getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -195,7 +195,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   // guests never reach this branch with a valid mention.
   if (intent === "send-mentions") {
     if (!sessionUser) return { ok: false };
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, sessionUser.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
     const body = String(form.get("body") || "");
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;

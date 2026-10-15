@@ -4,6 +4,7 @@ import { getSessionUser } from "~/lib/auth.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
 import { getWorkspaceDocuments, getDocument } from "~/lib/document.server";
 import { getAllWorkspaceFolders } from "~/lib/folder.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 
 function sanitizeFilename(name: string): string {
   return name
@@ -22,6 +23,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const role = getMembership(workspaceId, user.id, user.is_admin);
   if (!role) throw new Response("Forbidden", { status: 403 });
+
+  const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "export" });
+  if (!rl.allowed) {
+    throw new Response("Too many export requests. Try again later.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
 
   // Build folder ID → path map
   const folders = getAllWorkspaceFolders(workspaceId);
