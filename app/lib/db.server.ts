@@ -700,6 +700,24 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
 )`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 try { db.exec("CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 
+// ─── Activity log ─────────────────────────────────────────
+// Audit trail of document/folder/member/share mutations, scoped per
+// workspace. `actor_id` is SET NULL (not CASCADE) on user deletion so a
+// departed user's past actions stay in the log instead of disappearing.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS activity (
+    id           TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    actor_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+    action       TEXT NOT NULL,
+    target_type  TEXT,
+    target_id    TEXT,
+    target_title TEXT,
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`);
+try { db.exec("CREATE INDEX idx_activity_workspace_created ON activity(workspace_id, created_at DESC)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
 // ─── Fix: documents_au fired on every UPDATE ─────────────
 // A DB created before the trigger above was scoped to `OF title, content`
 // already has the old, unscoped version — CREATE TRIGGER IF NOT EXISTS is a

@@ -9,6 +9,7 @@ import {
   getFolderIncludingTrashed,
 } from "~/lib/folder.server";
 import { getMembership } from "~/lib/workspace.server";
+import { logActivity, ActivityAction } from "~/lib/activity.server";
 
 /** Minimal actor shape needed to authorize a trash action. */
 export interface TrashActor {
@@ -23,6 +24,7 @@ export function handleRestoreDoc(form: FormData, user: TrashActor) {
   const doc = getDocumentIncludingTrashed(docId);
   if (!doc || !getMembership(doc.workspace_id, user.id, user.is_admin)) return NOT_FOUND;
   restoreDocument(docId, doc.workspace_id);
+  logActivity({ workspaceId: doc.workspace_id, actorId: user.id, action: ActivityAction.DocRestore, targetType: "document", targetId: docId, targetTitle: doc.title });
   return { ok: true };
 }
 
@@ -31,6 +33,7 @@ export function handleRestoreFolder(form: FormData, user: TrashActor) {
   const folder = getFolderIncludingTrashed(folderId);
   if (!folder || !getMembership(folder.workspace_id, user.id, user.is_admin)) return NOT_FOUND;
   restoreFolder(folderId, folder.workspace_id);
+  logActivity({ workspaceId: folder.workspace_id, actorId: user.id, action: ActivityAction.FolderRestore, targetType: "folder", targetId: folderId, targetTitle: folder.name });
   return { ok: true };
 }
 
@@ -40,6 +43,7 @@ export function handlePurgeDoc(form: FormData, user: TrashActor) {
   if (!doc || doc.deleted_at == null) return NOT_FOUND;
   if (!getMembership(doc.workspace_id, user.id, user.is_admin)) return NOT_FOUND;
   permanentlyDeleteDocument(docId, doc.workspace_id);
+  logActivity({ workspaceId: doc.workspace_id, actorId: user.id, action: ActivityAction.DocPurge, targetType: "document", targetId: docId, targetTitle: doc.title });
   return { ok: true };
 }
 
@@ -49,5 +53,6 @@ export function handlePurgeFolder(form: FormData, user: TrashActor) {
   if (!folder || folder.deleted_at == null) return NOT_FOUND;
   if (!getMembership(folder.workspace_id, user.id, user.is_admin)) return NOT_FOUND;
   permanentlyDeleteFolder(folderId, folder.workspace_id);
+  logActivity({ workspaceId: folder.workspace_id, actorId: user.id, action: ActivityAction.FolderPurge, targetType: "folder", targetId: folderId, targetTitle: folder.name });
   return { ok: true };
 }

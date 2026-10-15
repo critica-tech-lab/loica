@@ -25,6 +25,7 @@ import { dbPath } from "./app/lib/paths.server.ts";
 // ─── Import modular components ────────────────────────────────────────────────
 
 import { authenticateWs } from "./ws/auth.ts";
+import { deleteOldActivity } from "./app/lib/activity.server.ts";
 import {
   initializePersistenceStatements,
   loadDocumentState,
@@ -722,6 +723,7 @@ const cleanupTimer = setInterval(() => {
   cleanupOrphanUploads(db, cleanupStmts);
   pruneAutoVersions(db);
   deleteOldNotifications(db);
+  deleteOldActivity();
 }, CLEANUP_INTERVAL);
 
 // Run cleanup tasks once on startup after a short delay
@@ -730,6 +732,7 @@ setTimeout(() => {
   cleanupOrphanUploads(db, cleanupStmts);
   pruneAutoVersions(db);
   deleteOldNotifications(db);
+  deleteOldActivity();
 }, 10_000);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
