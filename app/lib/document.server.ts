@@ -6,7 +6,7 @@ import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
-import { kickAccess } from "./ws-notify.server";
+import { kickAccess, notifyDocUnavailable } from "./ws-notify.server";
 
 export type Document = {
   id: string;
@@ -306,6 +306,10 @@ export function trashDocument(id: string, userId: string): void {
   db.prepare(
     "UPDATE documents SET deleted_at = unixepoch(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL"
   ).run(userId, id);
+  // A live room has no idea its document just moved to trash — the editor
+  // would otherwise keep accepting edits that saveDoc silently stops
+  // persisting once the doc is gone for good (see permanentlyDeleteDocument).
+  void notifyDocUnavailable(id, "This document was moved to trash.");
 }
 
 export function restoreDocument(id: string, workspaceId: string): void {
@@ -334,6 +338,10 @@ export function permanentlyDeleteDocument(id: string, workspaceId: string): void
   if (doc.pdf_file) {
     try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
+  // Notify before deleting the row: once it's gone, any live room's next
+  // scheduleSave() flush is a 0-row saveDoc UPDATE that drops its edits
+  // without a trace (see persistence.ts's saveIfSafe row-count warning).
+  void notifyDocUnavailable(id, "This document was permanently deleted.");
   db.prepare("DELETE FROM documents WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
 }
 
@@ -409,6 +417,10 @@ export function moveDocumentToWorkspace(
   db.prepare(
     "UPDATE documents SET workspace_id = ?, folder_id = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?"
   ).run(targetWorkspaceId, targetFolderId, docId, sourceWorkspaceId);
+  // A live room's URL/breadcrumbs are now stale (the doc belongs to a
+  // different workspace) — tell anyone with it open rather than leaving
+  // them editing under a now-wrong path.
+  void notifyDocUnavailable(docId, "This document was moved to another workspace.");
 }
 
 // ─── Public sharing ───────────────────────────────────────

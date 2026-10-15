@@ -25,6 +25,17 @@ export function isDocumentRestoredClose(event: { code: number } | null | undefin
   return event?.code === DOCUMENT_RESTORED_CLOSE_CODE;
 }
 
+// Keep in sync with WS_CLOSE_ACCESS_REVOKED / WS_CLOSE_DOC_UNAVAILABLE in
+// ws/types.ts. Both sit in y-websocket's "permanent" close-code range
+// (4400-4499), so the provider won't auto-reconnect on its own — these are
+// terminal for this session, worth telling the user about.
+const CONNECTION_NOTICE_CLOSE_CODES = new Set([4401, 4402]);
+
+/** Did this WS close happen for a reason the user should be told about (access lost, doc gone)? */
+export function isConnectionNoticeClose(event: { code: number } | null | undefined): boolean {
+  return !!event && CONNECTION_NOTICE_CLOSE_CODES.has(event.code);
+}
+
 interface Props {
   docId: string;
   wsUrl: string;
@@ -48,6 +59,11 @@ interface Props {
   // the `key` prop) so this connection's stale local state never gets the
   // chance to re-sync.
   onDocumentReset?: () => void;
+  // Fires when the server closed the connection for a reason the user
+  // should see — access was revoked/downgraded away from this doc, or the
+  // doc was trashed/moved/deleted out from under a live session. Unlike
+  // onDocumentReset, this is terminal: the client doesn't auto-reconnect.
+  onConnectionNotice?: (reason: string) => void;
   onChange?: (content: string) => void;
   // Fires with the doc's YAML frontmatter (kept out of the PM tree, in the
   // synced `meta` map). Empty string when none. Lets the host detect the doc
@@ -137,6 +153,7 @@ export function ProseMirrorEditor({
   onPresenceChange,
   onConnectionStatus,
   onDocumentReset,
+  onConnectionNotice,
   onChange,
   onFrontmatter,
   onTitle,
@@ -182,6 +199,8 @@ export function ProseMirrorEditor({
   onFrontmatterRef.current = onFrontmatter;
   const onDocumentResetRef = useRef(onDocumentReset);
   onDocumentResetRef.current = onDocumentReset;
+  const onConnectionNoticeRef = useRef(onConnectionNotice);
+  onConnectionNoticeRef.current = onConnectionNotice;
   const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
   const onTrackChangeClickRef = useRef(onTrackChangeClick);
@@ -282,9 +301,14 @@ export function ProseMirrorEditor({
       // treats this code as transient, by design — see ws/types.ts) starts
       // from a clean slate instead of resurrecting pre-restore content.
       provider.on("connection-close", (event: CloseEvent | null) => {
-        if (!isDocumentRestoredClose(event)) return;
-        idb.clearData().catch(() => {});
-        onDocumentResetRef.current?.();
+        if (isDocumentRestoredClose(event)) {
+          idb.clearData().catch(() => {});
+          onDocumentResetRef.current?.();
+          return;
+        }
+        if (isConnectionNoticeClose(event)) {
+          onConnectionNoticeRef.current?.(event?.reason || "Connection closed by the server.");
+        }
       });
 
       // Surface YAML frontmatter (kept out of the PM tree) so the host can

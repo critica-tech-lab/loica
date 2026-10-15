@@ -291,7 +291,15 @@ export function saveIfSafe(
     reportOversized(stmts, docId, bytes, updatedBy);
     return false;
   }
-  stmts.saveDoc.run({ id: docId, content, state, updatedBy });
+  const result = stmts.saveDoc.run({ id: docId, content, state, updatedBy });
+  // A 0-row UPDATE means the document row is gone (permanently deleted
+  // while this room was still live — see permanentlyDeleteDocument) or
+  // never existed. The room keeps accepting edits either way; this at
+  // least leaves a trace of what happened to them instead of a silent
+  // no-op on every flush.
+  if (result.changes === 0) {
+    console.warn(`[ws-server] saveDoc UPDATE matched 0 rows for doc ${docId} — document may have been deleted while its room was open.`);
+  }
   // Back under the limit — a later breach is news again.
   reportedOversized.delete(docId);
   return true;
