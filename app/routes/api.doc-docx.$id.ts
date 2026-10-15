@@ -7,6 +7,7 @@ import { renderDocx } from "~/lib/export/docx.server";
 import { safeFilename } from "~/lib/export/shared.server";
 import { getDocumentThreads } from "~/lib/comments.server";
 import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
+import { heavyExportSemaphore, tooManyHeavyOps, MAX_EXPORT_INPUT_BYTES } from "~/lib/concurrency.server";
 
 function rateLimitExport(request: Request): Response | null {
   const user = getSessionUser(request);
@@ -19,27 +20,32 @@ function rateLimitExport(request: Request): Response | null {
 }
 
 async function exportDocx(doc: any, content: string): Promise<Response> {
-  const frontmatter = parseFrontmatter(doc.content || "");
+  if (!heavyExportSemaphore.tryAcquire()) return tooManyHeavyOps();
+  try {
+    const frontmatter = parseFrontmatter(doc.content || "");
 
-  const typeExporter = getServerExtensionForDocType(frontmatter?.type)?.exporters?.docx;
-  if (typeExporter) return typeExporter(doc, frontmatter, content);
+    const typeExporter = getServerExtensionForDocType(frontmatter?.type)?.exporters?.docx;
+    if (typeExporter) return typeExporter(doc, frontmatter, content);
 
-  // Global exporter mirrors the core renderer's input (stripped body);
-  // per-doc-type exporters above get raw content.
-  const body = stripFrontmatter(content);
+    // Global exporter mirrors the core renderer's input (stripped body);
+    // per-doc-type exporters above get raw content.
+    const body = stripFrontmatter(content);
 
-  const globalExporter = getActiveGlobalExporter("docx");
-  if (globalExporter) return globalExporter(doc, frontmatter, body);
+    const globalExporter = getActiveGlobalExporter("docx");
+    if (globalExporter) return globalExporter(doc, frontmatter, body);
 
-  // Unresolved comment threads → native Word comments, anchored by text match.
-  const threads = getDocumentThreads(doc.id).filter((th) => !th.root.resolved);
-  const docx = await renderDocx(body, doc.title || "Untitled", threads);
-  return new Response(new Uint8Array(docx), {
-    headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "Content-Disposition": `attachment; filename="${safeFilename(doc.title)}.docx"`,
-    },
-  });
+    // Unresolved comment threads → native Word comments, anchored by text match.
+    const threads = getDocumentThreads(doc.id).filter((th) => !th.root.resolved);
+    const docx = await renderDocx(body, doc.title || "Untitled", threads);
+    return new Response(new Uint8Array(docx), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${safeFilename(doc.title)}.docx"`,
+      },
+    });
+  } finally {
+    heavyExportSemaphore.release();
+  }
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -58,5 +64,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   await ensurePluginsLoaded();
   const doc = authorizeDocRead(request, params.id);
   const { content = "" } = (await request.json()) as { content?: string };
+  if (Buffer.byteLength(content, "utf8") > MAX_EXPORT_INPUT_BYTES) {
+    return new Response("Content too large to export.", { status: 413 });
+  }
   return exportDocx(doc, content || doc.content || "");
 }

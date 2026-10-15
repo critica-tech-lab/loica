@@ -643,6 +643,11 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
 // ── Import ───────────────────────────────────────────────────
 
 const IMPORT_MAX_FILES = 500;
+// contentSchema already bounds a single file (~5 MB), but with up to
+// IMPORT_MAX_FILES of those in one request the batch itself has no ceiling —
+// a full-size batch is 2.5 GB parsed and inserted on one request. Cap the
+// total so one import can't tie up the event loop for everyone else.
+const IMPORT_MAX_TOTAL_BYTES = 200 * 1024 * 1024; // 200 MB
 
 export function handleImport(ctx: ActionContext, defaultFolderId: string | null) {
   const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "import" });
@@ -670,6 +675,7 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
   for (const file of files) {
     if (!contentSchema.safeParse(file.content).success) continue; // skip oversized content silently in batch
     const contentBytes = Buffer.byteLength(file.content, "utf8");
+    if (importedBytes + contentBytes > IMPORT_MAX_TOTAL_BYTES) break; // batch cap hit — stop, don't keep parsing
     if (!hasStorageHeadroom(ctx.workspace.id, importedBytes + contentBytes)) continue; // over quota — skip silently in batch
     const parts = file.path.split("/");
     let parentFolderId: string | null = defaultFolderId;
