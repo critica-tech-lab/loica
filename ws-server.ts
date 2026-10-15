@@ -41,6 +41,7 @@ import {
   cleanupOrphanUploads,
   pruneAutoVersions,
   deleteOldNotifications,
+  deleteOldClientErrors,
   type CleanupStatements,
 } from "./ws/cleanup.ts";
 import {
@@ -717,19 +718,21 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // ─── Background cleanup tasks ─────────────────────────────────────────────────
 
-const cleanupTimer = setInterval(() => {
+const cleanupTimer = setInterval(async () => {
   cleanupStaleDocs(cleanupStmts, new Set(rooms.keys()));
-  cleanupOrphanUploads(db, cleanupStmts);
+  await cleanupOrphanUploads(db);
   pruneAutoVersions(db);
   deleteOldNotifications(db);
+  deleteOldClientErrors(db);
 }, CLEANUP_INTERVAL);
 
 // Run cleanup tasks once on startup after a short delay
-setTimeout(() => {
+setTimeout(async () => {
   cleanupStaleDocs(cleanupStmts, new Set(rooms.keys()));
-  cleanupOrphanUploads(db, cleanupStmts);
+  await cleanupOrphanUploads(db);
   pruneAutoVersions(db);
   deleteOldNotifications(db);
+  deleteOldClientErrors(db);
 }, 10_000);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
