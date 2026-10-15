@@ -12,6 +12,7 @@ import {
   restoreDocumentVersion,
   isStarred as checkStarred,
   toggleStar,
+  recordRecentDoc,
 } from "~/lib/document.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
@@ -70,6 +71,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       ? getSharedFolderPath(document.folder_id, user.id)
       : [];
 
+  try { recordRecentDoc(user.id, params.id); } catch { /* non-critical */ }
   const starred = checkStarred(user.id, params.id);
 
   const userIds = [document.created_by, document.updated_by].filter(
