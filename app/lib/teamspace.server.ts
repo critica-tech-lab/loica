@@ -141,6 +141,28 @@ export function addTeamspaceMember(
   })();
 }
 
+/** Thrown when an action would leave a teamspace with no admin at all. */
+export class LastAdminError extends Error {
+  constructor() {
+    super("last_admin");
+  }
+}
+
+/** True if `userId` is a teamspace admin and the only one left. */
+function isLastAdmin(workspaceId: string, userId: string): boolean {
+  const member = prep<{ role: string }, [string, string]>(
+      "SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?"
+    )
+    .get(workspaceId, userId);
+  if (member?.role !== "admin") return false;
+
+  const adminCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM workspace_members WHERE workspace_id = ? AND role = 'admin'"
+    )
+    .get(workspaceId)!.cnt;
+  return adminCount <= 1;
+}
+
 export function removeTeamspaceMember(
   workspaceId: string,
   userId: string
@@ -150,6 +172,7 @@ export function removeTeamspaceMember(
     )
     .get(workspaceId);
   if (!group) return;
+  if (isLastAdmin(workspaceId, userId)) throw new LastAdminError();
 
   db.transaction(() => {
     db.prepare(
@@ -172,6 +195,7 @@ export function updateTeamspaceMemberRole(
     )
     .get(workspaceId);
   if (!group) return;
+  if (role !== "admin" && isLastAdmin(workspaceId, userId)) throw new LastAdminError();
 
   db.transaction(() => {
     db.prepare(

@@ -42,6 +42,7 @@ import {
   pruneAutoVersions,
   deleteOldNotifications,
   deleteOldClientErrors,
+  purgeExpiredTrash,
   type CleanupStatements,
 } from "./ws/cleanup.ts";
 import {
@@ -724,6 +725,9 @@ const cleanupTimer = setInterval(async () => {
   pruneAutoVersions(db);
   deleteOldNotifications(db);
   deleteOldClientErrors(db);
+  // So trash gets purged on a schedule, not only when someone happens to
+  // open a trash page.
+  purgeExpiredTrash(db);
 }, CLEANUP_INTERVAL);
 
 // Run cleanup tasks once on startup after a short delay
@@ -733,6 +737,7 @@ setTimeout(async () => {
   pruneAutoVersions(db);
   deleteOldNotifications(db);
   deleteOldClientErrors(db);
+  purgeExpiredTrash(db);
 }, 10_000);
 
 // ─── Start ───────────────────────────────────────────────────────────────────

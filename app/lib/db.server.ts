@@ -250,6 +250,10 @@ try { db.exec("ALTER TABLE document_shares ADD COLUMN group_id TEXT REFERENCES g
 try { db.exec("CREATE INDEX idx_doc_shares_group ON document_shares(group_id)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 
 // ─── Trash (soft-delete) columns ─────────────────────────
+// deleted_by is intentionally a plain TEXT column with no FK to users(id):
+// if the deleter's account is later removed, the trashed row must survive
+// (not CASCADE-deleted) so a workspace admin can still see and restore it
+// until the normal 30-day purge age.
 try { db.exec("ALTER TABLE documents ADD COLUMN deleted_at INTEGER"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
 try { db.exec("ALTER TABLE documents ADD COLUMN deleted_by TEXT"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
 try { db.exec("ALTER TABLE folders ADD COLUMN deleted_at INTEGER"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
