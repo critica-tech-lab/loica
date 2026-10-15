@@ -5,6 +5,7 @@
 import * as http from "node:http";
 import Database from "better-sqlite3";
 import type { AuthResult } from "./types.ts";
+import { verifySharePasswordCookie } from "../app/lib/share-password.server.ts";
 
 const SHARED_ACCESS_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -175,10 +176,10 @@ export function authenticateWs(
 
     // Check for password protection
     if (docMeta.share_password_hash) {
-      // Need to verify password via cookie
+      // Need to verify password via the signed cookie set by routes/s.$token.tsx
       const cookieHeader = req.headers.cookie ?? "";
       const cookies = parseCookies(cookieHeader);
-      if (cookies[`__share_pwd_${token}`] !== "1") return false;
+      if (!verifySharePasswordCookie(db, token, docMeta.share_password_hash, cookies[`__share_pwd_${token}`])) return false;
     }
 
     if (docMeta.edit_token && docMeta.edit_token === token) return { access: "write", userId: "guest" };
