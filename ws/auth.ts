@@ -121,6 +121,16 @@ function checkDocSharedAccess(
 }
 
 /**
+ * Drop every cached folder/document share verdict. The web process calls
+ * this (via ws-server's /kick admin endpoint) right after it revokes a
+ * share, a membership, or a role, so a re-check run immediately after
+ * doesn't read a stale "still allowed" result for up to SHARED_ACCESS_TTL.
+ */
+export function invalidateSharedAccessCache(): void {
+  sharedAccessCache.clear();
+}
+
+/**
  * Authenticate a WebSocket connection.
  *
  * Checks (in order):

@@ -51,10 +51,34 @@ export function initializePersistenceStatements(db: Database.Database) {
       `INSERT INTO notifications (id, user_id, type, title, body, link)
        VALUES (@id, @userId, 'save_blocked', @title, @body, @link)`
     ),
+    // Comment sync runs on every debounced save flush (every ~2s per active
+    // room) — prepare these once instead of re-preparing on each flush.
+    upsertComment: db.prepare(
+      `INSERT INTO comments (id, document_id, thread_id, user_id, body, anchor_from, anchor_to, anchor_text, resolved, created_at, updated_at)
+       VALUES (@id, @docId, @threadId, @userId, @body, @anchorFrom, @anchorTo, @anchorText, @resolved, @createdAt, @updatedAt)
+       ON CONFLICT(id) DO UPDATE SET
+         body = excluded.body, resolved = excluded.resolved, updated_at = excluded.updated_at`
+    ),
+    deleteComment: db.prepare(`DELETE FROM comments WHERE id = ?`),
+    commentIdsForDoc: db.prepare(`SELECT id FROM comments WHERE document_id = ?`),
+    userName: db.prepare<[string], { name: string }>("SELECT name FROM users WHERE id = ?"),
   };
 }
 
 export type PersistenceStatements = ReturnType<typeof initializePersistenceStatements>;
+
+/**
+ * Resolve a user's display name. Callers cache the result per connection
+ * (see ws-server.ts's handleConnection) instead of calling this on every
+ * Yjs update — a connection's name never changes mid-session.
+ */
+export function lookupUserName(stmts: PersistenceStatements, userId: string): string | null {
+  try {
+    return stmts.userName.get(userId)?.name ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Save a Yjs update to the document_updates table.
@@ -300,16 +324,15 @@ export function maybeAutoVersion(
 /**
  * Persist comments from Yjs map to database.
  */
-export function saveCommentsFromYjs(db: Database.Database, docId: string, commentsMap: Y.Map<unknown>): void {
-  const stmtUpsertComment = db.prepare(
-    `INSERT INTO comments (id, document_id, thread_id, user_id, body, anchor_from, anchor_to, anchor_text, resolved, created_at, updated_at)
-     VALUES (@id, @docId, @threadId, @userId, @body, @anchorFrom, @anchorTo, @anchorText, @resolved, @createdAt, @updatedAt)
-     ON CONFLICT(id) DO UPDATE SET
-       body = excluded.body, resolved = excluded.resolved, updated_at = excluded.updated_at`
-  );
-
-  const stmtDeleteComment = db.prepare(`DELETE FROM comments WHERE id = ?`);
-  const stmtCommentIds = db.prepare(`SELECT id FROM comments WHERE document_id = ?`);
+export function saveCommentsFromYjs(
+  db: Database.Database,
+  stmts: PersistenceStatements,
+  docId: string,
+  commentsMap: Y.Map<unknown>
+): void {
+  const stmtUpsertComment = stmts.upsertComment;
+  const stmtDeleteComment = stmts.deleteComment;
+  const stmtCommentIds = stmts.commentIdsForDoc;
 
   // Collect existing IDs before upsert so we can detect truly new comments
   const existingIds = new Set(

@@ -24,7 +24,7 @@ import { dbPath } from "./app/lib/paths.server.ts";
 
 // ─── Import modular components ────────────────────────────────────────────────
 
-import { authenticateWs } from "./ws/auth.ts";
+import { authenticateWs, invalidateSharedAccessCache } from "./ws/auth.ts";
 import {
   initializePersistenceStatements,
   loadDocumentState,
@@ -33,6 +33,7 @@ import {
   saveCommentsFromYjs,
   getDocContent,
   saveDocumentUpdate,
+  lookupUserName,
   type PersistenceStatements,
 } from "./ws/persistence.ts";
 import {
@@ -49,6 +50,9 @@ import {
   CLEANUP_INTERVAL,
   MAX_SPREADSHEET_CELLS,
   MAX_SPREADSHEET_DIMENSIONS,
+  WS_CLOSE_DOCUMENT_RESTORED,
+  WS_CLOSE_ACCESS_REVOKED,
+  WS_CLOSE_DOC_UNAVAILABLE,
   type Room,
 } from "./ws/types.ts";
 
@@ -153,9 +157,16 @@ function getOrCreateRoom(docId: string): Room {
     awareness,
     connections: new Map(),
     wsUserMap: new Map(),
+    wsUserNameMap: new Map(),
+    wsAccessMap: new Map(),
     saveTimer: null,
+    firstPendingSaveAt: null,
     lastVersionAt: Date.now(),
     lastEditor: null,
+    colorByIdentity: new Map(),
+    nextColorIndex: 0,
+    anonSeq: 0,
+    wsColorMap: new Map(),
   };
 
   // Attribute edits to the user whose connection caused the update. The
@@ -179,12 +190,9 @@ function getOrCreateRoom(docId: string): Room {
     const ws = origin as WebSocket;
     const userId = room.wsUserMap.get(ws) ?? null;
     if (!userId) return;
-    // Get user name from DB
-    let userName: string | null = null;
-    try {
-      const u = db.prepare<[string], { name: string }>("SELECT name FROM users WHERE id = ?").get(userId);
-      userName = u?.name ?? null;
-    } catch {}
+    // Resolved once at connect time (see handleConnection) — a connection's
+    // name doesn't change mid-session, so there's no need to hit the DB here.
+    const userName = room.wsUserNameMap.get(ws) ?? null;
     const key = `${docId}:${userId}`;
     const now = Math.floor(Date.now() / 1000);
     const existing = pendingUpdates.get(key);
@@ -261,23 +269,38 @@ function capMapSize(doc: Y.Doc, map: Y.Map<unknown>, max: number): void {
   });
 }
 
+const SAVE_DEBOUNCE_MS = 2000;
+// A steady stream of updates (e.g. someone typing continuously) kept
+// resetting the plain debounce below, so a room could go unsaved for its
+// whole session. Cap how long a save can be deferred regardless of new
+// activity.
+const SAVE_MAX_WAIT_MS = 10_000;
+
+function flushRoomSave(docId: string, room: Room) {
+  const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
+  const content = getDocContent(room.doc);
+  if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
+    room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor);
+  }
+  // Persist comments from Yjs map to DB
+  try {
+    const commentsMap = room.doc.getMap("comments");
+    saveCommentsFromYjs(db, persistenceStmts, docId, commentsMap);
+  } catch (err) {
+    console.error(`[ws-server] Failed to save comments for doc ${docId}:`, err);
+  }
+}
+
 function scheduleSave(docId: string, room: Room) {
   if (room.saveTimer) clearTimeout(room.saveTimer);
+  if (room.firstPendingSaveAt == null) room.firstPendingSaveAt = Date.now();
+  const elapsed = Date.now() - room.firstPendingSaveAt;
+  const delay = Math.min(SAVE_DEBOUNCE_MS, Math.max(0, SAVE_MAX_WAIT_MS - elapsed));
   room.saveTimer = setTimeout(() => {
-    const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
-    const content = getDocContent(room.doc);
-    if (saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor)) {
-      room.lastVersionAt = maybeAutoVersion(persistenceStmts, docId, room.doc, content, room.lastVersionAt, room.lastEditor);
-    }
-    // Persist comments from Yjs map to DB
-    try {
-      const commentsMap = room.doc.getMap("comments");
-      saveCommentsFromYjs(db, docId, commentsMap);
-    } catch (err) {
-      console.error(`[ws-server] Failed to save comments for doc ${docId}:`, err);
-    }
+    room.firstPendingSaveAt = null;
     room.saveTimer = null;
-  }, 2000);
+    flushRoomSave(docId, room);
+  }, delay);
 }
 
 // ─── Message utilities ────────────────────────────────────────────────────────
@@ -294,6 +317,108 @@ function broadcastToRoom(room: Room, message: Uint8Array, exclude?: WebSocket) {
   }
 }
 
+// ─── Cursor colour assignment ──────────────────────────────────────────────────
+//
+// Collision-free within a room for its first 12 distinct identities (one
+// colour per join, in join order); a 13th falls back to a deterministic hash
+// of its identity key, which can collide with another identity but never
+// changes for the same one.
+const CURSOR_PALETTE = [
+  "#e63946", "#f4a261", "#e9c46a", "#2a9d8f", "#264653", "#457b9d",
+  "#b5838d", "#6d6875", "#52b788", "#f07167", "#8338ec", "#3a86ff",
+];
+
+function hashColor(key: string): string {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  return CURSOR_PALETTE[Math.abs(hash) % CURSOR_PALETTE.length];
+}
+
+function assignRoomColor(room: Room, identityKey: string): string {
+  const existing = room.colorByIdentity.get(identityKey);
+  if (existing) return existing;
+  const color = room.nextColorIndex < CURSOR_PALETTE.length
+    ? CURSOR_PALETTE[room.nextColorIndex++]
+    : hashColor(identityKey);
+  room.colorByIdentity.set(identityKey, color);
+  return color;
+}
+
+// ─── Live access control: kick / re-check ─────────────────────────────────────
+//
+// Permissions are checked only at connect time (authenticateWs, below). If a
+// share is revoked, a member removed, or a role downgraded afterwards, an
+// already-open connection doesn't know. Two mechanisms close that gap:
+//  1. Explicit kick: the web process calls POST /kick (or /kick/:docId) right
+//     after it revokes access, so the affected connection drops immediately
+//     instead of waiting for the next sweep.
+//  2. Periodic sweep: every heartbeat tick, every open connection is
+//     re-authenticated against current DB state, catching access lost any
+//     other way within HEARTBEAT_INTERVAL_MS.
+// Both funnel through recheckConnection() so the logic lives in one place.
+
+// Map from ws to the original upgrade request, kept so a later re-check can
+// re-run authenticateWs() exactly as it ran at connect time (same cookie /
+// ?token=). Populated on connect, cleared on close.
+const connReqMap = new Map<WebSocket, import("http").IncomingMessage>();
+
+/**
+ * Re-authenticate one connection against current DB state. Closes it if
+ * access was lost entirely; otherwise updates its stored access level so a
+ * downgrade (editor -> viewer) takes effect without forcing a reconnect.
+ * Returns true if the connection was closed.
+ */
+function recheckConnection(docId: string, room: Room, ws: WebSocket, reason: string): boolean {
+  const req = connReqMap.get(ws);
+  if (!req) return false; // shouldn't happen; be conservative and leave the connection be
+  const auth = authenticateWs(db, req, docId);
+  if (!auth) {
+    ws.close(WS_CLOSE_ACCESS_REVOKED, reason);
+    return true;
+  }
+  if (room.wsAccessMap.get(ws) !== auth.access) {
+    room.wsAccessMap.set(ws, auth.access);
+  }
+  return false;
+}
+
+/** Re-check (and close if it now fails) connections in one room, optionally scoped to one user. */
+function kickRoom(docId: string, userId: string | undefined, reason: string): number {
+  const room = rooms.get(docId);
+  if (!room) return 0;
+  let closed = 0;
+  for (const [ws, connUserId] of room.wsUserMap) {
+    if (userId !== undefined && connUserId !== userId) continue;
+    if (recheckConnection(docId, room, ws, reason)) closed++;
+  }
+  return closed;
+}
+
+/** Re-check (and close if it now fails) one user's connections across every room. */
+function kickUserEverywhere(userId: string, reason: string): number {
+  let closed = 0;
+  for (const [docId, room] of rooms) {
+    for (const [ws, connUserId] of room.wsUserMap) {
+      if (connUserId !== userId) continue;
+      if (recheckConnection(docId, room, ws, reason)) closed++;
+    }
+  }
+  return closed;
+}
+
+/** Unconditionally close a room's connections — for lifecycle events (trash/move/delete) that
+ *  authenticateWs() has no opinion on, so a recheck-based kick would be a silent no-op. */
+function closeRoomConnections(docId: string, code: number, reason: string): number {
+  const room = rooms.get(docId);
+  if (!room) return 0;
+  let closed = 0;
+  for (const [ws] of room.wsUserMap) {
+    ws.close(code, reason);
+    closed++;
+  }
+  return closed;
+}
+
 // ─── Connection handler ───────────────────────────────────────────────────────
 
 function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "write", userId: string | null) {
@@ -301,6 +426,16 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
   const clientIds = new Set<number>();
   room.connections.set(ws, clientIds);
   room.wsUserMap.set(ws, userId);
+  room.wsAccessMap.set(ws, accessLevel);
+
+  // Resolve identity once at connect: a real account gets its DB name and a
+  // room-stable colour; an anonymous share-link guest ("guest" or null) gets
+  // its own per-connection colour slot but no borrowed name.
+  const hasRealIdentity = !!userId && userId !== "guest";
+  const userName = hasRealIdentity ? lookupUserName(persistenceStmts, userId) : null;
+  room.wsUserNameMap.set(ws, userName);
+  const identityKey = hasRealIdentity ? userId : `guest:${room.anonSeq++}`;
+  room.wsColorMap.set(ws, assignRoomColor(room, identityKey));
 
   // 1. Send sync step 1 (our state vector)
   {
@@ -357,8 +492,11 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
         const syncType = decoding.readVarUint(decoder);
 
         // Read-only clients can only send sync step 1 (request state),
-        // not sync step 2 (send state) or updates
-        if (accessLevel === "read" && syncType !== syncProtocol.messageYjsSyncStep1) {
+        // not sync step 2 (send state) or updates. Read from the live map,
+        // not the connect-time `accessLevel` param — recheckConnection()
+        // (see the heartbeat sweep and /kick) updates it in place on a
+        // editor -> viewer downgrade, without forcing a reconnect.
+        if (room.wsAccessMap.get(ws) === "read" && syncType !== syncProtocol.messageYjsSyncStep1) {
           return; // silently drop write attempts from read-only clients
         }
 
@@ -386,7 +524,41 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
       } else if (messageType === MESSAGE_AWARENESS) {
         const update = decoding.readVarUint8Array(decoder);
         awarenessProtocol.applyAwarenessUpdate(room.awareness, update, ws);
-        broadcastToRoom(room, data, ws);
+
+        // Anti-spoof: the "user" field in an awareness state (name, colour,
+        // userId) is client-supplied — an edit-token guest could otherwise
+        // claim to be any real user, since their id is visible to everyone
+        // via this same broadcast. Overwrite it on this connection's own
+        // client IDs with what was verified at connect time, then re-encode
+        // before broadcasting so peers never see the claimed values.
+        let corrected = false;
+        for (const clientId of clientIds) {
+          const state = room.awareness.states.get(clientId);
+          if (!state?.user) continue;
+          const authUserId = room.wsUserMap.get(ws) ?? null;
+          const verifiedUserId = authUserId && authUserId !== "guest" ? authUserId : null;
+          room.awareness.states.set(clientId, {
+            ...state,
+            user: {
+              ...state.user,
+              userId: verifiedUserId,
+              name: verifiedUserId ? room.wsUserNameMap.get(ws) ?? state.user.name : state.user.name,
+              color: room.wsColorMap.get(ws) ?? state.user.color,
+            },
+          });
+          corrected = true;
+        }
+        if (corrected) {
+          const encoder = encoding.createEncoder();
+          encoding.writeVarUint(encoder, MESSAGE_AWARENESS);
+          encoding.writeVarUint8Array(
+            encoder,
+            awarenessProtocol.encodeAwarenessUpdate(room.awareness, Array.from(clientIds))
+          );
+          broadcastToRoom(room, encoding.toUint8Array(encoder), ws);
+        } else {
+          broadcastToRoom(room, data, ws);
+        }
       }
     } catch (err) {
       console.error(`[ws-server] Error processing message for doc ${docId}:`, err);
@@ -398,6 +570,10 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
     room.awareness.off("change", onAwarenessChange);
     room.connections.delete(ws);
     room.wsUserMap.delete(ws);
+    room.wsUserNameMap.delete(ws);
+    room.wsAccessMap.delete(ws);
+    room.wsColorMap.delete(ws);
+    connReqMap.delete(ws);
     // Remove this client's awareness state
     if (clientIds.size > 0) {
       awarenessProtocol.removeAwarenessStates(
@@ -426,7 +602,7 @@ function handleConnection(ws: WebSocket, docId: string, accessLevel: "read" | "w
           // Persist comments
           try {
             const commentsMap = room.doc.getMap("comments");
-            saveCommentsFromYjs(db, docId, commentsMap);
+            saveCommentsFromYjs(db, persistenceStmts, docId, commentsMap);
           } catch (e) {
             console.error("[ws] error persisting comments on room close:", e);
           }
@@ -461,7 +637,7 @@ function flushAndDestroyRoom(docId: string) {
   rooms.delete(docId);
   // Close all WS connections so clients reconnect with fresh state
   for (const [conn] of room.connections) {
-    conn.close(4000, "Document restored");
+    conn.close(WS_CLOSE_DOCUMENT_RESTORED, "Document restored");
   }
 }
 
@@ -501,6 +677,57 @@ const adminServer = http.createServer((req, res) => {
     flushAndDestroyRoom(docId);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // POST /kick/:docId or /kick — re-check access and drop connections that
+  // lost it. Called by the web process right after it revokes a share, a
+  // membership, or a role (unshareFolder, unshareDoc, removeTeamspaceMember,
+  // updateTeamspaceMemberRole, setViewShare/setEditShare(false), ...).
+  // ?userId= scopes to one user; omitted with a :docId it re-checks everyone
+  // in that room; omitted entirely with no :docId it is a (deliberate) no-op.
+  const kickMatch = pathname.match(/^\/kick(?:\/(.+))?$/);
+  if (req.method === "POST" && kickMatch) {
+    const params = new URL(req.url ?? "/", "http://localhost").searchParams;
+    const userId = params.get("userId") ?? undefined;
+    const reason = params.get("reason") ?? "Access revoked";
+    const kickDocId = kickMatch[1];
+    // A revoke just wrote to the DB; a stale cached "still allowed" verdict
+    // (up to SHARED_ACCESS_TTL old) must not survive this re-check.
+    invalidateSharedAccessCache();
+    const closed = kickDocId
+      ? kickRoom(kickDocId, userId, reason)
+      : userId
+        ? kickUserEverywhere(userId, reason)
+        : 0;
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, closed }));
+    return;
+  }
+
+  // POST /notify/:docId?reason= — unconditionally close a room's connections
+  // for a lifecycle event (trash/move/rename/delete) that authenticateWs()
+  // has no opinion on, so /kick's recheck would be a silent no-op. The
+  // client treats WS_CLOSE_DOC_UNAVAILABLE as permanent (see ws/types.ts)
+  // and shows the reason instead of retrying.
+  const notifyMatch = pathname.match(/^\/notify\/(.+)$/);
+  if (req.method === "POST" && notifyMatch) {
+    const docId = notifyMatch[1];
+    const reason = new URL(req.url ?? "/", "http://localhost").searchParams.get("reason") ?? "Document unavailable";
+    const closed = closeRoomConnections(docId, WS_CLOSE_DOC_UNAVAILABLE, reason);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, closed }));
+    return;
+  }
+
+  // GET /room/:docId — is a Yjs room currently live for this doc? Lets the
+  // web process (see app/lib/ws-notify.server.ts) reject a direct `content`
+  // write while a collaborative session owns the document, instead of
+  // silently losing it to the next debounced Yjs save.
+  const roomMatch = pathname.match(/^\/room\/(.+)$/);
+  if (req.method === "GET" && roomMatch) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ live: rooms.has(roomMatch[1]) }));
     return;
   }
 
@@ -614,6 +841,14 @@ const heartbeatTimer = setInterval(() => {
       try { ws.ping(); } catch { /* socket closing */ }
     }
   }
+  // Safety net for access lost without an explicit /kick call (e.g. the
+  // caller forgot, or the SHARED_ACCESS_TTL cache just expired on its own).
+  // Same recheckConnection() used by /kick, just unscoped.
+  for (const [docId, room] of rooms) {
+    for (const [ws] of room.wsUserMap) {
+      recheckConnection(docId, room, ws, "Access revoked");
+    }
+  }
 }, HEARTBEAT_INTERVAL_MS);
 wss.on("close", () => clearInterval(heartbeatTimer));
 
@@ -657,6 +892,11 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
+  // Kept so a later live re-check (recheckConnection) can re-run
+  // authenticateWs() with the same cookie/token this connection used.
+  // Cleared in handleConnection's own close handler.
+  connReqMap.set(ws, req);
+
   handleConnection(ws, docId, auth.access, auth.userId);
 });
 
@@ -686,10 +926,20 @@ function gracefulShutdown(signal: string) {
       const content = getDocContent(room.doc);
       saveIfSafe(persistenceStmts, docId, content, state, room.lastEditor);
       const commentsMap = room.doc.getMap("comments");
-      saveCommentsFromYjs(db, docId, commentsMap);
+      saveCommentsFromYjs(db, persistenceStmts, docId, commentsMap);
     } catch (err) {
       console.error(`[ws-server] Failed to flush room ${docId}:`, err);
     }
+  }
+
+  // Flush the per-user document_updates audit log too — it debounces on its
+  // own 1s timer (see pendingUpdates/updateFlushTimers above), independent
+  // of the per-room save above, and was previously left for the next flush
+  // timer that a shutdown never lets fire.
+  for (const key of Array.from(pendingUpdates.keys())) {
+    const timer = updateFlushTimers.get(key);
+    if (timer) clearTimeout(timer);
+    flushPendingUpdate(key);
   }
 
   // Close all WebSocket connections
