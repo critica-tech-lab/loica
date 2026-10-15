@@ -128,6 +128,12 @@ export interface DocumentContextValue {
   editorReady: boolean;
   setEditorReady: (ready: boolean) => void;
   mounted: boolean;
+  // Called when the editor's WS connection closed because a version
+  // restore overwrote this doc (see ProseMirrorEditor's onDocumentReset).
+  // Forces the same remount a same-tab restore already triggers, so a
+  // collaborator's tab that didn't initiate the restore also drops its
+  // stale local state.
+  handleRemoteDocumentReset: () => void;
 
   // Comments
   comments: ResolvedThread[];
@@ -413,6 +419,17 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     }
   }, [comments.length]);
 
+  // ─── Remote restore: another tab/collaborator's version restore ─
+  // That tab gets fresh title/content via the fetcher branch below. This
+  // tab only learns about it from the WS close — no fetcher payload to
+  // read title/content from, so just drop local state and let the fresh
+  // Yjs sync (after remount) repopulate the editor.
+  const handleRemoteDocumentReset = useCallback(() => {
+    setEditorKey((k) => k + 1);
+    setEditorReady(false);
+    setActivePanel(null);
+  }, []);
+
   // ─── Restore: update state + remount Editor + undo toast ─
   // We only want to react to each restore once, so we track the backup id
   // we've already shown a toast for.
@@ -629,6 +646,7 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     editorReady,
     setEditorReady,
     mounted,
+    handleRemoteDocumentReset,
 
     comments,
     setComments,

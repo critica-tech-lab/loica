@@ -15,6 +15,16 @@ import {
 } from "prosemirror-tables";
 import { TableHandles } from "./editor/TableHandles";
 
+// Keep in sync with WS_CLOSE_DOCUMENT_RESTORED in ws/types.ts — the server
+// closes every connection in a room with this code after a version restore
+// overwrites yjs_state (see ws-server.ts's flushAndDestroyRoom).
+export const DOCUMENT_RESTORED_CLOSE_CODE = 4000;
+
+/** Did this WS close happen because the server just restored a version onto this doc? */
+export function isDocumentRestoredClose(event: { code: number } | null | undefined): boolean {
+  return event?.code === DOCUMENT_RESTORED_CLOSE_CODE;
+}
+
 interface Props {
   docId: string;
   wsUrl: string;
@@ -29,6 +39,15 @@ interface Props {
   onConnectionStatus?: (
     status: "connected" | "connecting" | "disconnected"
   ) => void;
+  // Fires when the server closed the connection because a version restore
+  // just overwrote this document (see ws-server.ts's flushAndDestroyRoom).
+  // The local Yjs/IndexedDB copy still holds the pre-restore history —
+  // y-websocket's default auto-reconnect would otherwise sync it right
+  // back onto the server, undoing the restore. The host should force a
+  // full remount (it already does this for its own restore action, via
+  // the `key` prop) so this connection's stale local state never gets the
+  // chance to re-sync.
+  onDocumentReset?: () => void;
   onChange?: (content: string) => void;
   // Fires with the doc's YAML frontmatter (kept out of the PM tree, in the
   // synced `meta` map). Empty string when none. Lets the host detect the doc
@@ -117,6 +136,7 @@ export function ProseMirrorEditor({
   onReady,
   onPresenceChange,
   onConnectionStatus,
+  onDocumentReset,
   onChange,
   onFrontmatter,
   onTitle,
@@ -160,6 +180,8 @@ export function ProseMirrorEditor({
   onSelectionChangeRef.current = onSelectionChange;
   const onFrontmatterRef = useRef(onFrontmatter);
   onFrontmatterRef.current = onFrontmatter;
+  const onDocumentResetRef = useRef(onDocumentReset);
+  onDocumentResetRef.current = onDocumentReset;
   const onTrackChangesStateChangeRef = useRef(onTrackChangesStateChange);
   onTrackChangesStateChangeRef.current = onTrackChangesStateChange;
   const onTrackChangeClickRef = useRef(onTrackChangeClick);
@@ -254,6 +276,16 @@ export function ProseMirrorEditor({
         params: wsParams ?? {},
       });
       providerRef.current = provider;
+
+      // See DOCUMENT_RESTORED_CLOSE_CODE above: clear the local IndexedDB
+      // copy before the host remounts us, so y-websocket's reconnect (it
+      // treats this code as transient, by design — see ws/types.ts) starts
+      // from a clean slate instead of resurrecting pre-restore content.
+      provider.on("connection-close", (event: CloseEvent | null) => {
+        if (!isDocumentRestoredClose(event)) return;
+        idb.clearData().catch(() => {});
+        onDocumentResetRef.current?.();
+      });
 
       // Surface YAML frontmatter (kept out of the PM tree) so the host can
       // detect the doc type. Emit on initial sync and whenever it changes.
