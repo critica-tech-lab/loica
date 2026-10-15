@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { redirect } from "react-router";
 import { uploadsDir } from "~/lib/paths.server";
@@ -18,6 +19,8 @@ import {
   unshareDocument,
   toggleStar,
   updateShareSettings,
+  hasStorageHeadroom,
+  MAX_UPLOAD_FILE_BYTES,
 } from "~/lib/document.server";
 import {
   getFolder,
@@ -450,7 +453,6 @@ export function handleDuplicateDoc(
 // ── File Upload ──────────────────────────────────────────────
 
 const UPLOAD_DIR = uploadsDir;
-const UPLOAD_MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const ALLOWED_UPLOAD_EXTENSIONS = new Set([
   ".pdf", ".pages",
@@ -474,7 +476,12 @@ export async function handleUploadFile(ctx: ActionContext, folderId: string | nu
   if (!rl.allowed) throw new Response("Too many uploads. Try again later.", { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
   const file = ctx.form.get("file");
   if (!file || !(file instanceof File)) throw new Response("Missing file", { status: 400 });
-  if (file.size > UPLOAD_MAX_SIZE) throw new Response("File too large (max 20MB)", { status: 400 });
+  if (file.size > MAX_UPLOAD_FILE_BYTES) {
+    throw new Response(`File too large (max ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)}MB)`, { status: 400 });
+  }
+  if (!hasStorageHeadroom(ctx.workspace.id, file.size)) {
+    throw new Response("Workspace storage quota exceeded.", { status: 400 });
+  }
 
   const ext = getAllowedExtension(file.name);
   if (!ext) throw new Response("Unsupported file type", { status: 400 });
@@ -542,7 +549,7 @@ export async function handleUploadFile(ctx: ActionContext, folderId: string | nu
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
   const filename = `${nanoid(16)}${ext}`;
-  writeFileSync(join(UPLOAD_DIR, filename), buffer);
+  await writeFile(join(UPLOAD_DIR, filename), buffer);
 
   const doc = createPdfDocument(ctx.workspace.id, ctx.user.id, title, filename, folderId);
   return { uploadedFile: true, docId: doc.id };
@@ -560,11 +567,16 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
   const results: { docId: string }[] = [];
   // Cache folder lookups/creates to avoid re-querying for same path segments
   const folderCache = new Map<string, string | null>();
+  // Bytes already queued in this batch — checked against the quota ahead of
+  // the DB's own usage figure, so one oversized batch can't slip past it by
+  // staying under quota on each individual file check.
+  let batchBytes = 0;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (!(file instanceof File)) continue;
-    if (file.size > UPLOAD_MAX_SIZE) continue; // skip oversized files silently in batch
+    if (file.size > MAX_UPLOAD_FILE_BYTES) continue; // skip oversized files silently in batch
+    if (!hasStorageHeadroom(ctx.workspace.id, batchBytes + file.size)) continue; // over quota — skip silently in batch
 
     // file.name may contain path separators (e.g. from webkitRelativePath)
     const fileName = file.name.split("/").pop() || file.name;
@@ -619,7 +631,8 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
     }
 
     const filename = `${nanoid(16)}${ext}`;
-    writeFileSync(join(UPLOAD_DIR, filename), buffer);
+    await writeFile(join(UPLOAD_DIR, filename), buffer);
+    batchBytes += file.size;
     const doc = createPdfDocument(ctx.workspace.id, ctx.user.id, title, filename, targetFolderId);
     results.push({ docId: doc.id });
   }
@@ -651,8 +664,13 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
   files = files.slice(0, IMPORT_MAX_FILES);
   const folderMap = new Map<string, string>();
   let imported = 0;
+  // Running total for this batch, checked against the quota ahead of the
+  // DB's own usage figure — same reasoning as batchBytes in handleUploadFiles.
+  let importedBytes = 0;
   for (const file of files) {
     if (!contentSchema.safeParse(file.content).success) continue; // skip oversized content silently in batch
+    const contentBytes = Buffer.byteLength(file.content, "utf8");
+    if (!hasStorageHeadroom(ctx.workspace.id, importedBytes + contentBytes)) continue; // over quota — skip silently in batch
     const parts = file.path.split("/");
     let parentFolderId: string | null = defaultFolderId;
     if (parts.length > 1) {
@@ -680,6 +698,7 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
       }
     }
     createDocument(ctx.workspace.id, ctx.user.id, file.title, parentFolderId, file.content);
+    importedBytes += contentBytes;
     imported++;
   }
   return { imported };

@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { getSessionUser } from "~/lib/auth.server";
 import { uploadsDir as UPLOAD_DIR } from "~/lib/paths.server";
 import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
-const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+import { MAX_UPLOAD_FILE_BYTES } from "~/lib/document.server";
 const ALLOWED_TYPES: Record<string, string> = {
   "image/png": ".png",
   "image/jpeg": ".jpg",
@@ -31,14 +32,23 @@ export async function action({ request }: { request: Request }) {
     return new Response("Expected multipart/form-data", { status: 400 });
   }
 
+  // Reject an oversized body before buffering the whole multipart payload —
+  // Content-Length covers the multipart envelope too, so it's a slight
+  // overestimate of the file's own size, but still catches the obvious case
+  // without reading anything off the wire.
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_UPLOAD_FILE_BYTES) {
+    return new Response(`File too large (max ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)}MB)`, { status: 400 });
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
   if (!file || !(file instanceof File)) {
     return new Response("Missing file", { status: 400 });
   }
 
-  if (file.size > MAX_SIZE) {
-    return new Response("File too large (max 10MB)", { status: 400 });
+  if (file.size > MAX_UPLOAD_FILE_BYTES) {
+    return new Response(`File too large (max ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)}MB)`, { status: 400 });
   }
 
   const ext = ALLOWED_TYPES[file.type];
@@ -52,7 +62,7 @@ export async function action({ request }: { request: Request }) {
 
   const filename = `${nanoid(16)}${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  writeFileSync(join(UPLOAD_DIR, filename), buffer);
+  await writeFile(join(UPLOAD_DIR, filename), buffer);
 
   return Response.json({ url: `/api/uploads/${filename}` });
 }

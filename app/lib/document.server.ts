@@ -1,4 +1,4 @@
-import { unlinkSync } from "node:fs";
+import { statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { hash, verify } from "@node-rs/argon2";
@@ -265,6 +265,50 @@ export function getWorkspaceStorageBytes(workspaceId: string): number {
     )
     .get(workspaceId);
   return row?.total ?? 0;
+}
+
+/**
+ * Bytes on disk used by this workspace's uploaded files (pdf_file uploads —
+ * PDFs, images, etc. — stored under uploadsDir, outside the database).
+ * Unlike getWorkspaceStorageBytes (hit on most page loads), this stats every
+ * file and is only meant for the upload/import quota check below.
+ */
+function getWorkspaceUploadBytes(workspaceId: string): number {
+  const rows = prep<{ pdf_file: string }, [string]>(
+    `SELECT pdf_file FROM documents
+     WHERE workspace_id = ? AND pdf_file IS NOT NULL AND length(pdf_file) > 0`
+  ).all(workspaceId);
+  let total = 0;
+  for (const { pdf_file } of rows) {
+    try {
+      total += statSync(join(uploadsDir, pdf_file)).size;
+    } catch {
+      // File vanished (e.g. quarantined) — not this check's concern.
+    }
+  }
+  return total;
+}
+
+// Max bytes a single uploaded file may be. Shared by api.upload.ts and the
+// upload handlers in doc-actions.server.ts so the limit — and its error
+// message — can't drift between the two routes that enforce it.
+export const MAX_UPLOAD_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+// Per-workspace cap on total storage (document content/yjs_state + uploaded
+// files). Configurable via WORKSPACE_STORAGE_QUOTA_BYTES (bytes); defaults to
+// 5 GiB, generous for a self-hosted team but small enough to stop a runaway
+// upload or import from filling the disk.
+export const WORKSPACE_STORAGE_QUOTA_BYTES =
+  Number(process.env.WORKSPACE_STORAGE_QUOTA_BYTES) || 5 * 1024 * 1024 * 1024;
+
+/**
+ * Whether adding `incomingBytes` to a workspace's current usage would stay
+ * within WORKSPACE_STORAGE_QUOTA_BYTES. Shared by the upload and import
+ * write paths so the quota can't be bypassed by one but not the other.
+ */
+export function hasStorageHeadroom(workspaceId: string, incomingBytes: number): boolean {
+  const used = getWorkspaceStorageBytes(workspaceId) + getWorkspaceUploadBytes(workspaceId);
+  return used + incomingBytes <= WORKSPACE_STORAGE_QUOTA_BYTES;
 }
 
 // ─── Update ───────────────────────────────────────────────
