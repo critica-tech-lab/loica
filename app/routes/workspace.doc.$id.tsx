@@ -20,6 +20,7 @@ import {
 } from "~/lib/document.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc, hasDocSharedAccess } from "~/lib/doc-sharing.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { getUserGroups } from "~/lib/group.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
@@ -143,6 +144,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "save") {
     const title = form.get("title");
     const content = form.get("content");
+    // A live Yjs room owns this doc's content — a direct write here would
+    // just get overwritten by the room's next debounced save (see
+    // ws-notify.server.ts's shouldRejectContentWrite). Only check when
+    // there's actually a content write to guard — a title-only save (the
+    // only thing today's UI sends) skips the extra round trip.
+    if (content != null && shouldRejectContentWrite(true, await isRoomLive(params.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     try {
       updateDocument(params.id, {
         ...(title != null ? { title: String(title) } : {}),

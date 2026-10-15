@@ -55,3 +55,16 @@ export async function isRoomLive(docId: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * A `content` write from a plain web form action (not through the Yjs
+ * room) bypasses yjs_state entirely — the room's next debounced save would
+ * just overwrite it again within SAVE_MAX_WAIT_MS, silently losing the web
+ * write. Reject the write instead of racing it. No client UI currently
+ * submits `content` through these paths (only `title` — see
+ * FilePreview.tsx), but the action handlers accept it from any POST, so the
+ * guard stays regardless of what today's UI happens to send.
+ */
+export function shouldRejectContentWrite(hasContent: boolean, roomLive: boolean): boolean {
+  return hasContent && roomLive;
+}

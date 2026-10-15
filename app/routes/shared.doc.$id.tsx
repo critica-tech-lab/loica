@@ -19,6 +19,7 @@ import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.serv
 import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
@@ -128,6 +129,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "save") {
     const title = form.get("title");
     const content = form.get("content");
+    // See workspace.doc.$id.tsx's identical guard — a live Yjs room owns
+    // this doc's content, so a direct write here would just be lost to the
+    // room's next debounced save.
+    if (content != null && shouldRejectContentWrite(true, await isRoomLive(params.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     updateDocument(params.id, {
       ...(title != null ? { title: String(title) } : {}),
       ...(content != null ? { content: String(content) } : {}),
