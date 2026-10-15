@@ -7,7 +7,7 @@ import type { PMActiveState, EditingMode } from "~/components/editor/types";
 import { UserMenu } from "~/components/UserMenu";
 import { DocMenu } from "~/components/DocMenu";
 import type { DocMenuItem } from "~/components/DocMenu";
-import { Editor } from "~/components/Editor";
+import { LazyEditor } from "~/components/LazyEditor";
 import { useToast } from "~/components/Toast";
 import { consumeUndoCreate } from "~/lib/undoCreate";
 import { useFetcher, useNavigate } from "react-router";
@@ -367,7 +367,7 @@ export function DocEditorView(_props: DocumentProps) {
             })()}
           </div>
         ) : (
-          <Editor
+          <LazyEditor
             key={editorKey}
             initialValue={document.content}
             onChange={handleContentChange}
