@@ -20,6 +20,8 @@ import { getDocument, getDocumentByToken } from "./document.server";
 import type { Document } from "./document.server";
 import { getMembership } from "./workspace.server";
 import { hasSharedAccess } from "./sharing.server";
+import { db } from "./db.server";
+import { verifySharePasswordCookie } from "./share-password.server";
 
 function parseCookies(header: string): Record<string, string> {
   return Object.fromEntries(
@@ -57,7 +59,12 @@ export function authorizeDocRead(request: Request, id: string | undefined): Docu
     if (viaToken && viaToken.document.id === doc.id) {
       const passwordOk =
         !viaToken.hasPassword ||
-        parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`] === "1";
+        verifySharePasswordCookie(
+          db,
+          token,
+          viaToken.document.share_password_hash ?? "",
+          parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`]
+        );
       if (passwordOk) return doc;
     }
   }
