@@ -365,7 +365,7 @@ export function findOrCreateUserViaExternalAuth(profile: ExternalAuthProfile): s
     "SELECT user_id as id FROM auth_links WHERE provider = ? AND sub = ?",
   ).get(profile.provider, profile.sub);
   if (bySub) {
-    db.prepare("UPDATE users SET name = ? WHERE id = ?").run(profile.name, bySub.id);
+    // The provider name only seeds the account; later logins must not undo a rename.
     return bySub.id;
   }
 
@@ -382,7 +382,6 @@ export function findOrCreateUserViaExternalAuth(profile: ExternalAuthProfile): s
     db.prepare(
       "INSERT OR REPLACE INTO auth_links (user_id, provider, sub) VALUES (?, ?, ?)",
     ).run(byEmail.id, profile.provider, profile.sub);
-    db.prepare("UPDATE users SET name = ? WHERE id = ?").run(profile.name, byEmail.id);
     return byEmail.id;
   }
 
