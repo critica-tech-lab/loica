@@ -56,6 +56,15 @@ export function getUserGroups(userId: string): GroupWithMeta[] {
     .all(userId);
 }
 
+/** Whether userId is an accepted member of groupId — used to authorize doc-group sharing. */
+export function isGroupMember(groupId: string, userId: string): boolean {
+  const row = prep<{ user_id: string }, [string, string]>(
+      "SELECT user_id FROM group_members WHERE group_id = ? AND user_id = ? AND status = 'accepted'"
+    )
+    .get(groupId, userId);
+  return !!row;
+}
+
 // ─── Search ──────────────────────────────────────────────
 
 export function searchUsers(
