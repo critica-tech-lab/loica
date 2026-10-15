@@ -6,8 +6,9 @@ import { appError } from "~/lib/errors";
 import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
 import { sendMentionNotification } from "~/lib/email.server";
-import { prep } from "~/lib/db.server";
+import { db, prep } from "~/lib/db.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { signSharePasswordCookie, verifySharePasswordCookie } from "~/lib/share-password.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -101,10 +102,10 @@ function parseCookies(header: string): Record<string, string> {
   );
 }
 
-function isPasswordAuthenticated(request: Request, token: string): boolean {
+function isPasswordAuthenticated(request: Request, token: string, passwordHash: string): boolean {
   const cookieHeader = request.headers.get("Cookie") ?? "";
   const cookies = parseCookies(cookieHeader);
-  return cookies[`__share_pwd_${token}`] === "1";
+  return verifySharePasswordCookie(db, token, passwordHash, cookies[`__share_pwd_${token}`]);
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -115,7 +116,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const trackChanges = url.searchParams.get("track") === "1";
 
   // If password protected, check if user is authenticated
-  if (result.hasPassword && !isPasswordAuthenticated(request, params.token)) {
+  if (result.hasPassword && !isPasswordAuthenticated(request, params.token, result.document.share_password_hash ?? "")) {
     return {
       needsPassword: true,
       docTitle: result.document.title,
@@ -163,10 +164,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { ok: false, error: "Invalid password" };
     }
 
-    // Set cookie to mark password as verified
+    // Set cookie to mark password as verified. The value is HMAC-signed over
+    // the token and the current password hash (see share-password.server) so
+    // it can't be forged by copying a plain "__share_pwd_<token>=1", and it
+    // stops verifying the moment the password is changed or removed.
     const useSecureCookie = process.env.SECURE_COOKIE === "true";
     const secure = useSecureCookie ? " Secure;" : "";
-    const setCookie = `__share_pwd_${params.token}=1; Path=/; HttpOnly; SameSite=Lax;${secure} Max-Age=2592000`;
+    const signedValue = signSharePasswordCookie(db, params.token, result.document.share_password_hash ?? "");
+    const setCookie = `__share_pwd_${params.token}=${signedValue}; Path=/; HttpOnly; SameSite=Lax;${secure} Max-Age=2592000`;
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -182,7 +187,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!result) throw appError("link_invalid");
   if (result.mode !== "public_edit") throw appError("link_view_only");
 
-  if (!isPasswordAuthenticated(request, params.token) && result.hasPassword) {
+  if (!isPasswordAuthenticated(request, params.token, result.document.share_password_hash ?? "") && result.hasPassword) {
     throw appError("link_password_required");
   }
 
