@@ -413,8 +413,16 @@ export function handleUnshareAllFolder(ctx: ActionContext, ownerRoles: string[])
 
 // ── Bulk handlers ────────────────────────────────────────────
 
+// Lists are paginated far below this; the cap only stops a hand-crafted
+// request from running thousands of synchronous UPDATE+INSERT pairs at once.
+const BULK_MAX_IDS = 200;
+
+function parseBulkIds(ctx: ActionContext): string[] {
+  return String(ctx.form.get("docIds") || "").split(",").filter(Boolean).slice(0, BULK_MAX_IDS);
+}
+
 export function handleBulkDelete(ctx: ActionContext, isOwner: boolean) {
-  const ids = String(ctx.form.get("docIds") || "").split(",").filter(Boolean);
+  const ids = parseBulkIds(ctx);
   const docs = getDocumentsByIds(ids);
   let deleted = 0;
   for (const doc of docs) {
@@ -428,7 +436,7 @@ export function handleBulkDelete(ctx: ActionContext, isOwner: boolean) {
 }
 
 export function handleBulkUnshare(ctx: ActionContext) {
-  const ids = String(ctx.form.get("docIds") || "").split(",").filter(Boolean);
+  const ids = parseBulkIds(ctx);
   const docs = getDocumentsByIds(ids);
   let unshared = 0;
   for (const doc of docs) {

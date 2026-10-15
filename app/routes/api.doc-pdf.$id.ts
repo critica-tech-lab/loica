@@ -10,7 +10,7 @@ import { heavyExportSemaphore, tooManyHeavyOps, MAX_EXPORT_INPUT_BYTES } from "~
 
 function rateLimitExport(request: Request): Response | null {
   const user = getSessionUser(request);
-  const rl = checkRateLimit(getRateLimitKey(request, user?.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "export" });
+  const rl = checkRateLimit(getRateLimitKey(request, user?.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "export-pdf" });
   if (rl.allowed) return null;
   return new Response("Too many export requests. Try again later.", {
     status: 429,

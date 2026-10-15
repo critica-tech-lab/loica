@@ -58,7 +58,13 @@ const stmtInsertActivity = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?)`
 );
 
-/** Record one workspace mutation. `actorId` may be null for system-initiated actions. */
+/**
+ * Record one workspace mutation. `actorId` may be null for system-initiated actions.
+ *
+ * Never throws: it runs after the mutation already succeeded, so a failed
+ * audit insert (locked DB, full disk) must not turn that success into an
+ * error response (e.g. a moved folder reported as a name conflict).
+ */
 export function logActivity(params: {
   workspaceId: string;
   actorId: string | null;
@@ -67,15 +73,19 @@ export function logActivity(params: {
   targetId?: string;
   targetTitle?: string;
 }): void {
-  stmtInsertActivity.run(
-    nanoid(16),
-    params.workspaceId,
-    params.actorId,
-    params.action,
-    params.targetType ?? null,
-    params.targetId ?? null,
-    params.targetTitle ?? null
-  );
+  try {
+    stmtInsertActivity.run(
+      nanoid(16),
+      params.workspaceId,
+      params.actorId,
+      params.action,
+      params.targetType ?? null,
+      params.targetId ?? null,
+      params.targetTitle ?? null
+    );
+  } catch (e) {
+    console.error(`[activity] failed to log ${params.action}:`, e);
+  }
 }
 
 type ActivityRow = ActivityEntry & { rowid: number };

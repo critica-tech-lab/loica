@@ -19,6 +19,8 @@ import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.serv
 import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
+import { userHasDocAccess } from "~/lib/doc-access.server";
+import { capMentionBody } from "~/lib/doc-mention-authz.server";
 import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
@@ -225,7 +227,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "send-mentions") {
     const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
-    const body = String(form.get("body") || "");
+    const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
     let match: RegExpExecArray | null;
     const origin = getPublicOrigin(request);
@@ -233,6 +235,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     while ((match = mentionRegex.exec(body)) !== null) {
       const mentionedUserId = match[2];
       if (mentionedUserId === user.id) continue;
+      // Only notify users who can actually see this doc — otherwise
+      // mentioning an arbitrary user id leaks its title/content to them.
+      if (!userHasDocAccess(doc, mentionedUserId)) continue;
       const mentioned = prep<{ email: string; name: string }, [string]>(
         "SELECT email, name FROM users WHERE id = ?"
       ).get(mentionedUserId);

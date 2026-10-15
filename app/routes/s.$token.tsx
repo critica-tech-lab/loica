@@ -131,8 +131,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // identified by their real account, not as an anonymous guest.
   const sessionUser = getSessionUser(request);
 
+  // The password hash must never reach the browser: a weak password could be
+  // cracked offline. Clients only need to know a password exists (hasPassword).
+  const { share_password_hash: _passwordHash, ...publicDocument } = result.document;
+
   return {
-    document: result.document,
+    document: publicDocument,
     mode: result.mode,
     shareToken: params.token,
     trackChanges,

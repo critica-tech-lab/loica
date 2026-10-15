@@ -727,12 +727,23 @@ try { db.exec("CREATE INDEX idx_activity_workspace_created ON activity(workspace
 // already has the old, unscoped version — CREATE TRIGGER IF NOT EXISTS is a
 // no-op there. Drop and recreate so existing installs pick up the fix too.
 // FTS rows are untouched (documents_fts is not read here), so no reindex.
-try { db.exec("DROP TRIGGER IF EXISTS documents_au"); } catch (e) { console.error("[db migration]", e); }
+//
+// Runs on every boot of both processes (web + ws), so it only acts when the
+// stored trigger is still the old one, and does the drop+create in a single
+// transaction: no window where a concurrent title/content UPDATE skips FTS.
 try {
-  db.exec(`
-    CREATE TRIGGER documents_au AFTER UPDATE OF title, content ON documents BEGIN
-      INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
-      INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
-    END
-  `);
+  const trigger = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'documents_au'")
+    .get() as { sql: string } | undefined;
+  if (trigger && !/AFTER UPDATE OF title, content/i.test(trigger.sql)) {
+    db.transaction(() => {
+      db.exec("DROP TRIGGER documents_au");
+      db.exec(`
+        CREATE TRIGGER documents_au AFTER UPDATE OF title, content ON documents BEGIN
+          INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
+          INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
+        END
+      `);
+    })();
+  }
 } catch (e) { console.error("[db migration]", e); }

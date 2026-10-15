@@ -31,7 +31,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const role = getMembership(workspaceId, user.id, user.is_admin);
   if (!role) throw new Response("Forbidden", { status: 403 });
 
-  const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "export" });
+  const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "export-workspace" });
   if (!rl.allowed) {
     throw new Response("Too many export requests. Try again later.", {
       status: 429,

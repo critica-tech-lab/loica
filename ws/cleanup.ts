@@ -318,16 +318,22 @@ export function deleteOldClientErrors(db: Database.Database): void {
  * own copy of the SQL instead. Previously this only ran when a trash page
  * loaded; this gives it a schedule independent of that.
  */
-export function purgeExpiredTrash(db: Database.Database): void {
+export function purgeExpiredTrash(db: Database.Database): string[] {
   const cutoff = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
-  const pdfDocs = db.prepare(
-    "SELECT pdf_file FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ? AND pdf_file IS NOT NULL"
-  ).all(cutoff) as { pdf_file: string }[];
-  for (const doc of pdfDocs) {
+  const expired = db.prepare(
+    "SELECT id, pdf_file FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?"
+  ).all(cutoff) as { id: string; pdf_file: string | null }[];
+  for (const doc of expired) {
+    if (!doc.pdf_file) {
+      continue;
+    }
     try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
   db.prepare("DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
   db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
+  // Returned so the caller can close any room still open on a purged doc
+  // (e.g. one trashed while the ws server was down, so it was never told).
+  return expired.map((doc) => doc.id);
 }
 
 /**

@@ -849,7 +849,13 @@ const heartbeatTimer = setInterval(() => {
   // Same recheckConnection() used by /kick, just unscoped.
   for (const [docId, room] of rooms) {
     for (const [ws] of room.wsUserMap) {
-      recheckConnection(docId, room, ws, "Access revoked");
+      // One failing check (e.g. DB busy) must not skip the remaining
+      // connections for this tick.
+      try {
+        recheckConnection(docId, room, ws, "Access revoked");
+      } catch (e) {
+        console.error(`[ws-server] Access re-check failed for doc ${docId}:`, e);
+      }
     }
   }
 }, HEARTBEAT_INTERVAL_MS);
@@ -970,28 +976,37 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // ─── Background cleanup tasks ─────────────────────────────────────────────────
 
-const cleanupTimer = setInterval(async () => {
-  cleanupStaleDocs(cleanupStmts, new Set(rooms.keys()));
-  await cleanupOrphanUploads(db);
-  pruneAutoVersions(db);
-  deleteOldNotifications(db);
-  deleteOldClientErrors(db);
+// Each task runs on its own: one throwing (locked DB, missing file) must not
+// skip the rest or surface as an unhandled rejection from the timer.
+async function runTask(name: string, task: () => void | Promise<void>): Promise<void> {
+  try {
+    await task();
+  } catch (e) {
+    console.error(`[ws-server] Cleanup task "${name}" failed:`, e);
+  }
+}
+
+async function runCleanup(): Promise<void> {
+  await runTask("stale docs", () => cleanupStaleDocs(cleanupStmts, new Set(rooms.keys())));
+  await runTask("orphan uploads", () => cleanupOrphanUploads(db));
+  await runTask("auto-versions", () => pruneAutoVersions(db));
+  await runTask("notifications", () => deleteOldNotifications(db));
+  await runTask("client errors", () => deleteOldClientErrors(db));
   // So trash gets purged on a schedule, not only when someone happens to
-  // open a trash page.
-  purgeExpiredTrash(db);
-  deleteOldActivity();
-}, CLEANUP_INTERVAL);
+  // open a trash page. A room still open on a purged doc would keep
+  // accepting edits that can no longer be saved: close it first.
+  await runTask("trash", () => {
+    for (const docId of purgeExpiredTrash(db)) {
+      closeRoomConnections(docId, WS_CLOSE_DOC_UNAVAILABLE, "Document permanently deleted");
+    }
+  });
+  await runTask("activity", () => deleteOldActivity());
+}
+
+const cleanupTimer = setInterval(runCleanup, CLEANUP_INTERVAL);
 
 // Run cleanup tasks once on startup after a short delay
-setTimeout(async () => {
-  cleanupStaleDocs(cleanupStmts, new Set(rooms.keys()));
-  await cleanupOrphanUploads(db);
-  pruneAutoVersions(db);
-  deleteOldNotifications(db);
-  deleteOldClientErrors(db);
-  purgeExpiredTrash(db);
-  deleteOldActivity();
-}, 10_000);
+setTimeout(runCleanup, 10_000);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
