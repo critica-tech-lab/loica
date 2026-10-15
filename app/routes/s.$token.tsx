@@ -7,6 +7,8 @@ import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
 import { sendMentionNotification } from "~/lib/email.server";
 import { prep } from "~/lib/db.server";
+import { userHasDocAccess } from "~/lib/doc-access.server";
+import { capMentionBody } from "~/lib/doc-mention-authz.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
@@ -197,13 +199,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!sessionUser) return { ok: false };
     const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
-    const body = String(form.get("body") || "");
+    const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
     const docUrl = `${getPublicOrigin(request)}/s/${params.token}`;
     let match: RegExpExecArray | null;
     while ((match = mentionRegex.exec(body)) !== null) {
       const mentionedUserId = match[2];
       if (mentionedUserId === sessionUser.id) continue;
+      // Only notify users who can actually see this doc — otherwise
+      // mentioning an arbitrary user id leaks its title/content to them.
+      if (!userHasDocAccess(result.document, mentionedUserId, sessionUser.is_admin)) continue;
       const mentioned = prep<{ email: string; name: string }, [string]>(
         "SELECT email, name FROM users WHERE id = ?"
       ).get(mentionedUserId);
