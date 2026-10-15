@@ -288,9 +288,13 @@ try {
   `);
 } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 
+// Scoped to `OF title, content` — ws/persistence.ts saveDoc touches
+// yjs_state/updated_at/updated_by every ~2s while someone is typing, which
+// would otherwise rebuild the FTS index on every autosave even when the
+// markdown projection (title/content) didn't change.
 try {
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+    CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE OF title, content ON documents BEGIN
       INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
       INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
     END
@@ -695,3 +699,18 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 )`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 try { db.exec("CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+// ─── Fix: documents_au fired on every UPDATE ─────────────
+// A DB created before the trigger above was scoped to `OF title, content`
+// already has the old, unscoped version — CREATE TRIGGER IF NOT EXISTS is a
+// no-op there. Drop and recreate so existing installs pick up the fix too.
+// FTS rows are untouched (documents_fts is not read here), so no reindex.
+try { db.exec("DROP TRIGGER IF EXISTS documents_au"); } catch (e) { console.error("[db migration]", e); }
+try {
+  db.exec(`
+    CREATE TRIGGER documents_au AFTER UPDATE OF title, content ON documents BEGIN
+      INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
+      INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
+    END
+  `);
+} catch (e) { console.error("[db migration]", e); }
