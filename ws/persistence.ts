@@ -24,6 +24,17 @@ export function initializePersistenceStatements(db: Database.Database) {
     saveDoc: db.prepare<{ id: string; content: string; state: Buffer; updatedBy: string | null }>(
       "UPDATE documents SET content = @content, yjs_state = @state, updated_at = unixepoch(), updated_by = COALESCE(@updatedBy, updated_by) WHERE id = @id"
     ),
+    // Used when `content` hasn't changed (e.g. a comment was added/resolved,
+    // which touches the shared Y.Doc and triggers a save but not the
+    // markdown projection) — leaves `content` out of the SET list so the
+    // documents_au trigger (scoped to `OF title, content`, db.server.ts)
+    // doesn't rebuild the FTS index for no reason.
+    saveDocStateOnly: db.prepare<{ id: string; state: Buffer; updatedBy: string | null }>(
+      "UPDATE documents SET yjs_state = @state, updated_at = unixepoch(), updated_by = COALESCE(@updatedBy, updated_by) WHERE id = @id"
+    ),
+    getStoredContent: db.prepare<{ id: string }, { content: string }>(
+      "SELECT content FROM documents WHERE id = @id"
+    ),
     createVersion: db.prepare(
       `INSERT INTO document_versions (id, document_id, title, content, yjs_state, created_by, auto)
        SELECT @vid, @docId, title, @content, @yjsState, @createdBy, 1 FROM documents WHERE id = @docId`
@@ -267,7 +278,12 @@ export function saveIfSafe(
     reportOversized(stmts, docId, bytes, updatedBy);
     return false;
   }
-  stmts.saveDoc.run({ id: docId, content, state, updatedBy });
+  const stored = stmts.getStoredContent.get({ id: docId }) as { content: string } | undefined;
+  if (stored && stored.content === content) {
+    stmts.saveDocStateOnly.run({ id: docId, state, updatedBy });
+  } else {
+    stmts.saveDoc.run({ id: docId, content, state, updatedBy });
+  }
   // Back under the limit — a later breach is news again.
   reportedOversized.delete(docId);
   return true;

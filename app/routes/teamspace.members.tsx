@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData } from "react-router";
+import { Form, Link, redirect, useLoaderData, useActionData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/teamspace.members";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
@@ -16,6 +16,7 @@ import {
   LastAdminError,
 } from "~/lib/teamspace.server";
 import { getWorkspaceStorageBytes } from "~/lib/document.server";
+import { logActivity, ActivityAction } from "~/lib/activity.server";
 import { getFoldersAtLevel } from "~/lib/folder.server";
 import { getSharedFoldersForUser } from "~/lib/sharing.server";
 import { getSharedDocsForUser } from "~/lib/doc-sharing.server";
@@ -92,6 +93,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       .get(teamspace.id, target.id);
     if (existing) return { error: "User is already a member of this teamspace." };
     addTeamspaceMember(teamspace.id, target.id, "editor");
+    logActivity({ workspaceId: teamspace.id, actorId: user.id, action: ActivityAction.MemberAdd, targetType: "user", targetId: target.id, targetTitle: email });
     return { success: `${email} has been added to the teamspace.` };
   }
 
@@ -107,6 +109,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         }
         throw e;
       }
+      logActivity({ workspaceId: teamspace.id, actorId: user.id, action: ActivityAction.MemberRemove, targetType: "user", targetId: user.id, targetTitle: user.name });
       throw redirect("/w");
     }
     if (!user.is_admin) return { error: "Only site admins can remove members." };
@@ -116,6 +119,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (e instanceof LastAdminError) return { error: "Cannot remove the last admin." };
       throw e;
     }
+    logActivity({ workspaceId: teamspace.id, actorId: user.id, action: ActivityAction.MemberRemove, targetType: "user", targetId: targetId });
     return { success: "Member removed." };
   }
 
@@ -134,6 +138,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (e instanceof LastAdminError) return { error: "Cannot demote the last admin." };
       throw e;
     }
+    logActivity({ workspaceId: teamspace.id, actorId: user.id, action: ActivityAction.MemberRole, targetType: "user", targetId: targetId, targetTitle: newRole });
     return { success: "Role updated." };
   }
 
@@ -234,6 +239,14 @@ export default function TeamspaceMembers() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {role === "admin" && (
+              <Link
+                to={`/t/${teamspace.id}/activity`}
+                className="rounded-xl border border-fg/15 bg-fg/[0.04] px-3 py-1.5 text-xs text-fg/50 transition-colors hover:border-fg/25 hover:bg-fg/[0.08]"
+              >
+                Activity
+              </Link>
+            )}
             {isSiteAdmin && (
               <Form method="post">
                 <input type="hidden" name="intent" value="delete-teamspace" />

@@ -51,6 +51,7 @@ import {
   permissionSchema,
 } from "~/lib/validation.server";
 import { createNotification } from "~/lib/notification.server";
+import { logActivity, ActivityAction } from "~/lib/activity.server";
 
 /** Common context passed from routes into shared action handlers. */
 export interface ActionContext {
@@ -59,6 +60,17 @@ export interface ActionContext {
   role: string;
   form: FormData;
   request: Request;
+}
+
+/** One-line activity-log call for a handler that already has `ctx` in scope. */
+function logAction(
+  ctx: ActionContext,
+  action: ActivityAction,
+  targetType?: string,
+  targetId?: string,
+  targetTitle?: string,
+): void {
+  logActivity({ workspaceId: ctx.workspace.id, actorId: ctx.user.id, action, targetType, targetId, targetTitle });
 }
 
 // ── Simple handlers ──────────────────────────────────────────
@@ -74,6 +86,7 @@ export function handleCreateFolder(ctx: ActionContext, parentFolderId: string | 
   if (!name) return null;
   const result = createFolder(ctx.workspace.id, ctx.user.id, name, parentFolderId);
   if (!result) return { error: "A folder with that name already exists." };
+  logAction(ctx, ActivityAction.FolderCreate, "folder", result.id, name);
   return null;
 }
 
@@ -96,6 +109,7 @@ export function handleRenameDoc(ctx: ActionContext) {
   const doc = getDocument(docId);
   if (doc && doc.workspace_id === ctx.workspace.id) {
     updateDocument(docId, { title });
+    logAction(ctx, ActivityAction.DocRename, "document", docId, title);
   }
   return null;
 }
@@ -107,6 +121,7 @@ export function handleRenameFolder(ctx: ActionContext) {
   const f = getFolder(fid);
   if (!f || f.workspace_id !== ctx.workspace.id) return null;
   if (!renameFolder(fid, name)) return { error: "A folder with that name already exists." };
+  logAction(ctx, ActivityAction.FolderRename, "folder", fid, name);
   return null;
 }
 
@@ -135,6 +150,7 @@ export function handleMoveDoc(ctx: ActionContext) {
     if (!tf || tf.workspace_id !== ctx.workspace.id) return null;
   }
   moveDocument(docId, target, ctx.workspace.id);
+  logAction(ctx, ActivityAction.DocMove, "document", docId, doc.title);
   return null;
 }
 
@@ -157,6 +173,7 @@ export function handleMoveFolder(
   }
   try {
     moveFolder(fid, target);
+    logAction(ctx, ActivityAction.FolderMove, "folder", fid, f.name);
   } catch {
     // circular move — ignore
   }
@@ -190,6 +207,7 @@ export function handleMoveDocToWorkspace(ctx: ActionContext) {
   }
 
   moveDocumentToWorkspace(docId, ctx.workspace.id, targetWorkspaceId, target);
+  logAction(ctx, ActivityAction.DocMove, "document", docId, doc.title);
   return null;
 }
 
@@ -216,6 +234,7 @@ export function handleMoveFolderToWorkspace(ctx: ActionContext) {
 
   try {
     moveFolderToWorkspace(folderId, targetWorkspaceId, target);
+    logAction(ctx, ActivityAction.FolderMove, "folder", folderId, folder.name);
   } catch {
     return { error: "Cannot move folder — name conflict or invalid target" };
   }
@@ -244,6 +263,7 @@ export function handleTrashDoc(ctx: ActionContext, isOwner: boolean) {
   const doc = getDocument(docId);
   if (doc && doc.workspace_id === ctx.workspace.id && (isOwner || doc.created_by === ctx.user.id)) {
     trashDocument(docId, ctx.user.id);
+    logAction(ctx, ActivityAction.DocTrash, "document", docId, doc.title);
   }
   return null;
 }
@@ -260,6 +280,7 @@ export function handleTrashFolder(
   const target = getFolder(fid);
   if (target && target.workspace_id === ctx.workspace.id) {
     trashFolder(fid, ctx.user.id);
+    logAction(ctx, ActivityAction.FolderTrash, "folder", fid, target.name);
     if (opts?.currentFolderId && fid === opts.currentFolderId && opts.redirectPath) {
       throw redirect(opts.redirectPath);
     }
@@ -299,11 +320,13 @@ export async function handleShareDoc(ctx: ActionContext) {
     const doc = getDocument(docId);
     const sharerName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(ctx.user.id)?.name ?? "Someone";
     sendExternalShareNotification(email, doc?.title ?? "Untitled", sharerName, editUrl);
+    logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc?.title ?? "Untitled");
     return { ok: true, sharedWith: email };
   }
   if (targetUser.id === ctx.user.id) return { ok: false, error: "Cannot share with yourself" };
   const targetName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(targetUser.id)?.name ?? email;
   shareDocWithUser(docId, targetUser.id, ctx.user.id, getEmailOrigin() ?? undefined);
+  logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc.title);
   return { ok: true, sharedWith: targetName };
 }
 
@@ -316,6 +339,7 @@ export function handleShareDocGroup(ctx: ActionContext) {
   const doc = getDocument(docId);
   if (!doc || doc.workspace_id !== ctx.workspace.id) throw new Response("Not found", { status: 404 });
   shareDocWithGroup(docId, groupId, ctx.user.id, getEmailOrigin() ?? undefined);
+  logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc.title);
   return { ok: true };
 }
 
@@ -324,12 +348,14 @@ export function handleUnshareDoc(ctx: ActionContext) {
   const shareId = ctx.form.get("shareId");
   if (shareId) {
     unshareDocShare(String(shareId), ctx.workspace.id);
+    logAction(ctx, ActivityAction.ShareRemove, "document");
     return { ok: true };
   }
   const docId = String(ctx.form.get("docId"));
   const doc = getDocument(docId);
   if (!doc || doc.workspace_id !== ctx.workspace.id) return null;
   unshareDocument(docId);
+  logAction(ctx, ActivityAction.ShareRemove, "document", docId, doc.title);
   return null;
 }
 
@@ -381,6 +407,7 @@ export function handleUnshareAllFolder(ctx: ActionContext, ownerRoles: string[])
   const f = getFolder(folderId);
   if (!f || f.workspace_id !== ctx.workspace.id) return null;
   unshareAllFolder(folderId);
+  logAction(ctx, ActivityAction.ShareRemove, "folder", folderId, f.name);
   return null;
 }
 
@@ -393,6 +420,7 @@ export function handleBulkDelete(ctx: ActionContext, isOwner: boolean) {
   for (const doc of docs) {
     if (doc.workspace_id === ctx.workspace.id && (isOwner || doc.created_by === ctx.user.id)) {
       trashDocument(doc.id, ctx.user.id);
+      logAction(ctx, ActivityAction.DocTrash, "document", doc.id, doc.title);
       deleted++;
     }
   }
@@ -406,6 +434,7 @@ export function handleBulkUnshare(ctx: ActionContext) {
   for (const doc of docs) {
     if (doc.workspace_id === ctx.workspace.id && (doc.public_token || doc.edit_token)) {
       unshareDocument(doc.id);
+      logAction(ctx, ActivityAction.ShareRemove, "document", doc.id, doc.title);
       unshared++;
     }
   }
@@ -428,6 +457,7 @@ export function handleCreateDoc(
   const title = String(ctx.form.get("title") || randomDocName()).trim();
   const content = template ? template.generateContent() : undefined;
   const doc = createDocument(ctx.workspace.id, ctx.user.id, title, folderId, content);
+  logAction(ctx, ActivityAction.DocCreate, "document", doc.id, title);
   throw redirect(redirectPath(doc.id));
 }
 
@@ -447,6 +477,7 @@ export function handleDuplicateDoc(
     doc.folder_id,
     doc.content ?? undefined,
   );
+  logAction(ctx, ActivityAction.DocCreate, "document", copy.id, copy.title);
   throw redirect(redirectPath(copy.id));
 }
 
@@ -774,6 +805,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
     const groupId = String(ctx.form.get("groupId") || "").trim();
     if (!groupId) return { error: "Select a group." };
     shareFolder(targetFolderId, { groupId }, ctx.user.id, origin);
+    logAction(ctx, ActivityAction.ShareAdd, "folder", targetFolderId, f.name);
     return { success: "Folder shared with group." };
   }
   if (shareType === "user") {
@@ -783,6 +815,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
       .get(email);
     if (!target) return { error: "User not found." };
     shareFolder(targetFolderId, { userId: target.id }, ctx.user.id, origin);
+    logAction(ctx, ActivityAction.ShareAdd, "folder", targetFolderId, f.name);
     return { success: "Folder shared." };
   }
   return null;
@@ -792,6 +825,7 @@ export function handleUnshareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to remove shares." };
   const shareId = String(ctx.form.get("shareId"));
   unshareFolder(shareId, ctx.workspace.id);
+  logAction(ctx, ActivityAction.ShareRemove, "folder");
   return { success: "Share removed." };
 }
 
