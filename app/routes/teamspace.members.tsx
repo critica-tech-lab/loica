@@ -13,6 +13,7 @@ import {
   renameTeamspace,
   deleteTeamspace,
   updateTeamspaceIcon,
+  LastAdminError,
 } from "~/lib/teamspace.server";
 import { getWorkspaceStorageBytes } from "~/lib/document.server";
 import { getFoldersAtLevel } from "~/lib/folder.server";
@@ -98,21 +99,41 @@ export async function action({ request, params }: Route.ActionArgs) {
     const targetId = String(form.get("userId"));
     if (targetId === user.id) {
       // Leaving the teamspace
-      removeTeamspaceMember(teamspace.id, user.id);
+      try {
+        removeTeamspaceMember(teamspace.id, user.id);
+      } catch (e) {
+        if (e instanceof LastAdminError) {
+          return { error: "You're the last admin — promote someone else first." };
+        }
+        throw e;
+      }
       throw redirect("/w");
     }
     if (!user.is_admin) return { error: "Only site admins can remove members." };
-    removeTeamspaceMember(teamspace.id, targetId);
+    try {
+      removeTeamspaceMember(teamspace.id, targetId);
+    } catch (e) {
+      if (e instanceof LastAdminError) return { error: "Cannot remove the last admin." };
+      throw e;
+    }
     return { success: "Member removed." };
   }
 
   if (intent === "update-role") {
-    if (!user.is_admin) return { error: "Only site admins can change roles." };
+    // Site admins can always manage roles; teamspace admins can too, but only
+    // within their own teamspace.
+    const isTeamspaceAdmin = role === "admin";
+    if (!user.is_admin && !isTeamspaceAdmin) return { error: "Only admins can change roles." };
     const targetId = String(form.get("userId"));
     const newRole = String(form.get("role")) as "admin" | "editor" | "viewer";
     if (newRole !== "admin" && newRole !== "editor" && newRole !== "viewer") return null;
     if (targetId === user.id) return { error: "You cannot change your own role." };
-    updateTeamspaceMemberRole(teamspace.id, targetId, newRole);
+    try {
+      updateTeamspaceMemberRole(teamspace.id, targetId, newRole);
+    } catch (e) {
+      if (e instanceof LastAdminError) return { error: "Cannot demote the last admin." };
+      throw e;
+    }
     return { success: "Role updated." };
   }
 
@@ -273,9 +294,14 @@ export default function TeamspaceMembers() {
 
         {/* Members table */}
         <section>
-          <h2 className="m-0 mb-3 text-xs font-bold uppercase tracking-wider text-fg/30">
+          <h2 className="m-0 mb-1 text-xs font-bold uppercase tracking-wider text-fg/30">
             Members ({members.length})
           </h2>
+          <p className="m-0 mb-3 text-xs text-fg/40">
+            <strong className="font-medium text-fg/60">Admin</strong> manages members & settings ·{" "}
+            <strong className="font-medium text-fg/60">Member</strong> can edit documents ·{" "}
+            <strong className="font-medium text-fg/60">Viewer</strong> can only view
+          </p>
           <div className="overflow-hidden rounded-xl border border-fg/[0.08] shadow-sm">
             <div className="flex items-center border-b border-fg/[0.06] bg-fg/[0.02] px-4 py-2 text-xs font-medium text-fg/40">
               <span className="flex-1">User</span>
@@ -297,7 +323,7 @@ export default function TeamspaceMembers() {
                   <div className="truncate text-xs text-fg/30">{m.email}</div>
                 </div>
                 <div className="w-24 shrink-0 text-center">
-                  {isSiteAdmin && m.user_id !== user?.id ? (
+                  {(isSiteAdmin || role === "admin") && m.user_id !== user?.id ? (
                     <Form method="post" className="inline">
                       <input type="hidden" name="intent" value="update-role" />
                       <input type="hidden" name="userId" value={m.user_id} />
