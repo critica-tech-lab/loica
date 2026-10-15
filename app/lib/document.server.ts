@@ -6,6 +6,7 @@ import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
+import { buildFtsQuery, MIN_SEARCH_QUERY_LENGTH } from "./search-query.server";
 
 export type Document = {
   id: string;
@@ -817,9 +818,9 @@ export type SearchResult = {
 };
 
 export function searchDocuments(userId: string, query: string): SearchResult[] {
-  if (!query.trim()) return [];
-  // Append * for prefix matching
-  const ftsQuery = query.trim().split(/\s+/).map(w => `"${w}"*`).join(" ");
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_SEARCH_QUERY_LENGTH) return [];
+  const ftsQuery = buildFtsQuery(trimmed);
   return prep<SearchResult, [string, string, string, string, string, string]>(
       `SELECT d.id, d.title,
               snippet(documents_fts, 1, '<mark>', '</mark>', '…', 40) AS snippet,
