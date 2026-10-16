@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { hash, verify } from "@node-rs/argon2";
 import * as Y from "yjs";
 import { db, prep } from "./db.server";
+import { assertDocSize } from "./doc-limits.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
 
@@ -282,6 +283,8 @@ export function updateDocument(
     values.push(fields.title);
   }
   if (fields.content !== undefined) {
+    // Same cap the ws server applies to realtime saves.
+    assertDocSize(fields.content);
     parts.push("content = ?");
     values.push(fields.content);
   }

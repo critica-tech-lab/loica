@@ -5,10 +5,11 @@
 import * as Y from "yjs";
 import * as awarenessProtocol from "y-protocols/awareness";
 import { WebSocket } from "ws";
+import { MAX_DOC_BYTES } from "../app/lib/doc-limits.server.ts";
 
 // ─── Size limits ──────────────────────────────────────────────────────────────
 
-export const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB
+export { MAX_DOC_BYTES };
 export const MAX_MESSAGE_BYTES = MAX_DOC_BYTES * 2; // 10 MB raw WS message
 
 // Applies both when seeding a spreadsheet doc's Y.Maps from persisted
