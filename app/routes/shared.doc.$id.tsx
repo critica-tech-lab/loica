@@ -14,11 +14,13 @@ import {
   toggleStar,
 } from "~/lib/document.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
-import { getWorkspace, getMembership } from "~/lib/workspace.server";
+import { getWorkspace } from "~/lib/workspace.server";
 import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.server";
-import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
+import { getSharedFolderPath } from "~/lib/sharing.server";
+import { getUserDocAccess } from "~/lib/doc-access.server";
+import { isShareAccess } from "~/lib/doc-permission.server";
 import { appError } from "~/lib/errors";
-import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
+import { acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
@@ -41,21 +43,19 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const document = getDocument(params.id);
   if (!document) throw appError("doc_not_found");
 
-  const hasFolderAccess = !!document.folder_id && hasSharedAccess(document.folder_id, user.id);
-  let hasDocAccess = hasDocSharedAccess(document.id, user.id);
+  let access = getUserDocAccess(document, user);
 
   // Auto-accept pending doc shares when the recipient clicks the email link
-  if (!hasDocAccess && !hasFolderAccess) {
-    const accepted = acceptPendingDocShare(document.id, user.id);
-    if (accepted) hasDocAccess = true;
+  if (!access && acceptPendingDocShare(document.id, user.id)) {
+    access = getUserDocAccess(document, user);
   }
 
-  if (!hasFolderAccess && !hasDocAccess) {
-    // User may have access via workspace membership — redirect to the canonical doc route
-    const role = getMembership(document.workspace_id, user.id, user.is_admin);
-    if (role) throw redirect(`/w/doc/${params.id}`);
-    throw appError("no_doc_access", { subject: document.title });
-  }
+  if (!access) throw appError("no_doc_access", { subject: document.title });
+
+  // Workspace members and admins belong on the canonical doc route
+  if (!isShareAccess(access)) throw redirect(`/w/doc/${params.id}`);
+
+  const hasFolderAccess = access.via.includes("folder-share");
 
   const workspace = getWorkspace(document.workspace_id);
   if (!workspace) throw appError("workspace_not_found");
@@ -112,10 +112,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const doc = getDocument(params.id);
   if (!doc) throw new Response("Not found", { status: 404 });
-  const hasFolderAccess = doc.folder_id && hasSharedAccess(doc.folder_id, user.id);
-  const hasDocAccess = hasDocSharedAccess(doc.id, user.id);
-  if (!hasFolderAccess && !hasDocAccess)
-    throw new Response("Not found", { status: 404 });
+  const access = getUserDocAccess(doc, user);
+  if (!access || !isShareAccess(access)) throw new Response("Not found", { status: 404 });
 
   const form = await request.formData();
   const intent = form.get("intent");
