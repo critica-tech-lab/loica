@@ -20,7 +20,7 @@ import {
 } from "~/lib/document.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc, hasDocSharedAccess } from "~/lib/doc-sharing.server";
 import { hasSharedAccess } from "~/lib/sharing.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getClientIp, checkRateLimit, checkShareRateLimit } from "~/lib/rate-limit.server";
 import { getUserGroups } from "~/lib/group.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
@@ -188,7 +188,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkShareRateLimit(request);
     if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { ok: false, error: "Missing email" };
@@ -222,7 +222,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc-group") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkShareRateLimit(request);
     if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
     const groupId = String(form.get("groupId") || "").trim();
     if (!groupId) throw new Response("Missing groupId", { status: 400 });

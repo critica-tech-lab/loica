@@ -1,5 +1,12 @@
 import { test, expect, describe } from "bun:test";
-import { pickForwardedHop, getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import {
+  pickForwardedHop,
+  getClientIp,
+  checkRateLimit,
+  checkShareRateLimit,
+} from "~/lib/rate-limit.server";
+
+const SHARE_LIMIT = 20;
 
 describe("pickForwardedHop", () => {
   // Each trusted proxy appends the address of whoever connected to IT
@@ -73,5 +80,15 @@ describe("checkRateLimit", () => {
     const b = checkRateLimit(ip, { windowMs, max: 1, prefix: `b-${Date.now()}` });
     expect(a.allowed).toBe(true);
     expect(b.allowed).toBe(true);
+  });
+});
+
+describe("checkShareRateLimit", () => {
+  test("allows 20 share requests per window, blocks the 21st", () => {
+    const req = new Request("http://x");
+    for (let i = 0; i < SHARE_LIMIT; i++) {
+      expect(checkShareRateLimit(req).allowed).toBe(true);
+    }
+    expect(checkShareRateLimit(req).allowed).toBe(false);
   });
 });
