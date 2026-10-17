@@ -10,7 +10,6 @@ import {
   getDocument,
   moveDocument,
   getStarredDocs,
-  toggleStar,
   getRecentDocsInFolderTree,
 } from "~/lib/document.server";
 import {
@@ -24,6 +23,7 @@ import {
   moveFolder,
 } from "~/lib/folder.server";
 import { getWorkspace, getWorkspaceOwnerName } from "~/lib/workspace.server";
+import { toggleStarWithAccess } from "~/lib/doc-access.server";
 import { hasSharedAccess, findSharedRootFolder, getSharedAccessInfo, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
 import { AppShell } from "~/components/AppShell";
@@ -90,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === "toggle-star") {
     const docId = String(form.get("docId") || "");
-    const newState = toggleStar(user.id, docId);
+    const newState = toggleStarWithAccess(user, docId);
     return { starred: newState };
   }
 

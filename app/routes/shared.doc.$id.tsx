@@ -11,10 +11,10 @@ import {
   createDocumentVersion,
   restoreDocumentVersion,
   isStarred as checkStarred,
-  toggleStar,
 } from "~/lib/document.server";
 import type { BreadcrumbSegment } from "~/lib/folder.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
+import { toggleStarWithAccess } from "~/lib/doc-access.server";
 import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.server";
 import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
@@ -121,7 +121,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "toggle-star") {
-    const newState = toggleStar(user.id, params.id);
+    const newState = toggleStarWithAccess(user, params.id);
     return { starred: newState };
   }
 

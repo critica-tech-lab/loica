@@ -16,7 +16,6 @@ import {
   setViewShare,
   setEditShare,
   unshareDocument,
-  toggleStar,
   updateShareSettings,
 } from "~/lib/document.server";
 import {
@@ -29,6 +28,7 @@ import {
   findFolderByName,
 } from "~/lib/folder.server";
 import { getMembership } from "~/lib/workspace.server";
+import { toggleStarWithAccess } from "~/lib/doc-access.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc as unshareDocShare } from "~/lib/doc-sharing.server";
 import { unshareAllFolder, shareFolder, unshareFolder, leaveFolderShare } from "~/lib/sharing.server";
 import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
@@ -62,7 +62,7 @@ export interface ActionContext {
 
 export function handleToggleStar(ctx: ActionContext) {
   const docId = String(ctx.form.get("docId") || "");
-  const newState = toggleStar(ctx.user.id, docId);
+  const newState = toggleStarWithAccess(ctx.user, docId);
   return { starred: newState };
 }
 
