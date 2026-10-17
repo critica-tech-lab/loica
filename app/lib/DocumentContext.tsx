@@ -389,7 +389,11 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
   const scheduleSave = useCallback(
     (t: string, c: string) => {
-      if (c === lastSavedContent.current && t === lastSavedTitle.current) return;
+      // PM docs save only the title (see save()), so a content change alone has
+      // nothing to send. Posting anyway made one request per typing pause, each
+      // aborting the previous one.
+      const contentPending = !USE_PM && c !== lastSavedContent.current;
+      if (!contentPending && t === lastSavedTitle.current) return;
       isSaving.current = true;
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       saveTimeout.current = setTimeout(() => {
