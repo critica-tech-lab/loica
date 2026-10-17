@@ -10,6 +10,7 @@ import {
 
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/root";
+import { isAbortError } from "~/lib/abort-error";
 import { getSessionUser } from "~/lib/auth.server";
 import { getPendingSharesForUser } from "~/lib/sharing.server";
 import { getPendingDocSharesForUser } from "~/lib/doc-sharing.server";
@@ -91,6 +92,8 @@ export default function App() {
     const NOISE_RE = /No tile at position|Ranges must be added sorted|Error in input stream|Invalid position \d+ in document of length/;
     function reportError(message: string, stack?: string) {
       if (!message || NOISE_RE.test(message)) return;
+      // A cancelled request (router replacing an autosave, an AbortController) is routine
+      if (isAbortError(message)) return;
       // Skip minified library TypeErrors (no app code in stack)
       if (/^TypeError:/.test(message) && stack && !stack.includes("/app/")) return;
       try {
@@ -105,6 +108,7 @@ export default function App() {
       reportError(e.message, e.error?.stack);
     }
     function onUnhandledRejection(e: PromiseRejectionEvent) {
+      if (isAbortError(e.reason)) return;
       const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
       const stack = e.reason instanceof Error ? e.reason.stack : undefined;
       reportError(msg, stack);
@@ -270,7 +274,9 @@ function presentError(error: unknown): PresentedError {
 
     // Network/fetch failures are common after the device sleeps, and recover on their own.
     const msg = error.message.toLowerCase();
+    const isAbort = isAbortError(error);
     const isTransient =
+      isAbort ||
       msg.includes("fetch") ||
       msg.includes("network") ||
       msg.includes("failed to fetch") ||
@@ -280,9 +286,11 @@ function presentError(error: unknown): PresentedError {
       title: isTransient ? "Connection lost" : "Something went wrong",
       detail: import.meta.env.DEV
         ? error.message
-        : isTransient
-          ? "This can happen after your device sleeps. Reconnecting…"
-          : "An unexpected error occurred.",
+        : isAbort
+          ? "A request was interrupted. Reconnecting…"
+          : isTransient
+            ? "This can happen after your device sleeps. Reconnecting…"
+            : "An unexpected error occurred.",
       isTransient,
       stack: import.meta.env.DEV ? error.stack : undefined,
     };
