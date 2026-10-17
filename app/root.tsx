@@ -9,6 +9,7 @@ import {
 } from "react-router";
 
 import { useEffect, useRef, useState } from "react";
+import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/root";
 import { isAbortError } from "~/lib/abort-error";
 import { getSessionUser } from "~/lib/auth.server";
@@ -20,6 +21,17 @@ import { ToastProvider } from "~/components/Toast";
 import { LogoIcon } from "~/components/icons";
 import { isAppErrorPayload, type AppErrorPayload, type ErrorAction } from "~/lib/errors";
 import stylesheet from "./app.css?url";
+
+// Saving, starring and mentioning change nothing root exposes (user, pending
+// share count, enabled extensions). Revalidating root after every autosave only
+// starts a request that the next autosave then aborts.
+const ROOT_UNCHANGED_INTENTS = new Set(["save", "toggle-star", "send-mentions"]);
+
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const intent = formData?.get("intent");
+  if (typeof intent === "string" && ROOT_UNCHANGED_INTENTS.has(intent)) return false;
+  return defaultShouldRevalidate;
+}
 
 export const headers: Route.HeadersFunction = () => ({
   "Cache-Control": "no-cache, no-store, must-revalidate",
