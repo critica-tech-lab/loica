@@ -13,7 +13,7 @@ import { capMentionBody } from "~/lib/doc-mention-authz.server";
 import { getClientIp, getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { signSharePasswordCookie, verifySharePasswordCookie } from "~/lib/share-password.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Editor } from "~/components/Editor";
+import { LazyEditor } from "~/components/LazyEditor";
 import type { Peer } from "~/components/Editor";
 import { useDocTypeExtension } from "~/extensions/hooks";
 import { Toolbar } from "~/components/Toolbar";
@@ -529,7 +529,7 @@ function LiveReadOnlyView({
           onReady={() => { setEditorReady(true); }}
         />
       ) : (
-        <Editor
+        <LazyEditor
           initialValue={document.content}
           readOnly
           docId={document.id}
@@ -754,7 +754,7 @@ function EditableView({
             })()}
           </div>
         ) : (
-          <Editor
+          <LazyEditor
             initialValue={document.content}
             onChange={(val) => {
               setContent(val);

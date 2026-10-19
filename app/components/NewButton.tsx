@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
+import { Menu, MenuAlign } from "./Menu";
+import type { MenuEntry } from "./Menu";
 import { PlusIcon, DocAddIcon, FolderAddIcon, UploadIcon, FolderIcon, ChevronDownIcon } from "./icons";
 import { processImportFiles, type ImportFile } from "./ImportDropZone";
 import { TEMPLATES } from "~/lib/templates";
@@ -21,14 +23,12 @@ interface NewButtonProps {
 const NEW_DOC_SHORTCUT_LABEL = "Ctrl+Alt+N";
 
 export function NewButton({ onCreateDoc, creating = false, onCreateFromTemplate, onCreateFolder, onImport, onUploadFile, onUploadFiles }: NewButtonProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   // Read through refs so the shortcut listener is attached once, not on
   // every render (callers pass a fresh onCreateDoc closure each time).
   const onCreateDocRef = useRef(onCreateDoc);
   const creatingRef = useRef(creating);
   onCreateDocRef.current = onCreateDoc;
   creatingRef.current = creating;
-  const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const enabledExtensionIds = useEnabledExtensionIds();
@@ -52,17 +52,6 @@ export function NewButton({ onCreateDoc, creating = false, onCreateFromTemplate,
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,13 +84,28 @@ export function NewButton({ onCreateDoc, creating = false, onCreateFromTemplate,
         if (imported.length > 0) onImport(imported);
       }
       e.target.value = "";
-      setMenuOpen(false);
     },
     [onImport, onUploadFile, onUploadFiles]
   );
 
+  const entries: MenuEntry[] = [
+    { kind: "item", label: "New document", icon: <DocAddIcon className="h-4 w-4" />, onSelect: onCreateDoc },
+    ...visibleTemplates.map((tpl): MenuEntry => ({
+      kind: "item",
+      label: `New ${tpl.label.toLowerCase()}`,
+      icon: tpl.Icon
+        ? <tpl.Icon className="h-4 w-4" />
+        : <span className="text-xs">{tpl.icon}</span>,
+      onSelect: () => onCreateFromTemplate(tpl.id),
+    })),
+    { kind: "item", label: "New folder", icon: <FolderAddIcon className="h-4 w-4" />, onSelect: onCreateFolder },
+    { kind: "separator" },
+    { kind: "item", label: "Upload file", icon: <UploadIcon className="h-4 w-4" />, onSelect: () => fileInputRef.current?.click() },
+    { kind: "item", label: "Upload folder", icon: <FolderIcon className="h-4 w-4" />, onSelect: () => folderInputRef.current?.click() },
+  ];
+
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       {/* Split button: the main part creates a blank document right away;
           the chevron opens templates, folder and upload options. */}
       <div className="flex items-stretch">
@@ -115,67 +119,21 @@ export function NewButton({ onCreateDoc, creating = false, onCreateFromTemplate,
           <PlusIcon className="h-4 w-4" />
           New
         </button>
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="More ways to create"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          className="flex cursor-pointer items-center rounded-r-md border-0 border-l border-solid border-accent-fg/25 bg-accent px-1.5 text-accent-fg transition-opacity hover:opacity-90"
-        >
-          <ChevronDownIcon className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      {menuOpen && (
-        <div className="absolute right-0 top-full z-40 mt-1 min-w-[180px] rounded-lg border border-fg/[0.1] bg-bg shadow-lg">
-          <button
-            type="button"
-            onClick={() => { onCreateDoc(); setMenuOpen(false); }}
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-t-lg border-none bg-transparent px-3 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/[0.04] hover:text-fg/90"
-          >
-            <DocAddIcon className="h-4 w-4 shrink-0 opacity-50" />
-            New document
-          </button>
-          {visibleTemplates.map((tpl) => (
+        <Menu
+          align={MenuAlign.End}
+          entries={entries}
+          renderTrigger={(props) => (
             <button
-              key={tpl.id}
+              {...props}
               type="button"
-              onClick={() => { onCreateFromTemplate(tpl.id); setMenuOpen(false); }}
-              className="flex w-full cursor-pointer items-center gap-2.5 border-none bg-transparent px-3 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/[0.04] hover:text-fg/90"
+              aria-label="More ways to create"
+              className="flex h-full cursor-pointer items-center rounded-r-md border-0 border-l border-solid border-accent-fg/25 bg-accent px-1.5 text-accent-fg transition-opacity hover:opacity-90"
             >
-              {tpl.Icon
-                ? <tpl.Icon className="h-4 w-4 shrink-0 opacity-50" />
-                : <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs opacity-60">{tpl.icon}</span>}
-              New {tpl.label.toLowerCase()}
+              <ChevronDownIcon className="h-3.5 w-3.5" />
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => { onCreateFolder(); setMenuOpen(false); }}
-            className="flex w-full cursor-pointer items-center gap-2.5 border-none bg-transparent px-3 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/[0.04] hover:text-fg/90"
-          >
-            <FolderAddIcon className="h-4 w-4 shrink-0 opacity-50" />
-            New folder
-          </button>
-          <div className="mx-2 border-t border-fg/[0.06]" />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex w-full cursor-pointer items-center gap-2.5 border-none bg-transparent px-3 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/[0.04] hover:text-fg/90"
-          >
-            <UploadIcon className="h-4 w-4 shrink-0 opacity-50" />
-            Upload file
-          </button>
-          <button
-            type="button"
-            onClick={() => folderInputRef.current?.click()}
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-b-lg border-none bg-transparent px-3 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/[0.04] hover:text-fg/90"
-          >
-            <FolderIcon className="h-4 w-4 shrink-0 opacity-50" />
-            Upload folder
-          </button>
-        </div>
-      )}
+          )}
+        />
+      </div>
       <input
         ref={fileInputRef}
         type="file"
