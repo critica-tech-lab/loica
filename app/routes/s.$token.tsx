@@ -2,12 +2,16 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { MetaFunction } from "react-router";
 import type { Route } from "./+types/s.$token";
 import { getDocumentByToken, updateDocument, verifySharePassword } from "~/lib/document.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { appError } from "~/lib/errors";
 import { getWebSocketUrl, getPublicOrigin } from "~/lib/url.server";
 import { getSessionUser } from "~/lib/auth.server";
 import { sendMentionNotification } from "~/lib/email.server";
-import { prep } from "~/lib/db.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { db, prep } from "~/lib/db.server";
+import { userHasDocAccess } from "~/lib/doc-access.server";
+import { capMentionBody } from "~/lib/doc-mention-authz.server";
+import { getClientIp, getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
+import { signSharePasswordCookie, verifySharePasswordCookie } from "~/lib/share-password.server";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "~/components/Editor";
 import type { Peer } from "~/components/Editor";
@@ -101,10 +105,10 @@ function parseCookies(header: string): Record<string, string> {
   );
 }
 
-function isPasswordAuthenticated(request: Request, token: string): boolean {
+function isPasswordAuthenticated(request: Request, token: string, passwordHash: string): boolean {
   const cookieHeader = request.headers.get("Cookie") ?? "";
   const cookies = parseCookies(cookieHeader);
-  return cookies[`__share_pwd_${token}`] === "1";
+  return verifySharePasswordCookie(db, token, passwordHash, cookies[`__share_pwd_${token}`]);
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -115,7 +119,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const trackChanges = url.searchParams.get("track") === "1";
 
   // If password protected, check if user is authenticated
-  if (result.hasPassword && !isPasswordAuthenticated(request, params.token)) {
+  if (result.hasPassword && !isPasswordAuthenticated(request, params.token, result.document.share_password_hash ?? "")) {
     return {
       needsPassword: true,
       docTitle: result.document.title,
@@ -127,8 +131,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // identified by their real account, not as an anonymous guest.
   const sessionUser = getSessionUser(request);
 
+  // The password hash must never reach the browser: a weak password could be
+  // cracked offline. Clients only need to know a password exists (hasPassword).
+  const { share_password_hash: _passwordHash, ...publicDocument } = result.document;
+
   return {
-    document: result.document,
+    document: publicDocument,
     mode: result.mode,
     shareToken: params.token,
     trackChanges,
@@ -163,10 +171,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { ok: false, error: "Invalid password" };
     }
 
-    // Set cookie to mark password as verified
+    // Set cookie to mark password as verified. The value is HMAC-signed over
+    // the token and the current password hash (see share-password.server) so
+    // it can't be forged by copying a plain "__share_pwd_<token>=1", and it
+    // stops verifying the moment the password is changed or removed.
     const useSecureCookie = process.env.SECURE_COOKIE === "true";
     const secure = useSecureCookie ? " Secure;" : "";
-    const setCookie = `__share_pwd_${params.token}=1; Path=/; HttpOnly; SameSite=Lax;${secure} Max-Age=2592000`;
+    const signedValue = signSharePasswordCookie(db, params.token, result.document.share_password_hash ?? "");
+    const setCookie = `__share_pwd_${params.token}=${signedValue}; Path=/; HttpOnly; SameSite=Lax;${secure} Max-Age=2592000`;
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -182,7 +194,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!result) throw appError("link_invalid");
   if (result.mode !== "public_edit") throw appError("link_view_only");
 
-  if (!isPasswordAuthenticated(request, params.token) && result.hasPassword) {
+  if (!isPasswordAuthenticated(request, params.token, result.document.share_password_hash ?? "") && result.hasPassword) {
     throw appError("link_password_required");
   }
 
@@ -195,15 +207,18 @@ export async function action({ request, params }: Route.ActionArgs) {
   // guests never reach this branch with a valid mention.
   if (intent === "send-mentions") {
     if (!sessionUser) return { ok: false };
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, sessionUser.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
-    const body = String(form.get("body") || "");
+    const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
     const docUrl = `${getPublicOrigin(request)}/s/${params.token}`;
     let match: RegExpExecArray | null;
     while ((match = mentionRegex.exec(body)) !== null) {
       const mentionedUserId = match[2];
       if (mentionedUserId === sessionUser.id) continue;
+      // Only notify users who can actually see this doc — otherwise
+      // mentioning an arbitrary user id leaks its title/content to them.
+      if (!userHasDocAccess(result.document, mentionedUserId, sessionUser.is_admin)) continue;
       const mentioned = prep<{ email: string; name: string }, [string]>(
         "SELECT email, name FROM users WHERE id = ?"
       ).get(mentionedUserId);
@@ -223,6 +238,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const content = form.get("content");
   if (content != null) {
+    // See workspace.doc.$id.tsx's identical guard — a live Yjs room owns
+    // this doc's content, so a direct write here would just be lost to the
+    // room's next debounced save.
+    if (shouldRejectContentWrite(true, await isRoomLive(result.document.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     updateDocument(result.document.id, { content: String(content) }, sessionUser?.id ?? "guest");
   }
   return { ok: true };

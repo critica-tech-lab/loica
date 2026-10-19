@@ -19,8 +19,10 @@ import {
   toggleStar,
 } from "~/lib/document.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
-import { getUserDocAccess } from "~/lib/doc-access.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getUserDocAccess, userHasDocAccess } from "~/lib/doc-access.server";
+import { capMentionBody } from "~/lib/doc-mention-authz.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { getUserGroups } from "~/lib/group.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
@@ -141,6 +143,14 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "save") {
     const title = form.get("title");
     const content = form.get("content");
+    // A live Yjs room owns this doc's content — a direct write here would
+    // just get overwritten by the room's next debounced save (see
+    // ws-notify.server.ts's shouldRejectContentWrite). Only check when
+    // there's actually a content write to guard — a title-only save (the
+    // only thing today's UI sends) skips the extra round trip.
+    if (content != null && shouldRejectContentWrite(true, await isRoomLive(params.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     try {
       updateDocument(params.id, {
         ...(title != null ? { title: String(title) } : {}),
@@ -186,7 +196,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
     if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { ok: false, error: "Missing email" };
@@ -220,7 +230,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc-group") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
     if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
     const groupId = String(form.get("groupId") || "").trim();
     if (!groupId) throw new Response("Missing groupId", { status: 400 });
@@ -236,9 +246,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "send-mentions") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
-    const body = String(form.get("body") || "");
+    const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
     let match: RegExpExecArray | null;
     const origin = getPublicOrigin(request);
@@ -246,6 +256,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     while ((match = mentionRegex.exec(body)) !== null) {
       const mentionedUserId = match[2];
       if (mentionedUserId === user.id) continue;
+      // Only notify users who can actually see this doc — otherwise
+      // mentioning an arbitrary user id leaks its title/content to them.
+      if (!userHasDocAccess(doc, mentionedUserId)) continue;
       const mentioned = prep<{ email: string; name: string }, [string]>(
         "SELECT email, name FROM users WHERE id = ?"
       ).get(mentionedUserId);

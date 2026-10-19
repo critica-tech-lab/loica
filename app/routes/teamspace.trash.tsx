@@ -14,6 +14,7 @@ import { getSharedFoldersForUser } from "~/lib/sharing.server";
 import { getSharedDocsForUser } from "~/lib/doc-sharing.server";
 import { db, prep } from "~/lib/db.server";
 import { handleRestoreDoc, handleRestoreFolder, handlePurgeDoc, handlePurgeFolder } from "~/lib/actions/trash-actions.server";
+import { canPurgeTrashItem } from "~/lib/actions/trash-authz.server";
 import { AppShell } from "~/components/AppShell";
 import { UserMenu } from "~/components/UserMenu";
 import { FolderTreeSidebar } from "~/components/FolderTreeSidebar";
@@ -33,11 +34,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (!teamspace) throw new Response("Not found", { status: 404 });
 
   const role = getMembership(teamspace.id, user.id, user.is_admin);
-  if (!role) throw new Response("Forbidden", { status: 403 });
+  // Viewers get no trash access — it's a write-adjacent operation (restore).
+  if (!role || role === "viewer") throw redirect(`/t/${teamspace.id}`);
+  const canManageAll = role === "owner" || role === "admin";
 
   purgeExpiredTrash();
-  const documents = getTrashedDocumentsForWorkspace(user.id, teamspace.id);
-  const folders = getTrashedFoldersForWorkspace(user.id, teamspace.id);
+  // Same rule the purge action enforces, so the button shows exactly when
+  // the server would accept the request.
+  const canDelete = (item: { created_by?: string; deleted_by: string }) =>
+    canPurgeTrashItem(role, user.id, { created_by: item.created_by ?? "", deleted_by: item.deleted_by });
+  const documents = getTrashedDocumentsForWorkspace(teamspace.id).map((d) => ({
+    ...d,
+    canDelete: canDelete(d),
+  }));
+  const folders = getTrashedFoldersForWorkspace(teamspace.id).map((f) => ({
+    ...f,
+    canDelete: canDelete(f),
+  }));
   const storageBytes = getWorkspaceStorageBytes(teamspace.id);
   const personalWorkspaces = getUserPersonalWorkspaces(user.id);
   const personalWsId = personalWorkspaces.length > 0 ? personalWorkspaces[0].id : teamspace.id;
@@ -51,7 +64,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     `SELECT id, title, pdf_file FROM documents WHERE workspace_id = ? AND folder_id IS NULL AND deleted_at IS NULL ORDER BY title ASC`
   ).all(personalWsId);
 
-  return { teamspace, role, documents, folders, storageBytes, teamspaces, sharedCount, personalWsId, personalWsName, sidebarRootFolders, sidebarRootDocs };
+  return { teamspace, role, canManageAll, documents, folders, storageBytes, teamspaces, sharedCount, personalWsId, personalWsName, sidebarRootFolders, sidebarRootDocs };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -62,7 +75,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (!teamspace) throw data("Not found", { status: 404 });
 
   const role = getMembership(teamspace.id, user.id, user.is_admin);
-  if (!role) throw data("Forbidden", { status: 403 });
+  if (!role || role === "viewer") throw data("Forbidden", { status: 403 });
 
   const form = await request.formData();
   const intent = form.get("intent");
@@ -73,13 +86,21 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "purge-folder") return handlePurgeFolder(form, user);
 
   if (intent === "empty-trash") {
+    // Admins/owners empty the whole team's trash; other members only clear
+    // what they personally deleted — same rule as the per-item purge button.
+    const isManager = role === "owner" || role === "admin";
     db.transaction(() => {
-      db.prepare(
-        "DELETE FROM documents WHERE deleted_by = ? AND deleted_at IS NOT NULL AND workspace_id = ?"
-      ).run(user.id, teamspace.id);
-      db.prepare(
-        "DELETE FROM folders WHERE deleted_by = ? AND deleted_at IS NOT NULL AND workspace_id = ?"
-      ).run(user.id, teamspace.id);
+      if (isManager) {
+        db.prepare("DELETE FROM documents WHERE deleted_at IS NOT NULL AND workspace_id = ?").run(teamspace.id);
+        db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND workspace_id = ?").run(teamspace.id);
+      } else {
+        db.prepare(
+          "DELETE FROM documents WHERE deleted_by = ? AND deleted_at IS NOT NULL AND workspace_id = ?"
+        ).run(user.id, teamspace.id);
+        db.prepare(
+          "DELETE FROM folders WHERE deleted_by = ? AND deleted_at IS NOT NULL AND workspace_id = ?"
+        ).run(user.id, teamspace.id);
+      }
     })();
     return { ok: true };
   }
@@ -88,7 +109,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function TeamspaceTrash() {
-  const { teamspace, role, documents, folders, storageBytes, teamspaces, sharedCount, personalWsId, personalWsName, sidebarRootFolders, sidebarRootDocs } = useLoaderData<typeof loader>();
+  const { teamspace, role, canManageAll, documents, folders, storageBytes, teamspaces, sharedCount, personalWsId, personalWsName, sidebarRootFolders, sidebarRootDocs } = useLoaderData<typeof loader>();
   const user = useSessionUser();
 
   const navActions = (
@@ -111,7 +132,7 @@ export default function TeamspaceTrash() {
 
   return (
     <AppShell navActions={navActions} scrollable sidebar={sidebar} tone="drive">
-      <TrashView documents={documents} folders={folders} />
+      <TrashView documents={documents} folders={folders} canManageAll={canManageAll} showDeletedBy />
     </AppShell>
   );
 }

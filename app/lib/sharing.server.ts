@@ -3,6 +3,7 @@ import { db, prep } from "./db.server";
 import { sendFolderShareNotification } from "./email.server";
 import { createNotification } from "./notification.server";
 import { getFolderPath, type BreadcrumbSegment } from "./folder.server";
+import { kickAccess } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -96,12 +97,39 @@ export function shareFolder(
   return id;
 }
 
+/** Everyone (direct share or via an accepted group membership) who currently has this folder shared with them. */
+function usersSharedOnFolder(folderId: string): string[] {
+  return prep<{ user_id: string }, [string, string]>(
+      `SELECT fs.user_id FROM folder_shares fs WHERE fs.folder_id = ? AND fs.user_id IS NOT NULL
+       UNION
+       SELECT gm.user_id FROM folder_shares fs
+       JOIN group_members gm ON gm.group_id = fs.group_id AND gm.status = 'accepted'
+       WHERE fs.folder_id = ?`
+    )
+    .all(folderId, folderId)
+    .map((r) => r.user_id);
+}
+
+/** Open WS connections don't learn a revoked folder share on their own (see ws-notify.server.ts) — kick each affected user. */
+function kickFolderShareUsers(userIds: string[]): void {
+  for (const userId of userIds) {
+    void kickAccess({ userId, reason: "Folder access revoked" });
+  }
+}
+
 export function unshareFolder(shareId: string, workspaceId: string): void {
+  const share = prep<{ folder_id: string }, [string]>(
+    "SELECT folder_id FROM folder_shares WHERE id = ?"
+  ).get(shareId);
+  const affectedUsers = share ? usersSharedOnFolder(share.folder_id) : [];
+
   db.prepare(
     `DELETE FROM folder_shares WHERE id = ? AND folder_id IN (
       SELECT id FROM folders WHERE workspace_id = ?
     )`
   ).run(shareId, workspaceId);
+
+  kickFolderShareUsers(affectedUsers);
 }
 
 /** Remove a specific user's direct share on a folder (user "leaves" the shared folder). */
@@ -109,11 +137,14 @@ export function leaveFolderShare(folderId: string, userId: string): void {
   db.prepare(
     "DELETE FROM folder_shares WHERE folder_id = ? AND user_id = ?"
   ).run(folderId, userId);
+  kickFolderShareUsers([userId]);
 }
 
 /** Remove ALL shares from a folder (all users and groups). */
 export function unshareAllFolder(folderId: string): void {
+  const affectedUsers = usersSharedOnFolder(folderId);
   db.prepare("DELETE FROM folder_shares WHERE folder_id = ?").run(folderId);
+  kickFolderShareUsers(affectedUsers);
 }
 
 // ─── Query shares on a folder ────────────────────────────

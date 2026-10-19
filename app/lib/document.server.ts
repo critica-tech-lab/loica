@@ -1,4 +1,4 @@
-import { unlinkSync } from "node:fs";
+import { statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { hash, verify } from "@node-rs/argon2";
@@ -6,6 +6,8 @@ import * as Y from "yjs";
 import { db, prep } from "./db.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
+import { buildFtsQuery, MIN_SEARCH_QUERY_LENGTH } from "./search-query.server";
+import { kickAccess, notifyDocUnavailable } from "./ws-notify.server";
 
 export type Document = {
   id: string;
@@ -24,6 +26,7 @@ export type Document = {
   share_expires_at: number | null;
   share_password_hash: string | null;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type DocumentSummary = Pick<
@@ -106,7 +109,7 @@ export function getDocumentIncludingTrashed(id: string): Document | null {
     prep<Document, [string]>(
         `SELECT id, workspace_id, created_by, updated_by, title, content,
                 visibility, public_token, edit_token, folder_id, pdf_file, created_at, updated_at,
-                share_expires_at, share_password_hash, deleted_at
+                share_expires_at, share_password_hash, deleted_at, deleted_by
          FROM documents WHERE id = ?`
       )
       .get(id) ?? null
@@ -267,6 +270,50 @@ export function getWorkspaceStorageBytes(workspaceId: string): number {
   return row?.total ?? 0;
 }
 
+/**
+ * Bytes on disk used by this workspace's uploaded files (pdf_file uploads —
+ * PDFs, images, etc. — stored under uploadsDir, outside the database).
+ * Unlike getWorkspaceStorageBytes (hit on most page loads), this stats every
+ * file and is only meant for the upload/import quota check below.
+ */
+function getWorkspaceUploadBytes(workspaceId: string): number {
+  const rows = prep<{ pdf_file: string }, [string]>(
+    `SELECT pdf_file FROM documents
+     WHERE workspace_id = ? AND pdf_file IS NOT NULL AND length(pdf_file) > 0`
+  ).all(workspaceId);
+  let total = 0;
+  for (const { pdf_file } of rows) {
+    try {
+      total += statSync(join(uploadsDir, pdf_file)).size;
+    } catch {
+      // File vanished (e.g. quarantined) — not this check's concern.
+    }
+  }
+  return total;
+}
+
+// Max bytes a single uploaded file may be. Shared by api.upload.ts and the
+// upload handlers in doc-actions.server.ts so the limit — and its error
+// message — can't drift between the two routes that enforce it.
+export const MAX_UPLOAD_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+// Per-workspace cap on total storage (document content/yjs_state + uploaded
+// files). Configurable via WORKSPACE_STORAGE_QUOTA_BYTES (bytes); defaults to
+// 5 GiB, generous for a self-hosted team but small enough to stop a runaway
+// upload or import from filling the disk.
+export const WORKSPACE_STORAGE_QUOTA_BYTES =
+  Number(process.env.WORKSPACE_STORAGE_QUOTA_BYTES) || 5 * 1024 * 1024 * 1024;
+
+/**
+ * Whether adding `incomingBytes` to a workspace's current usage would stay
+ * within WORKSPACE_STORAGE_QUOTA_BYTES. Shared by the upload and import
+ * write paths so the quota can't be bypassed by one but not the other.
+ */
+export function hasStorageHeadroom(workspaceId: string, incomingBytes: number): boolean {
+  const used = getWorkspaceStorageBytes(workspaceId) + getWorkspaceUploadBytes(workspaceId);
+  return used + incomingBytes <= WORKSPACE_STORAGE_QUOTA_BYTES;
+}
+
 // ─── Update ───────────────────────────────────────────────
 
 export function updateDocument(
@@ -305,6 +352,10 @@ export function trashDocument(id: string, userId: string): void {
   db.prepare(
     "UPDATE documents SET deleted_at = unixepoch(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL"
   ).run(userId, id);
+  // A live room has no idea its document just moved to trash — the editor
+  // would otherwise keep accepting edits that saveDoc silently stops
+  // persisting once the doc is gone for good (see permanentlyDeleteDocument).
+  void notifyDocUnavailable(id, "This document was moved to trash.");
 }
 
 export function restoreDocument(id: string, workspaceId: string): void {
@@ -333,6 +384,10 @@ export function permanentlyDeleteDocument(id: string, workspaceId: string): void
   if (doc.pdf_file) {
     try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
   }
+  // Notify before deleting the row: once it's gone, any live room's next
+  // scheduleSave() flush is a 0-row saveDoc UPDATE that drops its edits
+  // without a trace (see persistence.ts's saveIfSafe row-count warning).
+  void notifyDocUnavailable(id, "This document was permanently deleted.");
   db.prepare("DELETE FROM documents WHERE id = ? AND workspace_id = ?").run(id, workspaceId);
 }
 
@@ -346,19 +401,32 @@ export type TrashedDocument = {
   folder_id: string | null;
   deleted_at: number;
   deleted_by: string;
+  /** Needed by the purge rule (canPurgeTrashItem), which also allows the creator. */
+  created_by?: string;
+  /** Display name of the deleter — null if that user no longer exists. */
+  deleted_by_name?: string | null;
 };
 
-export function getTrashedDocumentsForWorkspace(userId: string, workspaceId: string): TrashedDocument[] {
-  return prep<TrashedDocument, [string, string]>(
-      `SELECT d.id, d.title, f.name AS folder_name, d.folder_id, d.deleted_at, d.deleted_by
+/**
+ * All trashed documents in a team/shared workspace, regardless of who
+ * deleted them — any non-viewer member needs to see the whole team's trash,
+ * not just their own (otherwise a departed member's deletions become
+ * invisible to everyone else). Personal workspaces keep the per-user
+ * `getTrashedDocuments` below instead.
+ */
+export function getTrashedDocumentsForWorkspace(workspaceId: string): TrashedDocument[] {
+  return prep<TrashedDocument, [string]>(
+      `SELECT d.id, d.title, f.name AS folder_name, d.folder_id, d.deleted_at, d.deleted_by,
+              d.created_by, u.name AS deleted_by_name
        FROM documents d
        LEFT JOIN folders f ON f.id = d.folder_id
-       WHERE d.deleted_by = ? AND d.deleted_at IS NOT NULL AND d.workspace_id = ?
+       LEFT JOIN users u ON u.id = d.deleted_by
+       WHERE d.deleted_at IS NOT NULL AND d.workspace_id = ?
          AND (d.folder_id IS NULL
               OR NOT EXISTS (SELECT 1 FROM folders p WHERE p.id = d.folder_id AND p.deleted_at IS NOT NULL))
        ORDER BY d.deleted_at DESC`
     )
-    .all(userId, workspaceId);
+    .all(workspaceId);
 }
 
 export function getTrashedDocuments(userId: string): TrashedDocument[] {
@@ -408,6 +476,10 @@ export function moveDocumentToWorkspace(
   db.prepare(
     "UPDATE documents SET workspace_id = ?, folder_id = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?"
   ).run(targetWorkspaceId, targetFolderId, docId, sourceWorkspaceId);
+  // A live room's URL/breadcrumbs are now stale (the doc belongs to a
+  // different workspace) — tell anyone with it open rather than leaving
+  // them editing under a now-wrong path.
+  void notifyDocUnavailable(docId, "This document was moved to another workspace.");
 }
 
 // ─── Public sharing ───────────────────────────────────────
@@ -423,6 +495,10 @@ export async function setViewShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET public_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // The view-link's guests are anonymous (no userId to target) — re-check
+    // everyone currently in this doc's room so the now-invalid token stops
+    // working immediately instead of at the next heartbeat sweep.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ public_token: string | null }, [string]>(
@@ -449,6 +525,9 @@ export async function setEditShare(id: string, enabled: boolean, options?: Share
     db.prepare(
       "UPDATE documents SET edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
     ).run(id);
+    // Same as setViewShare: the edit-link's guests are anonymous, so kick
+    // everyone in the room rather than a specific user.
+    void kickAccess({ docId: id, reason: "Share link disabled" });
     return null;
   }
   const existing = prep<{ edit_token: string | null }, [string]>(
@@ -474,6 +553,7 @@ export function unshareDocument(id: string): void {
   db.prepare(
     "UPDATE documents SET public_token = NULL, edit_token = NULL, share_expires_at = NULL, share_password_hash = NULL, updated_at = unixepoch() WHERE id = ?"
   ).run(id);
+  void kickAccess({ docId: id, reason: "Share link disabled" });
 }
 
 /** Update share settings (expiration and/or password) for an existing share. */
@@ -773,9 +853,9 @@ export type SearchResult = {
 };
 
 export function searchDocuments(userId: string, query: string): SearchResult[] {
-  if (!query.trim()) return [];
-  // Append * for prefix matching
-  const ftsQuery = query.trim().split(/\s+/).map(w => `"${w}"*`).join(" ");
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_SEARCH_QUERY_LENGTH) return [];
+  const ftsQuery = buildFtsQuery(trimmed);
   return prep<SearchResult, [string, string, string, string, string, string]>(
       `SELECT d.id, d.title,
               snippet(documents_fts, 1, '<mark>', '</mark>', '…', 40) AS snippet,
