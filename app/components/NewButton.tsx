@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { PlusIcon, DocAddIcon, FolderAddIcon, UploadIcon, FolderIcon } from "./icons";
+import { PlusIcon, DocAddIcon, FolderAddIcon, UploadIcon, FolderIcon, ChevronDownIcon } from "./icons";
 import { processImportFiles, type ImportFile } from "./ImportDropZone";
 import { TEMPLATES } from "~/lib/templates";
 import { templateOwners } from "~/extensions";
@@ -7,6 +7,8 @@ import { useEnabledExtensionIds } from "~/root";
 
 interface NewButtonProps {
   onCreateDoc: () => void;
+  /** True while a create request is in flight: blocks a second click or shortcut from making a duplicate. */
+  creating?: boolean;
   /** Called when a template button is clicked. `templateId` is the id of the
    *  selected entry from `TEMPLATES` (e.g. "spreadsheet", "report"). */
   onCreateFromTemplate: (templateId: string) => void;
@@ -16,8 +18,16 @@ interface NewButtonProps {
   onUploadFiles?: (files: { file: File; path?: string }[]) => void;
 }
 
-export function NewButton({ onCreateDoc, onCreateFromTemplate, onCreateFolder, onImport, onUploadFile, onUploadFiles }: NewButtonProps) {
+const NEW_DOC_SHORTCUT_LABEL = "Ctrl+Alt+N";
+
+export function NewButton({ onCreateDoc, creating = false, onCreateFromTemplate, onCreateFolder, onImport, onUploadFile, onUploadFiles }: NewButtonProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Read through refs so the shortcut listener is attached once, not on
+  // every render (callers pass a fresh onCreateDoc closure each time).
+  const onCreateDocRef = useRef(onCreateDoc);
+  const creatingRef = useRef(creating);
+  onCreateDocRef.current = onCreateDoc;
+  creatingRef.current = creating;
   const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +39,19 @@ export function NewButton({ onCreateDoc, onCreateFromTemplate, onCreateFolder, o
     const owner = templateOwners.get(t.id);
     return !owner || enabledExtensionIds.has(owner);
   });
+
+  // Ctrl/Cmd+Alt+N: new blank document. Cmd+N / Ctrl+N alone belong to the browser.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const isShortcut = e.altKey && (e.ctrlKey || e.metaKey) && e.code === "KeyN";
+      if (!isShortcut) return;
+      e.preventDefault();
+      if (creatingRef.current) return;
+      onCreateDocRef.current();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -79,14 +102,30 @@ export function NewButton({ onCreateDoc, onCreateFromTemplate, onCreateFolder, o
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        type="button"
-        onClick={() => setMenuOpen((v) => !v)}
-        className="flex cursor-pointer items-center gap-1.5 rounded-md border-none bg-accent px-2.5 py-1 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90"
-      >
-        <PlusIcon className="h-4 w-4" />
-        New
-      </button>
+      {/* Split button: the main part creates a blank document right away;
+          the chevron opens templates, folder and upload options. */}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => onCreateDoc()}
+          disabled={creating}
+          title={`New document (${NEW_DOC_SHORTCUT_LABEL})`}
+          className="flex cursor-pointer items-center gap-1.5 rounded-l-md border-none bg-accent px-2.5 py-1 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-60"
+        >
+          <PlusIcon className="h-4 w-4" />
+          New
+        </button>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="More ways to create"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          className="flex cursor-pointer items-center rounded-r-md border-0 border-l border-solid border-accent-fg/25 bg-accent px-1.5 text-accent-fg transition-opacity hover:opacity-90"
+        >
+          <ChevronDownIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
       {menuOpen && (
         <div className="absolute right-0 top-full z-40 mt-1 min-w-[180px] rounded-lg border border-fg/[0.1] bg-bg shadow-lg">
           <button
