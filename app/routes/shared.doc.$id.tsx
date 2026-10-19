@@ -19,7 +19,10 @@ import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.serv
 import { hasSharedAccess, getSharedFolderPath } from "~/lib/sharing.server";
 import { appError } from "~/lib/errors";
 import { hasDocSharedAccess, acceptPendingDocShare, shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { userHasDocAccess } from "~/lib/doc-access.server";
+import { capMentionBody } from "~/lib/doc-mention-authz.server";
+import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
+import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
 import { sendMentionNotification, sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { emailSchema, sharePasswordSchema } from "~/lib/validation.server";
@@ -128,6 +131,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "save") {
     const title = form.get("title");
     const content = form.get("content");
+    // See workspace.doc.$id.tsx's identical guard — a live Yjs room owns
+    // this doc's content, so a direct write here would just be lost to the
+    // room's next debounced save.
+    if (content != null && shouldRejectContentWrite(true, await isRoomLive(params.id))) {
+      return { ok: false, error: "Document is being edited live — content not saved." };
+    }
     updateDocument(params.id, {
       ...(title != null ? { title: String(title) } : {}),
       ...(content != null ? { content: String(content) } : {}),
@@ -168,6 +177,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "share-doc") {
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+    if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
     const email = String(form.get("email") || "").trim().toLowerCase();
     if (!email) return { ok: false, error: "Missing email" };
     if (!emailSchema.safeParse(email).success) {
@@ -214,9 +225,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "send-mentions") {
-    const rl = checkRateLimit(getClientIp(request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
+    const rl = checkRateLimit(getRateLimitKey(request, user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "mention" });
     if (!rl.allowed) return { ok: false };
-    const body = String(form.get("body") || "");
+    const body = capMentionBody(String(form.get("body") || ""));
     const mentionRegex = /@\[(.+?)\]\(user:(.+?)\)/g;
     let match: RegExpExecArray | null;
     const origin = getPublicOrigin(request);
@@ -224,6 +235,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     while ((match = mentionRegex.exec(body)) !== null) {
       const mentionedUserId = match[2];
       if (mentionedUserId === user.id) continue;
+      // Only notify users who can actually see this doc — otherwise
+      // mentioning an arbitrary user id leaks its title/content to them.
+      if (!userHasDocAccess(doc, mentionedUserId)) continue;
       const mentioned = prep<{ email: string; name: string }, [string]>(
         "SELECT email, name FROM users WHERE id = ?"
       ).get(mentionedUserId);

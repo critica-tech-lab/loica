@@ -250,6 +250,10 @@ try { db.exec("ALTER TABLE document_shares ADD COLUMN group_id TEXT REFERENCES g
 try { db.exec("CREATE INDEX idx_doc_shares_group ON document_shares(group_id)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 
 // ─── Trash (soft-delete) columns ─────────────────────────
+// deleted_by is intentionally a plain TEXT column with no FK to users(id):
+// if the deleter's account is later removed, the trashed row must survive
+// (not CASCADE-deleted) so a workspace admin can still see and restore it
+// until the normal 30-day purge age.
 try { db.exec("ALTER TABLE documents ADD COLUMN deleted_at INTEGER"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
 try { db.exec("ALTER TABLE documents ADD COLUMN deleted_by TEXT"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
 try { db.exec("ALTER TABLE folders ADD COLUMN deleted_at INTEGER"); } catch (e) { if (!String(e).includes("already exists") && !String(e).includes("duplicate column")) console.error("[db migration]", e); }
@@ -288,9 +292,13 @@ try {
   `);
 } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 
+// Scoped to `OF title, content` — ws/persistence.ts saveDoc touches
+// yjs_state/updated_at/updated_by every ~2s while someone is typing, which
+// would otherwise rebuild the FTS index on every autosave even when the
+// markdown projection (title/content) didn't change.
 try {
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+    CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE OF title, content ON documents BEGIN
       INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
       INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
     END
@@ -695,3 +703,47 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 )`); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
 try { db.exec("CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+// ─── Activity log ─────────────────────────────────────────
+// Audit trail of document/folder/member/share mutations, scoped per
+// workspace. `actor_id` is SET NULL (not CASCADE) on user deletion so a
+// departed user's past actions stay in the log instead of disappearing.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS activity (
+    id           TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    actor_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+    action       TEXT NOT NULL,
+    target_type  TEXT,
+    target_id    TEXT,
+    target_title TEXT,
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`);
+try { db.exec("CREATE INDEX idx_activity_workspace_created ON activity(workspace_id, created_at DESC)"); } catch (e) { if (!String(e).includes("already exists")) console.error("[db migration]", e); }
+
+// ─── Fix: documents_au fired on every UPDATE ─────────────
+// A DB created before the trigger above was scoped to `OF title, content`
+// already has the old, unscoped version — CREATE TRIGGER IF NOT EXISTS is a
+// no-op there. Drop and recreate so existing installs pick up the fix too.
+// FTS rows are untouched (documents_fts is not read here), so no reindex.
+//
+// Runs on every boot of both processes (web + ws), so it only acts when the
+// stored trigger is still the old one, and does the drop+create in a single
+// transaction: no window where a concurrent title/content UPDATE skips FTS.
+try {
+  const trigger = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'documents_au'")
+    .get() as { sql: string } | undefined;
+  if (trigger && !/AFTER UPDATE OF title, content/i.test(trigger.sql)) {
+    db.transaction(() => {
+      db.exec("DROP TRIGGER documents_au");
+      db.exec(`
+        CREATE TRIGGER documents_au AFTER UPDATE OF title, content ON documents BEGIN
+          INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
+          INSERT INTO documents_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
+        END
+      `);
+    })();
+  }
+} catch (e) { console.error("[db migration]", e); }

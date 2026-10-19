@@ -20,6 +20,10 @@ import { getDocument, getDocumentByToken } from "./document.server";
 import type { Document } from "./document.server";
 import { getMembership } from "./workspace.server";
 import { hasSharedAccess } from "./sharing.server";
+import { db } from "./db.server";
+import { verifySharePasswordCookie } from "./share-password.server";
+import { hasDocSharedAccess } from "./doc-sharing.server";
+import { hasDocAccess } from "./doc-mention-authz.server";
 
 function parseCookies(header: string): Record<string, string> {
   return Object.fromEntries(
@@ -57,10 +61,28 @@ export function authorizeDocRead(request: Request, id: string | undefined): Docu
     if (viaToken && viaToken.document.id === doc.id) {
       const passwordOk =
         !viaToken.hasPassword ||
-        parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`] === "1";
+        verifySharePasswordCookie(
+          db,
+          token,
+          viaToken.document.share_password_hash ?? "",
+          parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`]
+        );
       if (passwordOk) return doc;
     }
   }
 
   throw new Response("Not found", { status: 404 });
+}
+
+/**
+ * Whether a user may see this document at all: workspace membership, a
+ * folder-level share, or a direct doc-level share. Used to gate who a
+ * @mention notification may be sent to — mentioning an arbitrary user id
+ * should never leak the doc's title/content to someone's inbox.
+ */
+export function userHasDocAccess(doc: Document, userId: string, isAdmin?: boolean): boolean {
+  const role = getMembership(doc.workspace_id, userId, isAdmin);
+  const folderShared = doc.folder_id ? hasSharedAccess(doc.folder_id, userId) : false;
+  const docShared = hasDocSharedAccess(doc.id, userId);
+  return hasDocAccess({ role, folderShared, docShared });
 }
