@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
+import { kickAccess } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -141,6 +142,28 @@ export function addTeamspaceMember(
   })();
 }
 
+/** Thrown when an action would leave a teamspace with no admin at all. */
+export class LastAdminError extends Error {
+  constructor() {
+    super("last_admin");
+  }
+}
+
+/** True if `userId` is a teamspace admin and the only one left. */
+function isLastAdmin(workspaceId: string, userId: string): boolean {
+  const member = prep<{ role: string }, [string, string]>(
+      "SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?"
+    )
+    .get(workspaceId, userId);
+  if (member?.role !== "admin") return false;
+
+  const adminCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM workspace_members WHERE workspace_id = ? AND role = 'admin'"
+    )
+    .get(workspaceId)!.cnt;
+  return adminCount <= 1;
+}
+
 export function removeTeamspaceMember(
   workspaceId: string,
   userId: string
@@ -150,6 +173,7 @@ export function removeTeamspaceMember(
     )
     .get(workspaceId);
   if (!group) return;
+  if (isLastAdmin(workspaceId, userId)) throw new LastAdminError();
 
   db.transaction(() => {
     db.prepare(
@@ -160,6 +184,10 @@ export function removeTeamspaceMember(
       "DELETE FROM group_members WHERE group_id = ? AND user_id = ?"
     ).run(group.id, userId);
   })();
+
+  // A removed member can still have the teamspace's docs open in a live WS
+  // room — kick them (see ws-notify.server.ts).
+  void kickAccess({ userId, reason: "Removed from teamspace" });
 }
 
 export function updateTeamspaceMemberRole(
@@ -172,6 +200,7 @@ export function updateTeamspaceMemberRole(
     )
     .get(workspaceId);
   if (!group) return;
+  if (role !== "admin" && isLastAdmin(workspaceId, userId)) throw new LastAdminError();
 
   db.transaction(() => {
     db.prepare(
@@ -183,6 +212,11 @@ export function updateTeamspaceMemberRole(
       "UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?"
     ).run(groupRole, group.id, userId);
   })();
+
+  // Re-check this user's open connections so an editor -> viewer downgrade
+  // (or the reverse) takes effect without waiting for the next heartbeat
+  // sweep (see ws-notify.server.ts).
+  void kickAccess({ userId, reason: "Workspace role changed" });
 }
 
 // ─── Update ─────────────────────────────────────────────

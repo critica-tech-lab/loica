@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, prep } from "./db.server";
+import { notifyDocUnavailable } from "./ws-notify.server";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ export type Folder = {
   created_by: string;
   created_at: number;
   deleted_at?: number | null;
+  deleted_by?: string | null;
 };
 
 export type FolderSummary = Pick<Folder, "id" | "name" | "parent_id" | "created_at" | "created_by">;
@@ -101,7 +103,7 @@ export function getFolder(id: string): Folder | null {
 export function getFolderIncludingTrashed(id: string): Folder | null {
   return (
     prep<Folder, [string]>(
-        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at
+        `SELECT id, workspace_id, parent_id, name, created_by, created_at, deleted_at, deleted_by
          FROM folders WHERE id = ?`
       )
       .get(id) ?? null
@@ -255,6 +257,8 @@ export function moveFolderToWorkspace(
 // ─── Trash (soft-delete) ─────────────────────────────────
 
 export function trashFolder(id: string, userId: string): void {
+  let affectedDocIds: string[] = [];
+
   const trashTx = db.transaction(() => {
     // Collect all descendant folder IDs (including self)
     const descendantIds = prep<{ id: string }, [string]>(
@@ -279,6 +283,11 @@ export function trashFolder(id: string, userId: string): void {
     // Soft-delete all docs in those folders
     if (descendantIds.length > 0) {
       const placeholders = descendantIds.map(() => "?").join(",");
+      affectedDocIds = prep<{ id: string }, [...string[]]>(
+          `SELECT id FROM documents WHERE folder_id IN (${placeholders}) AND deleted_at IS NULL`
+        )
+        .all(...descendantIds)
+        .map((r) => r.id);
       db.prepare(
         `UPDATE documents SET deleted_at = unixepoch(), deleted_by = ?
          WHERE folder_id IN (${placeholders}) AND deleted_at IS NULL`
@@ -286,6 +295,13 @@ export function trashFolder(id: string, userId: string): void {
     }
   });
   trashTx();
+
+  // A live room on any of these docs has no idea its folder (or an
+  // ancestor) was just trashed — tell it (see document.server.ts's
+  // trashDocument for the single-document version of this call).
+  for (const docId of affectedDocIds) {
+    void notifyDocUnavailable(docId, "This document's folder was moved to trash.");
+  }
 }
 
 export function restoreFolder(id: string, workspaceId: string): void {
@@ -346,19 +362,29 @@ export type TrashedFolder = {
   parent_id: string | null;
   deleted_at: number;
   deleted_by: string;
+  /** Needed by the purge rule (canPurgeTrashItem), which also allows the creator. */
+  created_by?: string;
+  /** Display name of the deleter — null if that user no longer exists. */
+  deleted_by_name?: string | null;
 };
 
-export function getTrashedFoldersForWorkspace(userId: string, workspaceId: string): TrashedFolder[] {
-  return prep<TrashedFolder, [string, string]>(
-      `SELECT f.id, f.name, p.name AS parent_name, f.parent_id, f.deleted_at, f.deleted_by
+/**
+ * All trashed folders in a team/shared workspace, regardless of who deleted
+ * them — see getTrashedDocumentsForWorkspace for why this isn't per-user.
+ */
+export function getTrashedFoldersForWorkspace(workspaceId: string): TrashedFolder[] {
+  return prep<TrashedFolder, [string]>(
+      `SELECT f.id, f.name, p.name AS parent_name, f.parent_id, f.deleted_at, f.deleted_by,
+              f.created_by, u.name AS deleted_by_name
        FROM folders f
        LEFT JOIN folders p ON p.id = f.parent_id
-       WHERE f.deleted_by = ? AND f.deleted_at IS NOT NULL AND f.workspace_id = ?
+       LEFT JOIN users u ON u.id = f.deleted_by
+       WHERE f.deleted_at IS NOT NULL AND f.workspace_id = ?
          AND (f.parent_id IS NULL
               OR NOT EXISTS (SELECT 1 FROM folders pp WHERE pp.id = f.parent_id AND pp.deleted_at IS NOT NULL))
        ORDER BY f.deleted_at DESC`
     )
-    .all(userId, workspaceId);
+    .all(workspaceId);
 }
 
 export function getTrashedFolders(userId: string): TrashedFolder[] {

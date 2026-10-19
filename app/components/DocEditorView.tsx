@@ -301,6 +301,8 @@ export function DocEditorView(_props: DocumentProps) {
               onEditLink={openEditLinkModal}
               onPresenceChange={setPeers}
               onConnectionStatus={setConnectionStatus}
+              onDocumentReset={ctx.handleRemoteDocumentReset}
+              onConnectionNotice={ctx.handleConnectionNotice}
               onChange={handleContentChange}
               onFrontmatter={setFrontmatter}
               onTitle={(headingText, fullText) => maybeAdoptTitle(headingText, fullText)}

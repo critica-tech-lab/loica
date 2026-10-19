@@ -9,6 +9,8 @@ interface TrashedFolder {
   name: string;
   parent_name: string | null;
   deleted_at: number;
+  deleted_by_name?: string | null;
+  canDelete?: boolean;
 }
 
 interface TrashedDoc {
@@ -16,6 +18,8 @@ interface TrashedDoc {
   title: string;
   folder_name: string | null;
   deleted_at: number;
+  deleted_by_name?: string | null;
+  canDelete?: boolean;
 }
 
 function daysLeft(deletedAt: number): number {
@@ -27,9 +31,15 @@ function daysLeft(deletedAt: number): number {
 export function TrashView({
   documents,
   folders,
+  canManageAll = true,
+  showDeletedBy = false,
 }: {
   documents: TrashedDoc[];
   folders: TrashedFolder[];
+  /** False for team members who may only empty what they personally deleted. */
+  canManageAll?: boolean;
+  /** Show who deleted each item — relevant once trash is shared across a team. */
+  showDeletedBy?: boolean;
 }) {
   const fetcher = useFetcher();
   const { toast } = useToast();
@@ -52,7 +62,7 @@ export function TrashView({
               onClick={() => setConfirmAction({ type: "empty-trash", id: "", title: "" })}
               className="cursor-pointer rounded border border-scarlet/20 bg-scarlet/[0.06] px-2.5 py-1 text-xs font-medium text-scarlet transition-colors hover:bg-scarlet/15"
             >
-              Empty trash
+              {canManageAll ? "Empty trash" : "Empty my trash"}
             </button>
           )}
         </div>
@@ -71,6 +81,7 @@ export function TrashView({
             <div className="archive-header">
               <span className="flex-1">Name</span>
               <span className="w-24 shrink-0 text-right">Location</span>
+              {showDeletedBy && <span className="w-28 shrink-0 text-right">Deleted by</span>}
               <span className="w-16 shrink-0 text-right">Expires</span>
               <span className="w-24 shrink-0" />
             </div>
@@ -81,6 +92,14 @@ export function TrashView({
                   {f.name}
                 </span>
                 <span className="archive-meta w-24">{f.parent_name ?? "/"}</span>
+                {showDeletedBy && (
+                  <span
+                    className="archive-meta w-28 truncate"
+                    title={new Date(f.deleted_at * 1000).toLocaleString()}
+                  >
+                    {f.deleted_by_name ?? "Unknown"}
+                  </span>
+                )}
                 <span className="archive-meta w-16">{daysLeft(f.deleted_at)}d</span>
                 <div className="flex w-24 shrink-0 items-center justify-end gap-1.5">
                   <button
@@ -97,20 +116,22 @@ export function TrashView({
                   >
                     Restore
                   </button>
-                  <button
-                    type="button"
-                    title="Delete permanently"
-                    onClick={() =>
-                      setConfirmAction({
-                        type: "purge-folder",
-                        id: f.id,
-                        title: f.name,
-                      })
-                    }
-                    className="cursor-pointer rounded border border-scarlet/20 bg-scarlet/[0.06] p-0.5 text-scarlet transition-colors hover:bg-scarlet/15"
-                  >
-                    <TrashIcon className="h-3 w-3" />
-                  </button>
+                  {(f.canDelete ?? true) && (
+                    <button
+                      type="button"
+                      title="Delete permanently"
+                      onClick={() =>
+                        setConfirmAction({
+                          type: "purge-folder",
+                          id: f.id,
+                          title: f.name,
+                        })
+                      }
+                      className="cursor-pointer rounded border border-scarlet/20 bg-scarlet/[0.06] p-0.5 text-scarlet transition-colors hover:bg-scarlet/15"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -119,6 +140,14 @@ export function TrashView({
                 <DocIcon className="mr-1.5 h-4 w-4 shrink-0 text-fg/40" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{d.title}</span>
                 <span className="archive-meta w-24">{d.folder_name ?? "/"}</span>
+                {showDeletedBy && (
+                  <span
+                    className="archive-meta w-28 truncate"
+                    title={new Date(d.deleted_at * 1000).toLocaleString()}
+                  >
+                    {d.deleted_by_name ?? "Unknown"}
+                  </span>
+                )}
                 <span className="archive-meta w-16">{daysLeft(d.deleted_at)}d</span>
                 <div className="flex w-24 shrink-0 items-center justify-end gap-1.5">
                   <button
@@ -135,20 +164,22 @@ export function TrashView({
                   >
                     Restore
                   </button>
-                  <button
-                    type="button"
-                    title="Delete permanently"
-                    onClick={() =>
-                      setConfirmAction({
-                        type: "purge-doc",
-                        id: d.id,
-                        title: d.title,
-                      })
-                    }
-                    className="cursor-pointer rounded border border-scarlet/20 bg-scarlet/[0.06] p-0.5 text-scarlet transition-colors hover:bg-scarlet/15"
-                  >
-                    <TrashIcon className="h-3 w-3" />
-                  </button>
+                  {(d.canDelete ?? true) && (
+                    <button
+                      type="button"
+                      title="Delete permanently"
+                      onClick={() =>
+                        setConfirmAction({
+                          type: "purge-doc",
+                          id: d.id,
+                          title: d.title,
+                        })
+                      }
+                      className="cursor-pointer rounded border border-scarlet/20 bg-scarlet/[0.06] p-0.5 text-scarlet transition-colors hover:bg-scarlet/15"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -160,12 +191,14 @@ export function TrashView({
         <ConfirmModal
           title={
             confirmAction.type === "empty-trash"
-              ? "Empty trash"
+              ? canManageAll ? "Empty trash" : "Empty my trash"
               : "Delete permanently"
           }
           message={
             confirmAction.type === "empty-trash"
-              ? "Permanently delete all items in trash? This cannot be undone."
+              ? canManageAll
+                ? "Permanently delete all items in trash? This cannot be undone."
+                : "Permanently delete everything you sent to trash? This cannot be undone."
               : `Permanently delete "${confirmAction.title}"? This cannot be undone.`
           }
           confirmLabel="Delete permanently"
