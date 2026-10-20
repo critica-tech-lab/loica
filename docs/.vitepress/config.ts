@@ -4,6 +4,8 @@ export default defineConfig({
   title: 'Loica',
   description: 'Documentation for Loica — a self-hosted, real-time collaborative Markdown editor',
   base: '/loica/',
+  // The guides point at local dev URLs like http://localhost:3000 on purpose.
+  ignoreDeadLinks: 'localhostLinks',
 
   head: [
     ['link', { rel: 'icon', type: 'image/png', href: '/loica/loica-icon.png' }],
