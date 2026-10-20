@@ -94,3 +94,14 @@ export function checkRateLimit(
 
   return { allowed: true, retryAfterSeconds: 0 };
 }
+
+const SHARE_RATE_LIMIT = { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" };
+
+/**
+ * Limit for the doc-editor `share-doc` and `share-doc-group` intents, which
+ * send invitation emails. Every route exposing those intents must use this one
+ * bucket, or the limit can be sidestepped through the route that lacks it.
+ */
+export function checkShareRateLimit(request: Request, userId?: string | null) {
+  return checkRateLimit(getRateLimitKey(request, userId), SHARE_RATE_LIMIT);
+}

@@ -34,7 +34,7 @@ import {
 import { getMembership } from "~/lib/workspace.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc as unshareDocShare } from "~/lib/doc-sharing.server";
 import { unshareAllFolder, shareFolder, unshareFolder, leaveFolderShare } from "~/lib/sharing.server";
-import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
+import { getRateLimitKey, checkRateLimit, checkShareRateLimit } from "~/lib/rate-limit.server";
 import { sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { getEmailOrigin } from "~/lib/url.server";
@@ -291,7 +291,7 @@ export function handleTrashFolder(
 // ── Share handlers ───────────────────────────────────────────
 
 export async function handleShareDoc(ctx: ActionContext) {
-  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
   const email = String(ctx.form.get("email") || "").trim().toLowerCase();
   const docId = String(ctx.form.get("docId") || "");
@@ -331,7 +331,7 @@ export async function handleShareDoc(ctx: ActionContext) {
 }
 
 export function handleShareDocGroup(ctx: ActionContext) {
-  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
   const docId = String(ctx.form.get("docId") || "");
   const groupId = String(ctx.form.get("groupId") || "").trim();
@@ -802,7 +802,7 @@ export function dispatchAction(
 
 export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to share folders." };
-  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) return { error: "Too many share requests. Try again later." };
   const targetFolderId = String(ctx.form.get("folderId"));
   const f = getFolder(targetFolderId);
