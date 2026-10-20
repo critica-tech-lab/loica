@@ -58,13 +58,17 @@ describe("team workspace trash is shared, not per-deleter", () => {
   });
 
   test("survives the deleter's account being removed — still visible and restorable by an admin", () => {
+    // A throwaway member: deleting a shared user (e.g. `editor`) would also drop
+    // their membership and break every later test that uses them.
+    const departing = makeUser("Departing E");
+    addTeamspaceMember(ts.id, departing.id, "editor");
     const doc = createDocument(ts.id, admin.id, "Orphaned trash");
-    trashDocument(doc.id, editor.id);
+    trashDocument(doc.id, departing.id);
 
     // Simulate the deleter leaving/being removed. deleted_by has no FK, so
     // this must not cascade-delete the trashed row.
-    db.prepare("DELETE FROM users WHERE id = ?").run(editor.id);
-    userIds.splice(userIds.indexOf(editor.id), 1);
+    db.prepare("DELETE FROM users WHERE id = ?").run(departing.id);
+    userIds.splice(userIds.indexOf(departing.id), 1);
 
     const trashed = getTrashedDocumentsForWorkspace(ts.id);
     const row = trashed.find((d) => d.id === doc.id);
