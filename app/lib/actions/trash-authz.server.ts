@@ -19,13 +19,15 @@ export function canRestoreTrashItem(role: WorkspaceRole | null): boolean {
 /**
  * Permanently deleting is irreversible, so it's reserved for the workspace
  * owner/admin, or whoever created the item or sent it to trash in the first
- * place — not just anyone with edit access.
+ * place — not just anyone with edit access. Either way the actor must still
+ * be a member: leaving a workspace ends any claim to its content.
  */
 export function canPurgeTrashItem(
   role: WorkspaceRole | null,
   actorId: string,
   item: TrashedItem
 ): boolean {
+  if (!role) return false;
   if (role === "owner" || role === "admin") return true;
   if (actorId === item.created_by) return true;
   return !!item.deleted_by && actorId === item.deleted_by;

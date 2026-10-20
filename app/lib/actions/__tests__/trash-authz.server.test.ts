@@ -54,6 +54,11 @@ describe("canPurgeTrashItem", () => {
     expect(canPurgeTrashItem(null, "someone-else", item)).toBe(false);
   });
 
+  test("non-member who created or trashed the item cannot purge", () => {
+    expect(canPurgeTrashItem(null, "creator-1", item)).toBe(false);
+    expect(canPurgeTrashItem(null, "deleter-1", item)).toBe(false);
+  });
+
   test("handles a missing deleted_by (legacy row) without throwing", () => {
     expect(canPurgeTrashItem("editor", "someone-else", { created_by: "creator-1", deleted_by: null })).toBe(false);
     expect(canPurgeTrashItem("editor", "creator-1", { created_by: "creator-1", deleted_by: null })).toBe(true);
