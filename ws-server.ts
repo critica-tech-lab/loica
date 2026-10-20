@@ -1013,7 +1013,10 @@ setTimeout(runCleanup, 10_000);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 
-const WS_HOST = process.env.WS_HOST ?? "0.0.0.0";
+// Production sits behind a reverse proxy, so bind to loopback unless told
+// otherwise (the Docker image sets 0.0.0.0). Dev binds everywhere because macOS
+// resolves `localhost` to ::1, which a 127.0.0.1 listener would miss.
+const WS_HOST = process.env.WS_HOST ?? (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
 server.listen(PORT, WS_HOST, () => {
   console.log(`[ws-server] Yjs WebSocket server listening on ws://${WS_HOST}:${PORT}`);
 });
