@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { redirect } from "react-router";
 import { uploadsDir } from "~/lib/paths.server";
@@ -18,6 +19,8 @@ import {
   unshareDocument,
   toggleStar,
   updateShareSettings,
+  hasStorageHeadroom,
+  MAX_UPLOAD_FILE_BYTES,
 } from "~/lib/document.server";
 import {
   getFolder,
@@ -31,7 +34,7 @@ import {
 import { getMembership } from "~/lib/workspace.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc as unshareDocShare } from "~/lib/doc-sharing.server";
 import { unshareAllFolder, shareFolder, unshareFolder, leaveFolderShare } from "~/lib/sharing.server";
-import { getClientIp, checkRateLimit } from "~/lib/rate-limit.server";
+import { getRateLimitKey, checkRateLimit, checkShareRateLimit } from "~/lib/rate-limit.server";
 import { sendExternalShareNotification } from "~/lib/email.server";
 import { db, prep } from "~/lib/db.server";
 import { getEmailOrigin } from "~/lib/url.server";
@@ -48,6 +51,7 @@ import {
   permissionSchema,
 } from "~/lib/validation.server";
 import { createNotification } from "~/lib/notification.server";
+import { logActivity, ActivityAction } from "~/lib/activity.server";
 
 /** Common context passed from routes into shared action handlers. */
 export interface ActionContext {
@@ -56,6 +60,17 @@ export interface ActionContext {
   role: string;
   form: FormData;
   request: Request;
+}
+
+/** One-line activity-log call for a handler that already has `ctx` in scope. */
+function logAction(
+  ctx: ActionContext,
+  action: ActivityAction,
+  targetType?: string,
+  targetId?: string,
+  targetTitle?: string,
+): void {
+  logActivity({ workspaceId: ctx.workspace.id, actorId: ctx.user.id, action, targetType, targetId, targetTitle });
 }
 
 // ── Simple handlers ──────────────────────────────────────────
@@ -71,6 +86,7 @@ export function handleCreateFolder(ctx: ActionContext, parentFolderId: string | 
   if (!name) return null;
   const result = createFolder(ctx.workspace.id, ctx.user.id, name, parentFolderId);
   if (!result) return { error: "A folder with that name already exists." };
+  logAction(ctx, ActivityAction.FolderCreate, "folder", result.id, name);
   return null;
 }
 
@@ -93,6 +109,7 @@ export function handleRenameDoc(ctx: ActionContext) {
   const doc = getDocument(docId);
   if (doc && doc.workspace_id === ctx.workspace.id) {
     updateDocument(docId, { title });
+    logAction(ctx, ActivityAction.DocRename, "document", docId, title);
   }
   return null;
 }
@@ -104,6 +121,7 @@ export function handleRenameFolder(ctx: ActionContext) {
   const f = getFolder(fid);
   if (!f || f.workspace_id !== ctx.workspace.id) return null;
   if (!renameFolder(fid, name)) return { error: "A folder with that name already exists." };
+  logAction(ctx, ActivityAction.FolderRename, "folder", fid, name);
   return null;
 }
 
@@ -132,6 +150,7 @@ export function handleMoveDoc(ctx: ActionContext) {
     if (!tf || tf.workspace_id !== ctx.workspace.id) return null;
   }
   moveDocument(docId, target, ctx.workspace.id);
+  logAction(ctx, ActivityAction.DocMove, "document", docId, doc.title);
   return null;
 }
 
@@ -154,6 +173,7 @@ export function handleMoveFolder(
   }
   try {
     moveFolder(fid, target);
+    logAction(ctx, ActivityAction.FolderMove, "folder", fid, f.name);
   } catch {
     // circular move — ignore
   }
@@ -187,6 +207,7 @@ export function handleMoveDocToWorkspace(ctx: ActionContext) {
   }
 
   moveDocumentToWorkspace(docId, ctx.workspace.id, targetWorkspaceId, target);
+  logAction(ctx, ActivityAction.DocMove, "document", docId, doc.title);
   return null;
 }
 
@@ -213,6 +234,7 @@ export function handleMoveFolderToWorkspace(ctx: ActionContext) {
 
   try {
     moveFolderToWorkspace(folderId, targetWorkspaceId, target);
+    logAction(ctx, ActivityAction.FolderMove, "folder", folderId, folder.name);
   } catch {
     return { error: "Cannot move folder — name conflict or invalid target" };
   }
@@ -241,6 +263,7 @@ export function handleTrashDoc(ctx: ActionContext, isOwner: boolean) {
   const doc = getDocument(docId);
   if (doc && doc.workspace_id === ctx.workspace.id && (isOwner || doc.created_by === ctx.user.id)) {
     trashDocument(docId, ctx.user.id);
+    logAction(ctx, ActivityAction.DocTrash, "document", docId, doc.title);
   }
   return null;
 }
@@ -257,6 +280,7 @@ export function handleTrashFolder(
   const target = getFolder(fid);
   if (target && target.workspace_id === ctx.workspace.id) {
     trashFolder(fid, ctx.user.id);
+    logAction(ctx, ActivityAction.FolderTrash, "folder", fid, target.name);
     if (opts?.currentFolderId && fid === opts.currentFolderId && opts.redirectPath) {
       throw redirect(opts.redirectPath);
     }
@@ -267,7 +291,7 @@ export function handleTrashFolder(
 // ── Share handlers ───────────────────────────────────────────
 
 export async function handleShareDoc(ctx: ActionContext) {
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) return { ok: false, error: "Too many share requests. Try again later." };
   const email = String(ctx.form.get("email") || "").trim().toLowerCase();
   const docId = String(ctx.form.get("docId") || "");
@@ -296,16 +320,18 @@ export async function handleShareDoc(ctx: ActionContext) {
     const doc = getDocument(docId);
     const sharerName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(ctx.user.id)?.name ?? "Someone";
     sendExternalShareNotification(email, doc?.title ?? "Untitled", sharerName, editUrl);
+    logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc?.title ?? "Untitled");
     return { ok: true, sharedWith: email };
   }
   if (targetUser.id === ctx.user.id) return { ok: false, error: "Cannot share with yourself" };
   const targetName = prep<{ name: string }, [string]>("SELECT name FROM users WHERE id = ?").get(targetUser.id)?.name ?? email;
   shareDocWithUser(docId, targetUser.id, ctx.user.id, getEmailOrigin() ?? undefined);
+  logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc.title);
   return { ok: true, sharedWith: targetName };
 }
 
 export function handleShareDocGroup(ctx: ActionContext) {
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) throw new Response("Too many share requests. Try again later.", { status: 429 });
   const docId = String(ctx.form.get("docId") || "");
   const groupId = String(ctx.form.get("groupId") || "").trim();
@@ -313,6 +339,7 @@ export function handleShareDocGroup(ctx: ActionContext) {
   const doc = getDocument(docId);
   if (!doc || doc.workspace_id !== ctx.workspace.id) throw new Response("Not found", { status: 404 });
   shareDocWithGroup(docId, groupId, ctx.user.id, getEmailOrigin() ?? undefined);
+  logAction(ctx, ActivityAction.ShareAdd, "document", docId, doc.title);
   return { ok: true };
 }
 
@@ -321,12 +348,14 @@ export function handleUnshareDoc(ctx: ActionContext) {
   const shareId = ctx.form.get("shareId");
   if (shareId) {
     unshareDocShare(String(shareId), ctx.workspace.id);
+    logAction(ctx, ActivityAction.ShareRemove, "document");
     return { ok: true };
   }
   const docId = String(ctx.form.get("docId"));
   const doc = getDocument(docId);
   if (!doc || doc.workspace_id !== ctx.workspace.id) return null;
   unshareDocument(docId);
+  logAction(ctx, ActivityAction.ShareRemove, "document", docId, doc.title);
   return null;
 }
 
@@ -378,18 +407,28 @@ export function handleUnshareAllFolder(ctx: ActionContext, ownerRoles: string[])
   const f = getFolder(folderId);
   if (!f || f.workspace_id !== ctx.workspace.id) return null;
   unshareAllFolder(folderId);
+  logAction(ctx, ActivityAction.ShareRemove, "folder", folderId, f.name);
   return null;
 }
 
 // ── Bulk handlers ────────────────────────────────────────────
 
+// Lists are paginated far below this; the cap only stops a hand-crafted
+// request from running thousands of synchronous UPDATE+INSERT pairs at once.
+const BULK_MAX_IDS = 200;
+
+function parseBulkIds(ctx: ActionContext): string[] {
+  return String(ctx.form.get("docIds") || "").split(",").filter(Boolean).slice(0, BULK_MAX_IDS);
+}
+
 export function handleBulkDelete(ctx: ActionContext, isOwner: boolean) {
-  const ids = String(ctx.form.get("docIds") || "").split(",").filter(Boolean);
+  const ids = parseBulkIds(ctx);
   const docs = getDocumentsByIds(ids);
   let deleted = 0;
   for (const doc of docs) {
     if (doc.workspace_id === ctx.workspace.id && (isOwner || doc.created_by === ctx.user.id)) {
       trashDocument(doc.id, ctx.user.id);
+      logAction(ctx, ActivityAction.DocTrash, "document", doc.id, doc.title);
       deleted++;
     }
   }
@@ -397,12 +436,13 @@ export function handleBulkDelete(ctx: ActionContext, isOwner: boolean) {
 }
 
 export function handleBulkUnshare(ctx: ActionContext) {
-  const ids = String(ctx.form.get("docIds") || "").split(",").filter(Boolean);
+  const ids = parseBulkIds(ctx);
   const docs = getDocumentsByIds(ids);
   let unshared = 0;
   for (const doc of docs) {
     if (doc.workspace_id === ctx.workspace.id && (doc.public_token || doc.edit_token)) {
       unshareDocument(doc.id);
+      logAction(ctx, ActivityAction.ShareRemove, "document", doc.id, doc.title);
       unshared++;
     }
   }
@@ -425,6 +465,7 @@ export function handleCreateDoc(
   const title = String(ctx.form.get("title") || randomDocName()).trim();
   const content = template ? template.generateContent() : undefined;
   const doc = createDocument(ctx.workspace.id, ctx.user.id, title, folderId, content);
+  logAction(ctx, ActivityAction.DocCreate, "document", doc.id, title);
   throw redirect(redirectPath(doc.id));
 }
 
@@ -444,13 +485,13 @@ export function handleDuplicateDoc(
     doc.folder_id,
     doc.content ?? undefined,
   );
+  logAction(ctx, ActivityAction.DocCreate, "document", copy.id, copy.title);
   throw redirect(redirectPath(copy.id));
 }
 
 // ── File Upload ──────────────────────────────────────────────
 
 const UPLOAD_DIR = uploadsDir;
-const UPLOAD_MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const ALLOWED_UPLOAD_EXTENSIONS = new Set([
   ".pdf", ".pages",
@@ -470,9 +511,16 @@ function getAllowedExtension(filename: string): string | null {
 }
 
 export async function handleUploadFile(ctx: ActionContext, folderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 30, prefix: "upload" });
+  if (!rl.allowed) throw new Response("Too many uploads. Try again later.", { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
   const file = ctx.form.get("file");
   if (!file || !(file instanceof File)) throw new Response("Missing file", { status: 400 });
-  if (file.size > UPLOAD_MAX_SIZE) throw new Response("File too large (max 20MB)", { status: 400 });
+  if (file.size > MAX_UPLOAD_FILE_BYTES) {
+    throw new Response(`File too large (max ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)}MB)`, { status: 400 });
+  }
+  if (!hasStorageHeadroom(ctx.workspace.id, file.size)) {
+    throw new Response("Workspace storage quota exceeded.", { status: 400 });
+  }
 
   const ext = getAllowedExtension(file.name);
   if (!ext) throw new Response("Unsupported file type", { status: 400 });
@@ -540,13 +588,15 @@ export async function handleUploadFile(ctx: ActionContext, folderId: string | nu
   if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
   const filename = `${nanoid(16)}${ext}`;
-  writeFileSync(join(UPLOAD_DIR, filename), buffer);
+  await writeFile(join(UPLOAD_DIR, filename), buffer);
 
   const doc = createPdfDocument(ctx.workspace.id, ctx.user.id, title, filename, folderId);
   return { uploadedFile: true, docId: doc.id };
 }
 
 export async function handleUploadFiles(ctx: ActionContext, folderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 5 * 60 * 1000, max: 30, prefix: "upload" });
+  if (!rl.allowed) throw new Response("Too many uploads. Try again later.", { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } });
   const files = ctx.form.getAll("files");
   const paths = ctx.form.getAll("paths");
   if (files.length === 0) throw new Response("No files provided", { status: 400 });
@@ -556,11 +606,16 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
   const results: { docId: string }[] = [];
   // Cache folder lookups/creates to avoid re-querying for same path segments
   const folderCache = new Map<string, string | null>();
+  // Bytes already queued in this batch — checked against the quota ahead of
+  // the DB's own usage figure, so one oversized batch can't slip past it by
+  // staying under quota on each individual file check.
+  let batchBytes = 0;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (!(file instanceof File)) continue;
-    if (file.size > UPLOAD_MAX_SIZE) continue; // skip oversized files silently in batch
+    if (file.size > MAX_UPLOAD_FILE_BYTES) continue; // skip oversized files silently in batch
+    if (!hasStorageHeadroom(ctx.workspace.id, batchBytes + file.size)) continue; // over quota — skip silently in batch
 
     // file.name may contain path separators (e.g. from webkitRelativePath)
     const fileName = file.name.split("/").pop() || file.name;
@@ -615,7 +670,8 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
     }
 
     const filename = `${nanoid(16)}${ext}`;
-    writeFileSync(join(UPLOAD_DIR, filename), buffer);
+    await writeFile(join(UPLOAD_DIR, filename), buffer);
+    batchBytes += file.size;
     const doc = createPdfDocument(ctx.workspace.id, ctx.user.id, title, filename, targetFolderId);
     results.push({ docId: doc.id });
   }
@@ -626,8 +682,20 @@ export async function handleUploadFiles(ctx: ActionContext, folderId: string | n
 // ── Import ───────────────────────────────────────────────────
 
 const IMPORT_MAX_FILES = 500;
+// contentSchema already bounds a single file (~5 MB), but with up to
+// IMPORT_MAX_FILES of those in one request the batch itself has no ceiling —
+// a full-size batch is 2.5 GB parsed and inserted on one request. Cap the
+// total so one import can't tie up the event loop for everyone else.
+const IMPORT_MAX_TOTAL_BYTES = 200 * 1024 * 1024; // 200 MB
 
 export function handleImport(ctx: ActionContext, defaultFolderId: string | null) {
+  const rl = checkRateLimit(getRateLimitKey(ctx.request, ctx.user.id), { windowMs: 10 * 60 * 1000, max: 5, prefix: "import" });
+  if (!rl.allowed) {
+    throw new Response("Too many import requests. Try again later.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
   const json = ctx.form.get("files");
   if (!json || typeof json !== "string") return null;
   let files: { path: string; title: string; content: string }[];
@@ -640,8 +708,14 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
   files = files.slice(0, IMPORT_MAX_FILES);
   const folderMap = new Map<string, string>();
   let imported = 0;
+  // Running total for this batch, checked against the quota ahead of the
+  // DB's own usage figure — same reasoning as batchBytes in handleUploadFiles.
+  let importedBytes = 0;
   for (const file of files) {
     if (!contentSchema.safeParse(file.content).success) continue; // skip oversized content silently in batch
+    const contentBytes = Buffer.byteLength(file.content, "utf8");
+    if (importedBytes + contentBytes > IMPORT_MAX_TOTAL_BYTES) break; // batch cap hit — stop, don't keep parsing
+    if (!hasStorageHeadroom(ctx.workspace.id, importedBytes + contentBytes)) continue; // over quota — skip silently in batch
     const parts = file.path.split("/");
     let parentFolderId: string | null = defaultFolderId;
     if (parts.length > 1) {
@@ -669,6 +743,7 @@ export function handleImport(ctx: ActionContext, defaultFolderId: string | null)
       }
     }
     createDocument(ctx.workspace.id, ctx.user.id, file.title, parentFolderId, file.content);
+    importedBytes += contentBytes;
     imported++;
   }
   return { imported };
@@ -727,7 +802,7 @@ export function dispatchAction(
 
 export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to share folders." };
-  const rl = checkRateLimit(getClientIp(ctx.request), { windowMs: 5 * 60 * 1000, max: 20, prefix: "share" });
+  const rl = checkShareRateLimit(ctx.request, ctx.user.id);
   if (!rl.allowed) return { error: "Too many share requests. Try again later." };
   const targetFolderId = String(ctx.form.get("folderId"));
   const f = getFolder(targetFolderId);
@@ -738,6 +813,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
     const groupId = String(ctx.form.get("groupId") || "").trim();
     if (!groupId) return { error: "Select a group." };
     shareFolder(targetFolderId, { groupId }, ctx.user.id, origin);
+    logAction(ctx, ActivityAction.ShareAdd, "folder", targetFolderId, f.name);
     return { success: "Folder shared with group." };
   }
   if (shareType === "user") {
@@ -747,6 +823,7 @@ export function handleShareFolder(ctx: ActionContext, ownerRoles: string[]) {
       .get(email);
     if (!target) return { error: "User not found." };
     shareFolder(targetFolderId, { userId: target.id }, ctx.user.id, origin);
+    logAction(ctx, ActivityAction.ShareAdd, "folder", targetFolderId, f.name);
     return { success: "Folder shared." };
   }
   return null;
@@ -756,6 +833,7 @@ export function handleUnshareFolder(ctx: ActionContext, ownerRoles: string[]) {
   if (!ownerRoles.includes(ctx.role)) return { error: "You don't have permission to remove shares." };
   const shareId = String(ctx.form.get("shareId"));
   unshareFolder(shareId, ctx.workspace.id);
+  logAction(ctx, ActivityAction.ShareRemove, "folder");
   return { success: "Share removed." };
 }
 

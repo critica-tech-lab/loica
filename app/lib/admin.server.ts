@@ -7,6 +7,8 @@ import { dbPath } from "./paths.server";
 import { createPasswordResetToken } from "./auth.server";
 import { sendWelcomeEmail, sendPasswordResetNotification } from "./email.server";
 import { createWorkspace, getUserWorkspaces } from "./workspace.server";
+import { addTeamspaceMember, deleteTeamspace } from "./teamspace.server";
+import { reassignCreatedBy } from "./workspace-successor.server";
 import { getEmailOrigin } from "./url.server";
 
 // ─── Types ────────────────────────────────────────────────
@@ -433,6 +435,73 @@ export async function adminResetPassword(userId: string): Promise<void> {
   sendPasswordResetNotification(user.email, user.name, origin ? `${origin}/reset-password/${token}` : null);
 }
 
+export type SoloWorkspaceImpact = {
+  id: string;
+  name: string;
+  type: "personal" | "team";
+  docCount: number;
+  folderCount: number;
+};
+
+export type UserDeletionImpact = {
+  soloWorkspaces: SoloWorkspaceImpact[];
+  totalDocs: number;
+  totalFolders: number;
+};
+
+/**
+ * What `adminDeleteUser` would destroy: every workspace where this user is
+ * the sole owner (adminDeleteUser deletes those outright, content and all),
+ * plus how much content sits in each. The admin UI uses this to force an
+ * informed, explicit confirmation before taking the destructive path
+ * instead of `adminTransferAndDeleteUser`.
+ */
+export function getUserDeletionImpact(userId: string): UserDeletionImpact {
+  const soloWorkspaceIds = prep<{ workspace_id: string }, [string]>(
+      `SELECT wm.workspace_id FROM workspace_members wm
+       WHERE wm.user_id = ? AND wm.role = 'owner'
+       AND (SELECT COUNT(*) FROM workspace_members wm2
+            WHERE wm2.workspace_id = wm.workspace_id AND wm2.role = 'owner') = 1`
+    )
+    .all(userId)
+    .map((row) => row.workspace_id);
+  // adminDeleteUser also deletes Teamspaces the user is the only member of
+  for (const id of soleMemberTeamspaceIds(userId)) {
+    if (!soloWorkspaceIds.includes(id)) soloWorkspaceIds.push(id);
+  }
+
+  const soloWorkspaces: SoloWorkspaceImpact[] = soloWorkspaceIds.map((workspace_id) => {
+    const ws = prep<{ name: string; type: "personal" | "team" }, [string]>(
+      "SELECT name, type FROM workspaces WHERE id = ?"
+    ).get(workspace_id)!;
+    const docCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM documents WHERE workspace_id = ? AND deleted_at IS NULL"
+    ).get(workspace_id)!.cnt;
+    const folderCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM folders WHERE workspace_id = ? AND deleted_at IS NULL"
+    ).get(workspace_id)!.cnt;
+    return { id: workspace_id, name: ws.name, type: ws.type, docCount, folderCount };
+  });
+
+  return {
+    soloWorkspaces,
+    totalDocs: soloWorkspaces.reduce((sum, w) => sum + w.docCount, 0),
+    totalFolders: soloWorkspaces.reduce((sum, w) => sum + w.folderCount, 0),
+  };
+}
+
+/** Teamspaces whose only member is `userId`. Nobody is left to take them over. */
+function soleMemberTeamspaceIds(userId: string): string[] {
+  return prep<{ id: string }, [string]>(
+      `SELECT w.id FROM workspaces w
+       JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = ?
+       WHERE w.type = 'team'
+         AND (SELECT COUNT(*) FROM workspace_members WHERE workspace_id = w.id) = 1`
+    )
+    .all(userId)
+    .map((row) => row.id);
+}
+
 export function adminDeleteUser(userId: string): void {
   const tx = db.transaction(() => {
     // Delete workspaces where user is the sole owner
@@ -448,37 +517,19 @@ export function adminDeleteUser(userId: string): void {
       db.prepare("DELETE FROM workspaces WHERE id = ?").run(workspace_id);
     }
 
+    // Delete Teamspaces the user is the only member of, like solo workspaces
+    for (const id of soleMemberTeamspaceIds(userId)) {
+      deleteTeamspace(id);
+    }
+
     // Delete groups where user is the sole creator (no other members)
     db.prepare(
       `DELETE FROM groups WHERE created_by = ?
        AND id NOT IN (SELECT group_id FROM group_members WHERE user_id != ?)`
     ).run(userId, userId);
 
-    // Reassign created_by references in shared workspaces to another owner
-    db.prepare(
-      `UPDATE workspaces SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = workspaces.id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(userId, userId);
-
-    // Reassign created_by in folders/documents to another workspace owner
-    db.prepare(
-      `UPDATE folders SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = folders.workspace_id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(userId, userId);
-
-    db.prepare(
-      `UPDATE documents SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = documents.workspace_id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(userId, userId);
+    // Hand workspaces, folders and documents to another member
+    reassignCreatedBy(db, userId);
 
     // Reassign created_by in groups to another group member
     db.prepare(
@@ -651,30 +702,13 @@ export function adminTransferAndDeleteUser(
       }
     }
 
+    // Teamspaces the source user is the only member of go to the target as admin
+    for (const id of soleMemberTeamspaceIds(sourceUserId)) {
+      addTeamspaceMember(id, targetUserId, "admin");
+    }
+
     // Reassign created_by in co-owned workspaces/folders/documents/groups
-    db.prepare(
-      `UPDATE workspaces SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = workspaces.id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(sourceUserId, sourceUserId);
-
-    db.prepare(
-      `UPDATE folders SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = folders.workspace_id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(sourceUserId, sourceUserId);
-
-    db.prepare(
-      `UPDATE documents SET created_by = (
-         SELECT wm.user_id FROM workspace_members wm
-         WHERE wm.workspace_id = documents.workspace_id AND wm.user_id != ? AND wm.role = 'owner'
-         LIMIT 1
-       ) WHERE created_by = ?`
-    ).run(sourceUserId, sourceUserId);
+    reassignCreatedBy(db, sourceUserId);
 
     db.prepare(
       `DELETE FROM groups WHERE created_by = ?
