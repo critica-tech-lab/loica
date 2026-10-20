@@ -87,8 +87,8 @@ describe("checkShareRateLimit", () => {
   test("allows 20 share requests per window, blocks the 21st", () => {
     const req = new Request("http://x");
     for (let i = 0; i < SHARE_LIMIT; i++) {
-      expect(checkShareRateLimit(req).allowed).toBe(true);
+      expect(checkShareRateLimit(req, "u1").allowed).toBe(true);
     }
-    expect(checkShareRateLimit(req).allowed).toBe(false);
+    expect(checkShareRateLimit(req, "u1").allowed).toBe(false);
   });
 });

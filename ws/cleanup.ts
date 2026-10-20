@@ -15,7 +15,7 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from "node:fs";
+import { readdirSync, renameSync, mkdirSync, appendFileSync, statSync, unlinkSync } from "node:fs";
 import { STALE_AGE_SECS, MIN_CONTENT_LEN, RING_BUFFER_SIZE } from "./types.ts";
 import { uploadsDir } from "../app/lib/paths.server.ts";
 
@@ -49,8 +49,6 @@ export function initializeCleanupStatements(db: Database.Database) {
        SET deleted_at = unixepoch(), deleted_by = created_by
        WHERE id = ? AND deleted_at IS NULL`
     ),
-    allContent: db.prepare(`SELECT content FROM documents`),
-    allVersionContent: db.prepare(`SELECT content FROM document_versions`),
     pruneUpdates: db.prepare(
       `DELETE FROM document_updates
        WHERE document_id = @docId
@@ -113,6 +111,47 @@ export function cleanupStaleDocs(
 // very much still in use. Deleting a file is irreversible; waiting is free.
 const MIN_ORPHAN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Rows per batch when scanning documents/document_versions for upload
+// references. Small enough that one batch's query + regex scan is cheap,
+// large enough that a hundred-thousand-row table doesn't need a hundred-
+// thousand round trips.
+export const CLEANUP_BATCH_SIZE = 200;
+
+/** Yields to the event loop — used between batches so a large scan doesn't
+ * block ws message handling for its whole duration. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+/**
+ * Add every `/api/uploads/<filename>` reference found in `table`'s `content`
+ * column to `referenced`, processing CLEANUP_BATCH_SIZE rows at a time (by
+ * rowid, ascending) instead of one `SELECT content FROM <table>` for the
+ * whole table — this used to load every document's full markdown into
+ * memory at once, hourly, regardless of table size.
+ */
+export async function collectUploadRefsBatched(
+  db: Database.Database,
+  table: "documents" | "document_versions",
+  referenced: Set<string>,
+): Promise<void> {
+  let lastRowId = 0;
+  for (;;) {
+    const rows = db
+      .prepare(`SELECT rowid AS rowid, content FROM ${table} WHERE rowid > ? ORDER BY rowid LIMIT ?`)
+      .all(lastRowId, CLEANUP_BATCH_SIZE) as { rowid: number; content: string }[];
+    if (rows.length === 0) break;
+
+    for (const row of rows) {
+      for (const m of row.content.matchAll(/\/api\/uploads\/([^\s)"']+)/g)) referenced.add(m[1]);
+    }
+
+    lastRowId = rows[rows.length - 1].rowid;
+    if (rows.length < CLEANUP_BATCH_SIZE) break; // last page
+    await yieldToEventLoop();
+  }
+}
+
 /**
  * Names still referenced by a Yjs binary — the actual source of truth for
  * document contents (see storage-architecture.md); `documents.content` is only
@@ -161,7 +200,7 @@ function referencedInYjsState(db: Database.Database, candidates: Set<string>): S
  * pre-quarantine version of this code left behind — is invisible here. Use
  * `scripts/audit-uploads.sh` for that direction.
  */
-export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatements): void {
+export async function cleanupOrphanUploads(db: Database.Database): Promise<void> {
   const uploadDir = uploadsDir;
 
   let files: string[];
@@ -177,21 +216,15 @@ export function cleanupOrphanUploads(db: Database.Database, stmts: CleanupStatem
 
   if (files.length === 0) return;
 
-  // Collect every filename referenced in any document
+  // Collect every filename referenced in any document, and in version
+  // history (an image dropped from the live doc must survive so restoring an
+  // older version doesn't yield a broken image) — in CLEANUP_BATCH_SIZE-row
+  // batches rather than one `SELECT content FROM documents` for the whole
+  // table, so this doesn't hold the whole markdown corpus in memory at once
+  // or block the ws process's event loop for the scan's full duration.
   const referenced = new Set<string>();
-  const rows = stmts.allContent.all() as { content: string }[];
-
-  for (const row of rows) {
-    // Match /api/uploads/<filename> references in markdown content
-    const matches = row.content.matchAll(/\/api\/uploads\/([^\s)"']+)/g);
-    for (const m of matches) referenced.add(m[1]);
-  }
-
-  // Version history counts as a reference: an image dropped from the live doc
-  // must survive so restoring an older version doesn't yield a broken image.
-  for (const row of stmts.allVersionContent.all() as { content: string }[]) {
-    for (const m of row.content.matchAll(/\/api\/uploads\/([^\s)"']+)/g)) referenced.add(m[1]);
-  }
+  await collectUploadRefsBatched(db, "documents", referenced);
+  await collectUploadRefsBatched(db, "document_versions", referenced);
 
   // Also check pdf_file column (uploaded PDFs, docx, pages, xlsx, etc.)
   const pdfFileRows = db.prepare(`SELECT pdf_file FROM documents WHERE pdf_file IS NOT NULL AND length(pdf_file) > 0`).all() as { pdf_file: string }[];
@@ -259,6 +292,48 @@ export function deleteOldNotifications(db: Database.Database): void {
   if (result.changes > 0) {
     console.log(`[ws-server] Cleaned up ${result.changes} old notification(s)`);
   }
+}
+
+/**
+ * Delete old client-side error log rows (older than 30 days). Unlike the
+ * tables above, client_errors has no restore path and nothing reads a row
+ * once it's aged past debugging usefulness, so a hard DELETE is fine here.
+ */
+export function deleteOldClientErrors(db: Database.Database): void {
+  const cutoff = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+  const result = db.prepare("DELETE FROM client_errors WHERE created_at < ?").run(cutoff);
+  if (result.changes > 0) {
+    console.log(`[ws-server] Cleaned up ${result.changes} old client error log(s)`);
+  }
+}
+
+/**
+ * Permanently delete trash older than 30 days — documents and folders.
+ *
+ * Duplicated from app/lib/document.server.ts's purgeExpiredTrash rather than
+ * imported: that module (via templates.ts → ~/extensions) pulls in .tsx
+ * files that only Vite/Bun's bundler can load. ws-server.ts runs under
+ * plain `node`, which can't resolve the `~/` alias or JSX, so this file's
+ * convention (see cleanupStaleDocs/pruneAutoVersions above) is to keep its
+ * own copy of the SQL instead. Previously this only ran when a trash page
+ * loaded; this gives it a schedule independent of that.
+ */
+export function purgeExpiredTrash(db: Database.Database): string[] {
+  const cutoff = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+  const expired = db.prepare(
+    "SELECT id, pdf_file FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?"
+  ).all(cutoff) as { id: string; pdf_file: string | null }[];
+  for (const doc of expired) {
+    if (!doc.pdf_file) {
+      continue;
+    }
+    try { unlinkSync(join(uploadsDir, doc.pdf_file)); } catch { /* file may not exist */ }
+  }
+  db.prepare("DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
+  db.prepare("DELETE FROM folders WHERE deleted_at IS NOT NULL AND deleted_at < ?").run(cutoff);
+  // Returned so the caller can close any room still open on a purged doc
+  // (e.g. one trashed while the ws server was down, so it was never told).
+  return expired.map((doc) => doc.id);
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   adminToggleAdmin,
   adminTransferAndDeleteUser,
   adminMergeUserFiles,
+  getUserDeletionImpact,
   getCheapStats,
   refreshExpensiveStats,
   walCheckpoint,
@@ -237,6 +238,17 @@ export async function action({ request }: Route.ActionArgs) {
       } catch (e: unknown) {
         return { error: e instanceof Error ? e.message : "Failed to transfer and delete." };
       }
+    }
+
+    // Discarding (not transferring) wipes every workspace this user solely
+    // owns. If that would destroy real content, stop and show the blast
+    // radius instead of deleting — the admin has to explicitly resubmit
+    // with confirmDestroy to go through with it.
+    const impact = getUserDeletionImpact(userId);
+    const hasContent = impact.totalDocs > 0 || impact.totalFolders > 0;
+    const confirmed = form.get("confirmDestroy") === "true";
+    if (hasContent && !confirmed) {
+      return { confirmDestroyUserId: userId, impact };
     }
     adminDeleteUser(userId);
     return { success: "User deleted." };
@@ -1068,6 +1080,10 @@ export default function AdminPanel() {
               }
 
               if (deletingId === u.id) {
+                const pendingDestroy =
+                  actionData && "confirmDestroyUserId" in actionData && actionData.confirmDestroyUserId === u.id
+                    ? actionData.impact
+                    : null;
                 return (
                   <div
                     key={u.id}
@@ -1076,18 +1092,16 @@ export default function AdminPanel() {
                     <div className="mb-2 text-sm font-medium">
                       Delete <span className="text-scarlet">{u.name}</span>
                     </div>
+                    {pendingDestroy && (
+                      <div className="mb-3 rounded-lg border border-scarlet/25 bg-scarlet/[0.06] px-3 py-2 text-xs text-scarlet">
+                        This permanently deletes {pendingDestroy.totalDocs} document{pendingDestroy.totalDocs === 1 ? "" : "s"} and{" "}
+                        {pendingDestroy.totalFolders} folder{pendingDestroy.totalFolders === 1 ? "" : "s"} in{" "}
+                        {pendingDestroy.soloWorkspaces.map((w: { name: string }) => w.name).join(", ")} — workspaces only this user owns.
+                        Transfer instead to keep the files.
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-end gap-3">
-                      <Form method="post" className="flex items-center gap-2">
-                        <input type="hidden" name="intent" value="delete-user" />
-                        <input type="hidden" name="userId" value={u.id} />
-                        <button
-                          type="submit"
-                          disabled={busy}
-                          className="rounded bg-scarlet/80 px-3 py-1 font-mono text-xs text-white transition-opacity hover:opacity-80 disabled:opacity-40"
-                        >
-                          Discard data & delete
-                        </button>
-                      </Form>
+                      {/* Transfer first — the default, non-destructive path when the user has content. */}
                       <Form method="post" className="flex items-center gap-2">
                         <input type="hidden" name="intent" value="delete-user" />
                         <input type="hidden" name="userId" value={u.id} />
@@ -1114,6 +1128,18 @@ export default function AdminPanel() {
                           className="rounded bg-fg px-3 py-1 font-mono text-xs text-bg transition-opacity hover:opacity-80 disabled:opacity-40"
                         >
                           Transfer & delete
+                        </button>
+                      </Form>
+                      <Form method="post" className="flex items-center gap-2">
+                        <input type="hidden" name="intent" value="delete-user" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        {pendingDestroy && <input type="hidden" name="confirmDestroy" value="true" />}
+                        <button
+                          type="submit"
+                          disabled={busy}
+                          className="rounded bg-scarlet/80 px-3 py-1 font-mono text-xs text-white transition-opacity hover:opacity-80 disabled:opacity-40"
+                        >
+                          {pendingDestroy ? "Yes, discard everything" : "Discard data & delete"}
                         </button>
                       </Form>
                       <button

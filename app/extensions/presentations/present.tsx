@@ -3,8 +3,7 @@ import type { MetaFunction } from "react-router";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getWorkspace, getMembership } from "~/lib/workspace.server";
 import { getDocument } from "~/lib/document.server";
-import { hasSharedAccess } from "~/lib/sharing.server";
-import { hasDocSharedAccess } from "~/lib/doc-sharing.server";
+import { getUserDocAccess } from "~/lib/doc-access.server";
 import { getEnabledExtensionIdSet } from "~/extensions/index.server";
 import { PresentView } from "./PresentView";
 
@@ -31,9 +30,7 @@ export async function loader({ request, params }: { request: Request; params: { 
   const role = getMembership(workspace.id, user.id, user.is_admin);
   if (!role) {
     // Shared access → redirect to the shared presenting route
-    const hasFolderAccess = document.folder_id && hasSharedAccess(document.folder_id, user.id);
-    const hasDocAccess = hasDocSharedAccess(document.id, user.id);
-    if (hasFolderAccess || hasDocAccess) throw redirect(`/shared/doc/${params.id}/present`);
+    if (getUserDocAccess(document, user)) throw redirect(`/shared/doc/${params.id}/present`);
     throw new Response("Not authorized", { status: 403 });
   }
 
