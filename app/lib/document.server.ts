@@ -1019,11 +1019,20 @@ export type RecentDoc = {
   title: string;
   workspace_name: string;
   viewed_at: number;
+  /** Needed by the caller to check the user can still open the doc. */
+  workspace_id: string;
+  folder_id: string | null;
 };
 
+/**
+ * Docs the user opened most recently. Rows are NOT filtered by access: a doc
+ * may have been unshared or the user removed from its workspace since, so
+ * callers must check access before showing one.
+ */
 export function getRecentDocs(userId: string, limit = 10): RecentDoc[] {
   return prep<RecentDoc, [string, number]>(
-      `SELECT d.id, d.title, w.name AS workspace_name, r.viewed_at
+      `SELECT d.id, d.title, w.name AS workspace_name, r.viewed_at,
+              d.workspace_id, d.folder_id
        FROM user_recent_docs r
        JOIN documents d ON d.id = r.document_id
        JOIN workspaces w ON w.id = d.workspace_id

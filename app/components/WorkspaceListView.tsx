@@ -88,6 +88,7 @@ export function WorkspaceListView({
           {headerContent}
           {canEdit && (
             <NewButton
+              creating={createDocFetcher.state !== "idle"}
               onCreateDoc={() => {
                 armUndoCreate("doc", location.pathname);
                 const form = new FormData();

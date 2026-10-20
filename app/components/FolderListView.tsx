@@ -205,6 +205,7 @@ export function FolderListView({
             )}
             {canEdit && (
               <NewButton
+                creating={createDocFetcher.state !== "idle"}
                 onCreateDoc={() => createDoc()}
                 onCreateFromTemplate={(templateId) => createDoc(templateId)}
                 onCreateFolder={() => setCreatingNewFolder(true)}
