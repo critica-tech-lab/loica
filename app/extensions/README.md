@@ -42,6 +42,9 @@ If either is false, it's **core**:
 | appear in New/Insert + starter content | `template` | ✅ |
 | a row icon in lists | `rowIcon` | ✅ |
 | an item in the doc ⋯ menu | `getDocMenuItems` | ✅ |
+| decorate or react to the live editor (underlines, popovers) | `editorPlugins` | ✅ |
+| an action in the text-selection menu | `selectionMenuItems` | ✅ |
+| an API route for its own requests | `routes.ts` | folder extension only (build time) |
 | override PDF / DOCX export for one doc type | `exporters.pdf` / `.docx` | ✅ |
 | replace the core PDF/DOCX pipeline install-wide | `globalExporters.pdf` / `.docx` | ✅ |
 | take over print/share preview | `previewHtml` | ✅ |
@@ -76,15 +79,15 @@ Extensions are **convention, not isolation**:
 - **Not sandboxed.** A drop-in runs first-class server code — it imports the
   SDK and can do anything node can. No iframe, no separate process, no
   permissions.
-- **Installable, but trusted.** Drop-in extensions load at runtime from
-  `plugins/<id>/` and the planned admin flow installs them straight from a
-  repo. Because they run unsandboxed, install is **admin-only and limited to
-  allowlisted sources** — there is no untrusted community-upload flow. A public
-  marketplace would require sandboxing designed in *first*; it can't be
-  retrofitted.
+- **Installed by whoever runs the server.** Drop-in extensions load at runtime
+  from `plugins/<id>/`, which the operator fills on disk. There is no in-app
+  install or upload flow. Because plugins run unsandboxed, adding one is a
+  server-admin decision. A public marketplace would require sandboxing designed
+  in *first*; it can't be retrofitted.
 - **Restart, not rebuild.** A drop-in is picked up on process restart (the
-  plugin scan is memoized per process) — no app rebuild. Compile-bound features
-  *do* need a build, which is exactly why they're core, not extensions.
+  plugin scan is memoized per process) — no app rebuild. A folder under
+  `app/extensions/` is compiled in, so adding or removing one *does* need a
+  build.
 
 This trust model is deliberate (Discourse and Strapi work the same way).
 
@@ -93,13 +96,14 @@ This trust model is deliberate (Discourse and Strapi work the same way).
 ## Anatomy of an extension
 
 An extension is a folder under `app/extensions/<name>/` with at minimum an
-`index.ts` exporting a `LoicaExtension` object. The folder typically also
+`index.ts` whose default export is a `LoicaExtension` object. The folder typically also
 holds the feature's UI components, server-only code, templates, and assets.
 
 ```
 app/extensions/mindmaps/
 ├── index.ts          ← client-safe extension definition (template, icon)
 ├── index.server.ts   ← server-only definition (extends index.ts with exporters)
+├── routes.ts         ← optional API routes (default-exports route entries)
 ├── template.ts       ← starter content generator (client-safe)
 ├── MindmapView.tsx   ← custom editor view (client component)
 ├── parsing.server.ts ← server-side helpers (if any)
@@ -127,10 +131,10 @@ app/extensions/mindmaps/
 
 ```ts
 // app/extensions/mindmaps/index.ts
-import type { LoicaExtension } from "~/extensions/types";
-import { LOICA_EXTENSION_API_VERSION } from "~/extensions/types";
+import type { LoicaExtension } from "~/extensions/sdk";
+import { LOICA_EXTENSION_API_VERSION } from "~/extensions/sdk";
 
-export const mindmapsExtension: LoicaExtension = {
+const mindmapsExtension: LoicaExtension = {
   id: "mindmaps",
   apiVersion: LOICA_EXTENSION_API_VERSION,
   description: "Visual mindmaps with draggable nodes.",
@@ -148,6 +152,9 @@ export const mindmapsExtension: LoicaExtension = {
       `---\ntype: mindmap\n---\n{"nodes":[],"edges":[]}\n`,
   },
 };
+
+// The registry only picks up a default export (or one named `extension`).
+export default mindmapsExtension;
 ```
 
 ### 3. (Optional) Add a custom editor view
@@ -158,7 +165,7 @@ If your doc type needs more than the default markdown editor:
 // in index.ts — extends the extension object above:
 import { MindmapView } from "./MindmapView";
 
-export const mindmapsExtension: LoicaExtension = {
+const mindmapsExtension: LoicaExtension = {
   // ... fields from step 2 ...
   EditorView: MindmapView,
 };
@@ -175,41 +182,33 @@ client extension:
 
 ```ts
 // app/extensions/mindmaps/index.server.ts
-import type { LoicaExtension } from "~/extensions/types";
-import { mindmapsExtension as base } from "./index";
+import type { LoicaExtension } from "~/extensions/sdk";
+import base from "./index";
 import { generateMindmapPdf } from "./pdf.server";
 
-export const mindmapsServerExtension: LoicaExtension = {
+const mindmapsServerExtension: LoicaExtension = {
   ...base,
   exporters: {
     pdf: (doc, frontmatter) =>
       generateMindmapPdf(doc.content, frontmatter, doc.title),
   },
 };
+
+export default mindmapsServerExtension;
 ```
 
-### 5. Register the extension
+### 5. Registration is automatic
 
-Add two lines to `app/extensions/index.ts`:
+There is nothing to register. `app/extensions/index.ts`, `index.server.ts` and
+`routes.ts` glob `app/extensions/*/` at build time and pick up the default
+export of each extension's `index.ts`, `index.server.ts` and `routes.ts`.
+Removing the folder un-registers it. A named export alone is ignored: only the
+built-in presentations extension is registered by name.
 
-```ts
-import { mindmapsExtension } from "./mindmaps";
-
-export const extensions: LoicaExtension[] = [
-  mindmapsExtension,        // ← add here
-];
-```
-
-And if your extension has server code, the corresponding line in
-`app/extensions/index.server.ts`:
-
-```ts
-import { mindmapsServerExtension } from "./mindmaps/index.server";
-
-export const serverExtensions: LoicaExtension[] = [
-  mindmapsServerExtension,  // ← add here
-];
-```
+If the extension needs its own API route, add
+`app/extensions/mindmaps/routes.ts` that `export default`s an array of React
+Router route entries. See the LanguageTool extension's `routes.ts` for an
+example.
 
 ### 6. Build and test
 
@@ -231,6 +230,8 @@ you care about.
 | Field | Type | When to use |
 |---|---|---|
 | `id` | `string` | Always. Stable identifier (matches the toggle in admin UI). |
+| `defaultEnabled` | `boolean` | Set to `false` to keep the extension off until an admin enables it, e.g. when it needs an external server. |
+| `core` | `boolean` | Compiled-in core features only (presentations). Always on and hidden from the admin toggles. |
 | `apiVersion` | `number` | Always. Set to `LOICA_EXTENSION_API_VERSION`; warns on mismatch. Host-compat — distinct from `version`. |
 | `version` | `string` | Recommended. The extension's OWN semver (e.g. `"1.2.0"`). Shown in admin UI; basis for update detection. |
 | `homepage` / `repository` | `string` | Recommended. Linked from admin UI; `repository` is the basis for remote install/update. |
@@ -242,6 +243,8 @@ you care about.
 | `EditorView` | `ComponentType<ExtensionEditorViewProps>` | When the doc type needs a custom editor (not the markdown one). The host passes a typed prop contract. |
 | `EditorBanner` | `ComponentType<ExtensionEditorBannerProps>` | Component rendered above the editor for matching docType (e.g. the "Present" pill). |
 | `getDocMenuItems` | `(ctx) => ExtensionDocMenuItem[]` | Items the extension contributes to the doc actions menu. The host adds a separator after the group. |
+| `editorPlugins` | `(ctx) => Plugin[]` | ProseMirror plugins the host mounts into the editable editor, e.g. inline underlines and their popovers. Not mounted on read-only views. |
+| `selectionMenuItems` | `(ctx) => ExtensionSelectionMenuItem[]` | Actions added to the menu that appears over selected text. |
 | `authProvider` | `AuthProvider` | When the extension contributes a sign-in option (Google OAuth, SAML, generic OIDC). |
 | `exporters.pdf` | function | When PDF export of this doc type needs custom rendering. Falls back to core markdown→PDF when absent. |
 | `exporters.docx` | function | Same, for DOCX. Falls back to core markdown→DOCX. |
@@ -274,8 +277,9 @@ Built-ins declare these inline instead. The admin panel shows each extension's
 
 Two states, on purpose:
 
-- **Available** — the extension is in `app/extensions/index.ts` (a build-time
-  decision made by whoever maintains the Loica install).
+- **Available** — the extension's folder is under `app/extensions/` when Loica
+  is built, or under `plugins/` when the server starts (a decision made by
+  whoever maintains the Loica install).
 - **Enabled** — the extension is on for this install (a runtime decision made
   by the admin via `/admin` → Extensions section).
 
@@ -286,8 +290,8 @@ still open** — they just lose specialized features.
 
 The first time the admin toggles an extension, the choice persists in
 `app_settings.enabled_extensions` (a JSON array of IDs). Until that first
-toggle, every available extension is enabled by default — no surprises on
-upgrade.
+toggle, every available extension is enabled except those that set
+`defaultEnabled: false`. Core features (`core: true`) are always on.
 
 ---
 
@@ -296,8 +300,8 @@ upgrade.
 Extensions MUST import from `~/extensions/sdk` (client) or
 `~/extensions/sdk.server` (server) — and nothing else from inside Loica.
 
-**One exception**: route handlers that the extension contributes to
-`app/routes.ts` (files exporting a `loader` or `action`) are themselves
+**One exception**: route handlers that the extension contributes through its
+`routes.ts` (files exporting a `loader` or `action`) are themselves
 Loica routes. They get full access to core helpers (`getSessionUser`,
 `getDocument`, etc) just like any other route. The SDK rule is for
 extension-shape code — definitions, exporters, custom views, helpers.
@@ -376,11 +380,13 @@ accidental, and changing any of them is a major architectural shift.
    change to Loica. They have full database, filesystem, and module access.
 2. **No sandbox.** A buggy or malicious extension can take down the install.
    This is acceptable because extensions are first-party.
-3. **No third-party extension uploads.** If you need community extensions,
+3. **No third-party extension uploads.** Plugins reach a server only when its
+   operator puts them in `plugins/`. If you need community extensions,
    sandboxing must come first (see Standard Notes' iframe model or
    Logseq's postMessage bridge).
-4. **Build-time registration.** Adding/removing an extension requires a
-   rebuild and restart. Toggling enabled/disabled does not.
+4. **Registration at build or start.** Adding or removing a folder under
+   `app/extensions/` requires a rebuild and restart; a drop-in under
+   `plugins/` needs only a restart. Toggling enabled/disabled needs neither.
 5. **Activation is install-wide.** Per-workspace extension toggles are not
    on the roadmap. If you need that, the `enabled_extensions` schema will
    need to change first.
@@ -420,5 +426,7 @@ match the current one.
 - **Don't assume your extension is enabled.** Code that runs in the
   background (cron jobs, ws-server handlers) should check
   `getEnabledExtensionIdSet()` before doing extension-specific work.
-- **Avoid reaching into other extensions.** If you need a helper from
-  another extension, factor it into `app/extensions/shared/` first.
+- **Avoid reaching into other extensions.** Each extension may be installed
+  without the others. If two need the same helper, copy it (the translation
+  extension carries its own copy of the proofreader's `gate.ts`) or propose it
+  for the SDK.
