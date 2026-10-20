@@ -16,14 +16,28 @@
  * the token as a `?token=` query parameter.
  */
 import { getSessionUser } from "./auth.server";
+import { db } from "./db.server";
 import { getDocument, getDocumentByToken } from "./document.server";
 import type { Document } from "./document.server";
 import { getMembership } from "./workspace.server";
 import { hasSharedAccess } from "./sharing.server";
-import { db } from "./db.server";
 import { verifySharePasswordCookie } from "./share-password.server";
 import { hasDocSharedAccess } from "./doc-sharing.server";
 import { hasDocAccess } from "./doc-mention-authz.server";
+import { resolveDocAccess } from "./doc-permission.server";
+import type { DocAccess } from "./doc-permission.server";
+
+/**
+ * What a signed-in user may do with a document: admin, workspace member, folder
+ * share or document share. Null when none apply. Share-token access is separate
+ * (see `authorizeDocRead`).
+ */
+export function getUserDocAccess(
+  doc: Pick<Document, "id" | "workspace_id" | "folder_id">,
+  user: { id: string; is_admin: boolean },
+): DocAccess | null {
+  return resolveDocAccess(db, doc, user);
+}
 
 function parseCookies(header: string): Record<string, string> {
   return Object.fromEntries(
@@ -40,20 +54,16 @@ function parseCookies(header: string): Record<string, string> {
  * Return the document if the caller may read it, else throw a 404 (not a 403 —
  * an unauthorised caller should not learn that the id exists).
  *
- * Access is granted to a workspace member, a folder-share recipient, or a
- * caller presenting a valid share token for *this* document. A token that
- * resolves to a different document is not access to this one.
+ * Access is granted to a workspace member, a folder-share or document-share
+ * recipient, or a caller presenting a valid share token for *this* document. A
+ * token that resolves to a different document is not access to this one.
  */
 export function authorizeDocRead(request: Request, id: string | undefined): Document {
   const doc = getDocument(id!);
   if (!doc) throw new Response("Not found", { status: 404 });
 
   const user = getSessionUser(request);
-  if (user) {
-    const role = getMembership(doc.workspace_id, user.id, user.is_admin);
-    const shared = doc.folder_id ? hasSharedAccess(doc.folder_id, user.id) : false;
-    if (role || shared) return doc;
-  }
+  if (user && getUserDocAccess(doc, user)) return doc;
 
   const token = new URL(request.url).searchParams.get("token")?.trim();
   if (token) {

@@ -18,9 +18,8 @@ import {
   isStarred,
   toggleStar,
 } from "~/lib/document.server";
-import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc, hasDocSharedAccess } from "~/lib/doc-sharing.server";
-import { hasSharedAccess } from "~/lib/sharing.server";
-import { userHasDocAccess } from "~/lib/doc-access.server";
+import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
+import { getUserDocAccess, userHasDocAccess } from "~/lib/doc-access.server";
 import { capMentionBody } from "~/lib/doc-mention-authz.server";
 import { isRoomLive, shouldRejectContentWrite } from "~/lib/ws-notify.server";
 import { getRateLimitKey, checkRateLimit } from "~/lib/rate-limit.server";
@@ -64,9 +63,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const role = getMembership(workspace.id, user.id, user.is_admin);
   if (!role) {
     // User may have access via a share — redirect to the shared doc route
-    const hasFolderAccess = document.folder_id && hasSharedAccess(document.folder_id, user.id);
-    const hasDocAccess = hasDocSharedAccess(document.id, user.id);
-    if (hasFolderAccess || hasDocAccess) throw redirect(`/shared/doc/${params.id}`);
+    if (getUserDocAccess(document, user)) throw redirect(`/shared/doc/${params.id}`);
     // Deliberately "not found" rather than "no access" — a stranger shouldn't be
     // able to probe which document IDs exist.
     throw appError("doc_not_found");

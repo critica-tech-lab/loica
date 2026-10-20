@@ -24,7 +24,7 @@ import { dbPath } from "./app/lib/paths.server.ts";
 
 // ─── Import modular components ────────────────────────────────────────────────
 
-import { authenticateWs, invalidateSharedAccessCache } from "./ws/auth.ts";
+import { authenticateWs } from "./ws/auth.ts";
 import { deleteOldActivity } from "./app/lib/activity.server.ts";
 import {
   initializePersistenceStatements,
@@ -701,9 +701,6 @@ const adminServer = http.createServer((req, res) => {
     const userId = params.get("userId") ?? undefined;
     const reason = params.get("reason") ?? "Access revoked";
     const kickDocId = kickMatch[1];
-    // A revoke just wrote to the DB; a stale cached "still allowed" verdict
-    // (up to SHARED_ACCESS_TTL old) must not survive this re-check.
-    invalidateSharedAccessCache();
     const closed = kickDocId
       ? kickRoom(kickDocId, userId, reason)
       : userId
