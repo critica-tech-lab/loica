@@ -433,6 +433,56 @@ export async function adminResetPassword(userId: string): Promise<void> {
   sendPasswordResetNotification(user.email, user.name, origin ? `${origin}/reset-password/${token}` : null);
 }
 
+export type SoloWorkspaceImpact = {
+  id: string;
+  name: string;
+  type: "personal" | "team";
+  docCount: number;
+  folderCount: number;
+};
+
+export type UserDeletionImpact = {
+  soloWorkspaces: SoloWorkspaceImpact[];
+  totalDocs: number;
+  totalFolders: number;
+};
+
+/**
+ * What `adminDeleteUser` would destroy: every workspace where this user is
+ * the sole owner (adminDeleteUser deletes those outright, content and all),
+ * plus how much content sits in each. The admin UI uses this to force an
+ * informed, explicit confirmation before taking the destructive path
+ * instead of `adminTransferAndDeleteUser`.
+ */
+export function getUserDeletionImpact(userId: string): UserDeletionImpact {
+  const soloWorkspaceIds = prep<{ workspace_id: string }, [string]>(
+      `SELECT wm.workspace_id FROM workspace_members wm
+       WHERE wm.user_id = ? AND wm.role = 'owner'
+       AND (SELECT COUNT(*) FROM workspace_members wm2
+            WHERE wm2.workspace_id = wm.workspace_id AND wm2.role = 'owner') = 1`
+    )
+    .all(userId);
+
+  const soloWorkspaces: SoloWorkspaceImpact[] = soloWorkspaceIds.map(({ workspace_id }) => {
+    const ws = prep<{ name: string; type: "personal" | "team" }, [string]>(
+      "SELECT name, type FROM workspaces WHERE id = ?"
+    ).get(workspace_id)!;
+    const docCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM documents WHERE workspace_id = ? AND deleted_at IS NULL"
+    ).get(workspace_id)!.cnt;
+    const folderCount = prep<{ cnt: number }, [string]>(
+      "SELECT COUNT(*) as cnt FROM folders WHERE workspace_id = ? AND deleted_at IS NULL"
+    ).get(workspace_id)!.cnt;
+    return { id: workspace_id, name: ws.name, type: ws.type, docCount, folderCount };
+  });
+
+  return {
+    soloWorkspaces,
+    totalDocs: soloWorkspaces.reduce((sum, w) => sum + w.docCount, 0),
+    totalFolders: soloWorkspaces.reduce((sum, w) => sum + w.folderCount, 0),
+  };
+}
+
 export function adminDeleteUser(userId: string): void {
   const tx = db.transaction(() => {
     // Delete workspaces where user is the sole owner

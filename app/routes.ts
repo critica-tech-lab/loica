@@ -24,6 +24,7 @@ export default [
   route("t/:workspaceId/favorites", "routes/teamspace.favorites.tsx"),
   route("t/:workspaceId/trash", "routes/teamspace.trash.tsx"),
   route("t/:workspaceId/members", "routes/teamspace.members.tsx"),
+  route("t/:workspaceId/activity", "routes/teamspace.activity.tsx"),
   route("s/:token", "routes/s.$token.tsx"),
   route("teamspaces", "routes/teamspaces.tsx"),
   // Redirects only — see the route modules.
@@ -50,6 +51,7 @@ export default [
   route("api/doc-docx/:id", "routes/api.doc-docx.$id.ts"),
   route("api/user-search", "routes/api.user-search.ts"),
   route("api/search", "routes/api.search.ts"),
+  route("api/recent-docs", "routes/api.recent-docs.ts"),
   route("api/client-error", "routes/api.client-error.ts"),
   route("api/upload", "routes/api.upload.ts"),
   route("api/uploads/:file", "routes/api.uploads.$file.ts"),

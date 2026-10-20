@@ -1928,8 +1928,9 @@ footnote.ProseMirror-selectednode::after {
 /* Tables */
 .pm-editor-mount .ProseMirror table {
   border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
+  width: auto;
+  min-width: 100%;
+  table-layout: auto;
   overflow: hidden;
   font-size: 0.9rem;
 }
@@ -1961,7 +1962,30 @@ footnote.ProseMirror-selectednode::after {
   top: 0;
   width: 4px;
 }
-.pm-editor-mount .tableWrapper { overflow-x: auto; }
+/* Tables may outgrow the 65ch text column: the wrapper sizes to its content,
+   centers on the column, and scrolls once it hits the viewport edge. */
+.pm-editor-mount .tableWrapper {
+  overflow-x: auto;
+  width: max-content;
+  min-width: 100%;
+  max-width: calc(100vw - 2rem);
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+/* Print: wide tables fit the page instead of breaking out of it. */
+@media print {
+  .pm-editor-mount .tableWrapper {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    transform: none;
+    overflow: visible;
+  }
+  .pm-editor-mount .ProseMirror table {
+    width: 100%;
+    table-layout: auto;
+  }
+}
 
 /* Callouts — the same surface as the comment popup (see `popoverSurface` in
    lib/popover-styles.ts): plain background, hard 1.5px rule, offset shadow, no
