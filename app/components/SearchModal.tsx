@@ -13,9 +13,18 @@ type SearchResult = {
   workspace_type: string;
 };
 
+type RecentItem = {
+  id: string;
+  title: string;
+  workspace_name: string;
+  href: string;
+};
+
 export function SearchModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  // Shown while the query is empty: the docs this user opened last.
+  const [recents, setRecents] = useState<RecentItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +35,16 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
     inputRef.current?.focus();
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
+
+  useEffect(() => {
+    fetch("/api/recent-docs")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: RecentItem[]) => setRecents(data))
+      .catch(() => setRecents([]));
+  }, []);
+
+  const showingRecents = !query.trim();
+  const listLength = showingRecents ? recents.length : results.length;
 
   const doSearch = useCallback((q: string) => {
     if (!q.trim()) {
@@ -63,12 +82,17 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
       onClose();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+      setSelectedIndex((i) => Math.min(i + 1, listLength - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && results[selectedIndex]) {
-      handleSelect(results[selectedIndex]);
+    } else if (e.key === "Enter") {
+      if (showingRecents && recents[selectedIndex]) {
+        onClose();
+        navigate(recents[selectedIndex].href);
+      } else if (!showingRecents && results[selectedIndex]) {
+        handleSelect(results[selectedIndex]);
+      }
     }
   }
 
@@ -144,6 +168,39 @@ export function SearchModal({ onClose }: { onClose: () => void }) {
             ESC
           </kbd>
         </div>
+
+        {showingRecents && recents.length > 0 && (
+          <div style={{ maxHeight: "20rem", overflowY: "auto" }}>
+            <div style={{ padding: "0.5rem 1rem 0.25rem", opacity: 0.4, fontSize: "var(--fs-2xs)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Recently opened
+            </div>
+            {recents.map((r, i) => (
+              <button
+                key={r.id}
+                onClick={() => { onClose(); navigate(r.href); }}
+                onMouseEnter={() => setSelectedIndex(i)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.5rem 1rem",
+                  fontSize: "var(--fs-base)",
+                  background: i === selectedIndex
+                    ? "color-mix(in srgb, var(--fg) 6%, transparent)"
+                    : "none",
+                  border: "none",
+                  color: "var(--fg)",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>{r.title || "Untitled"}</div>
+                <div style={{ opacity: 0.3, fontSize: "var(--fs-2xs)", marginTop: "0.1rem" }}>
+                  {r.workspace_name}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {query.trim() && (
           <div style={{ maxHeight: "20rem", overflowY: "auto" }}>

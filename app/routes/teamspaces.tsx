@@ -107,7 +107,7 @@ export default function Teamspaces() {
                 <a href={`/t/${ts.id}`} className="flex min-w-0 flex-1 items-center gap-4 text-fg no-underline">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-fg/[0.06]">
                     {ts.icon ? (
-                      <span className="text-lg leading-none">{ts.icon}</span>
+                      <img src={ts.icon} alt="" className="h-10 w-10 rounded-lg object-cover" />
                     ) : (
                       <GroupIcon className="h-5 w-5 text-fg/40" />
                     )}
