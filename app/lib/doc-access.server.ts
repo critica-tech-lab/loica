@@ -17,7 +17,7 @@
  */
 import { getSessionUser } from "./auth.server";
 import { db } from "./db.server";
-import { getDocument, getDocumentByToken } from "./document.server";
+import { getDocument, getDocumentByToken, toggleStar } from "./document.server";
 import type { Document } from "./document.server";
 import { getMembership } from "./workspace.server";
 import { hasSharedAccess } from "./sharing.server";
@@ -48,6 +48,23 @@ function parseCookies(header: string): Record<string, string> {
       return [[trimmed.slice(0, eq).trim(), decodeURIComponent(trimmed.slice(eq + 1).trim())]];
     }),
   );
+}
+
+/**
+ * Star or unstar a document for a signed-in user who can see it (workspace
+ * member, site admin, or folder/document share). Anyone else gets a 404.
+ *
+ * Without the check, a user holding only a document id could star it, which
+ * lists its title and workspace name on their Favorites page, and the toggle
+ * fans out to every group member of a group-shared document.
+ */
+export function toggleStarWithAccess(
+  user: { id: string; is_admin?: boolean },
+  docId: string,
+): boolean {
+  const doc = getDocument(docId);
+  if (!doc || !getUserDocAccess(doc, { id: user.id, is_admin: !!user.is_admin })) throw new Response("Not found", { status: 404 });
+  return toggleStar(user.id, docId);
 }
 
 /**

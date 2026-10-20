@@ -14,7 +14,8 @@ import {
   acceptDocShare,
   declineDocShare,
 } from "~/lib/doc-sharing.server";
-import { getStarredDocs, toggleStar, getWorkspaceStorageBytes } from "~/lib/document.server";
+import { getStarredDocs, getWorkspaceStorageBytes } from "~/lib/document.server";
+import { toggleStarWithAccess } from "~/lib/doc-access.server";
 import { getUserWorkspaces } from "~/lib/workspace.server";
 import { getTeamspacesForUser } from "~/lib/teamspace.server";
 import { getFoldersAtLevel } from "~/lib/folder.server";
@@ -57,7 +58,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "toggle-star") {
     const docId = String(form.get("docId") || "");
-    const newState = toggleStar(user.id, docId);
+    const newState = toggleStarWithAccess(user, docId);
     return { starred: newState };
   }
 

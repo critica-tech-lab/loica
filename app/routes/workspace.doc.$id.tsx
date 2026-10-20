@@ -3,6 +3,7 @@ import type { MetaFunction, ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/workspace.doc.$id";
 import { getSessionUser, loginRedirect } from "~/lib/auth.server";
 import { getWorkspace, getMembership, getWorkspaceOwnerName } from "~/lib/workspace.server";
+import { toggleStarWithAccess } from "~/lib/doc-access.server";
 import { appError } from "~/lib/errors";
 import { getPublicOrigin, getEmailOrigin, getWebSocketUrl } from "~/lib/url.server";
 import {
@@ -16,7 +17,6 @@ import {
   restoreDocumentVersion,
   recordRecentDoc,
   isStarred,
-  toggleStar,
 } from "~/lib/document.server";
 import { shareDocWithUser, shareDocWithGroup, shareDocWithExternal, unshareDoc } from "~/lib/doc-sharing.server";
 import { getUserDocAccess, userHasDocAccess } from "~/lib/doc-access.server";
@@ -128,7 +128,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "toggle-star") {
-    const newState = toggleStar(user.id, params.id);
+    const newState = toggleStarWithAccess(user, params.id);
     return { starred: newState };
   }
 
