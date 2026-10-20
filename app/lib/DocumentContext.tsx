@@ -128,6 +128,16 @@ export interface DocumentContextValue {
   editorReady: boolean;
   setEditorReady: (ready: boolean) => void;
   mounted: boolean;
+  // Called when the editor's WS connection closed because a version
+  // restore overwrote this doc (see ProseMirrorEditor's onDocumentReset).
+  // Forces the same remount a same-tab restore already triggers, so a
+  // collaborator's tab that didn't initiate the restore also drops its
+  // stale local state.
+  handleRemoteDocumentReset: () => void;
+  // Shows a toast for a terminal WS close the user should know about
+  // (access revoked, document trashed/moved/deleted — see
+  // ProseMirrorEditor's onConnectionNotice).
+  handleConnectionNotice: (reason: string) => void;
 
   // Comments
   comments: ResolvedThread[];
@@ -389,7 +399,11 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
 
   const scheduleSave = useCallback(
     (t: string, c: string) => {
-      if (c === lastSavedContent.current && t === lastSavedTitle.current) return;
+      // PM docs save only the title (see save()), so a content change alone has
+      // nothing to send. Posting anyway made one request per typing pause, each
+      // aborting the previous one.
+      const contentPending = !USE_PM && c !== lastSavedContent.current;
+      if (!contentPending && t === lastSavedTitle.current) return;
       isSaving.current = true;
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       saveTimeout.current = setTimeout(() => {
@@ -412,6 +426,27 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
       setFocusedSuggestionId(null);
     }
   }, [comments.length]);
+
+  // ─── Remote restore: another tab/collaborator's version restore ─
+  // That tab gets fresh title/content via the fetcher branch below. This
+  // tab only learns about it from the WS close — no fetcher payload to
+  // read title/content from, so just drop local state and let the fresh
+  // Yjs sync (after remount) repopulate the editor.
+  const handleRemoteDocumentReset = useCallback(() => {
+    setEditorKey((k) => k + 1);
+    setEditorReady(false);
+    setActivePanel(null);
+  }, []);
+
+  // ─── Connection notice: access revoked, or doc trashed/moved/deleted ─
+  // The server closed the WS with a reason instead of leaving the editor
+  // looking healthy while nothing it does gets saved anymore. Surface it —
+  // the connection itself won't retry (see ProseMirrorEditor's
+  // isConnectionNoticeClose: these codes are outside y-websocket's
+  // auto-reconnect range).
+  const handleConnectionNotice = useCallback((reason: string) => {
+    toast(reason, { type: "error", duration: 10_000 });
+  }, [toast]);
 
   // ─── Restore: update state + remount Editor + undo toast ─
   // We only want to react to each restore once, so we track the backup id
@@ -629,6 +664,8 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
     editorReady,
     setEditorReady,
     mounted,
+    handleRemoteDocumentReset,
+    handleConnectionNotice,
 
     comments,
     setComments,

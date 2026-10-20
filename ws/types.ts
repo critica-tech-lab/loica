@@ -5,10 +5,11 @@
 import * as Y from "yjs";
 import * as awarenessProtocol from "y-protocols/awareness";
 import { WebSocket } from "ws";
+import { MAX_DOC_BYTES } from "../app/lib/doc-limits.server.ts";
 
 // ─── Size limits ──────────────────────────────────────────────────────────────
 
-export const MAX_DOC_BYTES = 5 * 1024 * 1024; // 5 MB
+export { MAX_DOC_BYTES };
 export const MAX_MESSAGE_BYTES = MAX_DOC_BYTES * 2; // 10 MB raw WS message
 
 // Applies both when seeding a spreadsheet doc's Y.Maps from persisted
@@ -33,15 +34,40 @@ export interface Room {
   awareness: awarenessProtocol.Awareness;
   connections: Map<WebSocket, Set<number>>; // ws → set of awarenessClientIds
   wsUserMap: Map<WebSocket, string | null>; // ws → userId
+  wsUserNameMap: Map<WebSocket, string | null>; // ws → display name, resolved once at connect
+  wsAccessMap: Map<WebSocket, "read" | "write">; // ws → current access level, re-checked live (see recheckConnection)
   saveTimer: ReturnType<typeof setTimeout> | null;
+  // Set when a save is first scheduled after the last flush, cleared once it
+  // runs. Lets scheduleSave() enforce a maxWait even under a steady stream of
+  // updates that keeps resetting the plain debounce timer.
+  firstPendingSaveAt: number | null;
   lastVersionAt: number;
   lastEditor: string | null;
+  // Cursor colour, assigned once per identity in join order from a fixed
+  // palette (falls back to a hash once the room has more identities than
+  // the palette has colours). Keyed by userId for authenticated connections,
+  // or a per-connection synthetic key for anonymous share-link guests.
+  colorByIdentity: Map<string, string>;
+  nextColorIndex: number;
+  anonSeq: number;
+  wsColorMap: Map<WebSocket, string>; // ws → its assigned colour, resolved once at connect
 }
 
 // ─── Message types (y-websocket protocol) ─────────────────────────────────────
 
 export const MESSAGE_SYNC = 0;
 export const MESSAGE_AWARENESS = 1;
+
+// ─── WS close codes ───────────────────────────────────────────────────────────
+//
+// y-websocket's client only auto-reconnects for codes outside [4400, 4500) —
+// see node_modules/y-websocket's `defaultShouldReconnect`. DOCUMENT_RESTORED
+// is deliberately below that range (the client should reconnect, just with
+// its local Yjs/IndexedDB state cleared first); the other two are inside it
+// (reconnecting would just be re-authenticated and closed again).
+export const WS_CLOSE_DOCUMENT_RESTORED = 4000;
+export const WS_CLOSE_ACCESS_REVOKED = 4401;
+export const WS_CLOSE_DOC_UNAVAILABLE = 4402;
 
 // ─── Cleanup ───────────────────────────────────────────────────────────────────
 

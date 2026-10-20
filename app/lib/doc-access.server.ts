@@ -16,11 +16,28 @@
  * the token as a `?token=` query parameter.
  */
 import { getSessionUser } from "./auth.server";
+import { db } from "./db.server";
 import { getDocument, getDocumentByToken, toggleStar } from "./document.server";
 import type { Document } from "./document.server";
 import { getMembership } from "./workspace.server";
 import { hasSharedAccess } from "./sharing.server";
+import { verifySharePasswordCookie } from "./share-password.server";
 import { hasDocSharedAccess } from "./doc-sharing.server";
+import { hasDocAccess } from "./doc-mention-authz.server";
+import { resolveDocAccess } from "./doc-permission.server";
+import type { DocAccess } from "./doc-permission.server";
+
+/**
+ * What a signed-in user may do with a document: admin, workspace member, folder
+ * share or document share. Null when none apply. Share-token access is separate
+ * (see `authorizeDocRead`).
+ */
+export function getUserDocAccess(
+  doc: Pick<Document, "id" | "workspace_id" | "folder_id">,
+  user: { id: string; is_admin: boolean },
+): DocAccess | null {
+  return resolveDocAccess(db, doc, user);
+}
 
 function parseCookies(header: string): Record<string, string> {
   return Object.fromEntries(
@@ -46,14 +63,7 @@ export function toggleStarWithAccess(
   docId: string,
 ): boolean {
   const doc = getDocument(docId);
-  if (!doc) throw new Response("Not found", { status: 404 });
-
-  const canSee =
-    !!getMembership(doc.workspace_id, user.id, user.is_admin) ||
-    (!!doc.folder_id && hasSharedAccess(doc.folder_id, user.id)) ||
-    hasDocSharedAccess(doc.id, user.id);
-  if (!canSee) throw new Response("Not found", { status: 404 });
-
+  if (!doc || !getUserDocAccess(doc, { id: user.id, is_admin: !!user.is_admin })) throw new Response("Not found", { status: 404 });
   return toggleStar(user.id, docId);
 }
 
@@ -61,20 +71,16 @@ export function toggleStarWithAccess(
  * Return the document if the caller may read it, else throw a 404 (not a 403 —
  * an unauthorised caller should not learn that the id exists).
  *
- * Access is granted to a workspace member, a folder-share recipient, or a
- * caller presenting a valid share token for *this* document. A token that
- * resolves to a different document is not access to this one.
+ * Access is granted to a workspace member, a folder-share or document-share
+ * recipient, or a caller presenting a valid share token for *this* document. A
+ * token that resolves to a different document is not access to this one.
  */
 export function authorizeDocRead(request: Request, id: string | undefined): Document {
   const doc = getDocument(id!);
   if (!doc) throw new Response("Not found", { status: 404 });
 
   const user = getSessionUser(request);
-  if (user) {
-    const role = getMembership(doc.workspace_id, user.id, user.is_admin);
-    const shared = doc.folder_id ? hasSharedAccess(doc.folder_id, user.id) : false;
-    if (role || shared) return doc;
-  }
+  if (user && getUserDocAccess(doc, user)) return doc;
 
   const token = new URL(request.url).searchParams.get("token")?.trim();
   if (token) {
@@ -82,10 +88,28 @@ export function authorizeDocRead(request: Request, id: string | undefined): Docu
     if (viaToken && viaToken.document.id === doc.id) {
       const passwordOk =
         !viaToken.hasPassword ||
-        parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`] === "1";
+        verifySharePasswordCookie(
+          db,
+          token,
+          viaToken.document.share_password_hash ?? "",
+          parseCookies(request.headers.get("Cookie") ?? "")[`__share_pwd_${token}`]
+        );
       if (passwordOk) return doc;
     }
   }
 
   throw new Response("Not found", { status: 404 });
+}
+
+/**
+ * Whether a user may see this document at all: workspace membership, a
+ * folder-level share, or a direct doc-level share. Used to gate who a
+ * @mention notification may be sent to — mentioning an arbitrary user id
+ * should never leak the doc's title/content to someone's inbox.
+ */
+export function userHasDocAccess(doc: Document, userId: string, isAdmin?: boolean): boolean {
+  const role = getMembership(doc.workspace_id, userId, isAdmin);
+  const folderShared = doc.folder_id ? hasSharedAccess(doc.folder_id, userId) : false;
+  const docShared = hasDocSharedAccess(doc.id, userId);
+  return hasDocAccess({ role, folderShared, docShared });
 }

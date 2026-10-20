@@ -44,6 +44,7 @@ export function RecentView({
           <h1 className="section-header">Recent</h1>
           {canEdit && (
             <NewButton
+              creating={createFetcher.state !== "idle"}
               onCreateDoc={() => {
                 armUndoCreate("doc", typeof window !== "undefined" ? window.location.pathname : "/");
                 createFetcher.submit({ intent: "create" }, { method: "post" });
