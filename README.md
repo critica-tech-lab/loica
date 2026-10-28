@@ -26,7 +26,7 @@ Loica runs on [React Router 8](https://reactrouter.com/) with a [ProseMirror](ht
 
 ## Quick start (development)
 
-You'll need [Bun](https://bun.sh/) (≥ 1.0) and [Node.js](https://nodejs.org/) (≥ 24).
+You'll need [Bun](https://bun.sh/) (≥ 1.0) and [Node.js](https://nodejs.org/) (≥ 26.12.1).
 
 ```sh
 git clone https://github.com/critica-tech-lab/loica.git

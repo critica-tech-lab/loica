@@ -9,8 +9,6 @@ interface UserAutocompleteProps {
   className?: string;
   style?: React.CSSProperties;
   required?: boolean;
-  /** Extra query params appended to the search URL (e.g. { groupId: "..." }) */
-  extraParams?: Record<string, string>;
   /** Called when the user selects a result — receives the email */
   onSelect?: (user: UserResult) => void;
 }
@@ -21,7 +19,6 @@ export function UserAutocomplete({
   className,
   style,
   required,
-  extraParams,
   onSelect,
 }: UserAutocompleteProps) {
   const [query, setQuery] = useState("");
@@ -45,7 +42,7 @@ export function UserAutocomplete({
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const params = new URLSearchParams({ q: query, ...extraParams });
+      const params = new URLSearchParams({ q: query });
       fetch(`/api/user-search?${params}`, {
         signal: controller.signal,
       })

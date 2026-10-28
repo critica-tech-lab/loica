@@ -53,7 +53,6 @@ for (const mod of Object.values(discoveredModules)) {
 // Warn (don't crash) when an extension targets an outdated API version.
 for (const e of extensions) {
   if (e.apiVersion !== undefined && e.apiVersion !== LOICA_EXTENSION_API_VERSION) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[loica extensions] Extension "${e.id}" targets API v${e.apiVersion}, current is v${LOICA_EXTENSION_API_VERSION}. Update it before bumping further.`,
     );

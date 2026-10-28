@@ -14,7 +14,7 @@
 # Shared by the two install stages. Built on the runtime's own base so the
 # native modules (better-sqlite3, @node-rs/argon2, sharp) are compiled and
 # linked against the exact glibc and node ABI they will run on.
-FROM node:24-bookworm-slim AS toolchain
+FROM node:26.12.1-bookworm-slim AS toolchain
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl unzip python3 build-essential \
@@ -56,7 +56,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production --omit=peer
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-FROM node:24-bookworm-slim
+FROM node:26.12.1-bookworm-slim
 
 # tini reaps zombies and forwards SIGTERM, which the WS server needs: on that
 # signal it flushes every open Yjs document to SQLite before exiting. Without
