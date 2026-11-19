@@ -8,7 +8,7 @@ import {
   setViewShare,
   setEditShare,
   updateShareSettings,
-  createDocumentVersion,
+  saveManualVersion,
   restoreDocumentVersion,
   isStarred as checkStarred,
   toggleStar,
@@ -145,7 +145,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "save-version") {
-    createDocumentVersion(params.id, user.id, false);
+    await saveManualVersion(params.id, user.id);
     return { savedVersion: true };
   }
 
@@ -153,7 +153,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const versionId = form.get("versionId");
     if (!versionId) throw new Response("Missing versionId", { status: 400 });
     const result = await restoreDocumentVersion(params.id, String(versionId), user.id);
-    if (!result) throw new Response("Version not found", { status: 404 });
+    if (result.status === "not-found") throw new Response("Version not found", { status: 404 });
+    if (result.status === "no-snapshot") return { restoreError: "no-snapshot" };
     const updated = getDocument(params.id);
     return {
       restored: true,

@@ -44,6 +44,21 @@ export async function notifyDocUnavailable(docId: string, reason: string): Promi
   await callAdmin(`/notify/${encodeURIComponent(docId)}?reason=${encodeURIComponent(reason)}`);
 }
 
+/**
+ * Persist a live room to the database. No ws-server (or no room) means there
+ * is nothing live to lose, so that case resolves quietly. A ws-server that
+ * answers but fails to save throws: the caller must not snapshot a stale row.
+ */
+export async function flushRoom(docId: string): Promise<void> {
+  const res = await callAdmin(`/flush/${encodeURIComponent(docId)}`);
+  if (res && !res.ok) throw new Error(`ws-server could not flush room ${docId} (${res.status})`);
+}
+
+/** Drop a room so its clients reconnect to the stored state (after a restore). */
+export async function resetRoom(docId: string): Promise<void> {
+  await callAdmin(`/reset/${encodeURIComponent(docId)}`);
+}
+
 /** Is a Yjs room currently open for this document? */
 export async function isRoomLive(docId: string): Promise<boolean> {
   const res = await callAdmin(`/room/${encodeURIComponent(docId)}`, "GET");

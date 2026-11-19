@@ -3,7 +3,7 @@ import { EditorState, Selection } from "prosemirror-state";
 import { StepMap } from "prosemirror-transform";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap } from "prosemirror-commands";
-import { undo, redo } from "y-prosemirror";
+import { undoSafely, redoSafely } from "./safe-undo.ts";
 
 // Inline footnote NodeView (adapted from the canonical ProseMirror footnote
 // example). The footnote's body lives as inline content inside the atom node,
@@ -49,9 +49,9 @@ export class FootnoteView {
           keymap({
             // y-prosemirror undo/redo drive the shared yUndoManager via the
             // outer state alone — no dispatch arg.
-            "Mod-z": () => undo(this.outerView.state),
-            "Mod-y": () => redo(this.outerView.state),
-            "Mod-Shift-z": () => redo(this.outerView.state),
+            "Mod-z": () => this.stepFromNote(undoSafely),
+            "Mod-y": () => this.stepFromNote(redoSafely),
+            "Mod-Shift-z": () => this.stepFromNote(redoSafely),
             // Enter commits the note and returns to the main editor (instead of
             // inserting a hard break, which inline-only footnote content can't
             // hold anyway). Shift-Enter still does the baseKeymap default.
@@ -87,6 +87,15 @@ export class FootnoteView {
       e.stopPropagation();
       this.removeFootnote();
     });
+  }
+
+  // Undo/redo moves the outer selection off the footnote, which closes this
+  // popup and destroys the focused inner editor. Without a refocus the next
+  // Mod-Z goes to <body> and does nothing.
+  private stepFromNote(step: (view: EditorView) => boolean): boolean {
+    const changed = step(this.outerView);
+    this.outerView.focus();
+    return changed;
   }
 
   close() {

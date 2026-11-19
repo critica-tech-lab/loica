@@ -142,6 +142,11 @@ export function loadDocumentState(
       if (!isSpreadsheetContent(row.content)) {
         seedPmFragmentFromMarkdown(doc, row.content);
       }
+    } else {
+      // Blank document. ProseMirror always shows one empty paragraph; without
+      // it in Yjs too, the first typing creates it as an undoable edit and
+      // undoing that edit breaks redo (see the loadDocumentState tests).
+      doc.getXmlFragment("prosemirror").insert(0, [new Y.XmlElement("paragraph")]);
     }
   }
 

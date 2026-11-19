@@ -14,6 +14,7 @@ import {
   deleteTable,
 } from "prosemirror-tables";
 import { TableHandles } from "./editor/TableHandles";
+import { trackCommentsInUndo } from "./editor/safe-undo";
 
 // Keep in sync with WS_CLOSE_DOCUMENT_RESTORED in ws/types.ts — the server
 // closes every connection in a room with this code after a version restore
@@ -263,7 +264,7 @@ export function ProseMirrorEditor({
 
       const [Y, { WebsocketProvider }, {
         ySyncPlugin, yCursorPlugin, yUndoPlugin,
-        ySyncPluginKey,
+        ySyncPluginKey, yUndoPluginKey,
         absolutePositionToRelativePosition,
         relativePositionToAbsolutePosition,
       }, { IndexeddbPersistence }] = yjsMods as any[];
@@ -797,6 +798,10 @@ export function ProseMirrorEditor({
         },
       });
       viewRef.current = view;
+
+      // No undo plugin when read-only, so there is no history to extend.
+      const undoManager = yUndoPluginKey.getState(view.state)?.undoManager;
+      if (undoManager) trackCommentsInUndo(undoManager, commentsMap);
 
       if (autoFocus && !readOnlyRef.current) view.focus();
 

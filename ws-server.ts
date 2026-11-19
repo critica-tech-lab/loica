@@ -122,6 +122,9 @@ interface PendingUpdate {
   createdAt: number;
 }
 
+// Longest span of edits merged into one document_updates row.
+const UPDATE_LOG_MAX_WINDOW_S = 30;
+
 // Per-room pending updates: key = `${docId}:${userId}`, value = merged update
 const pendingUpdates = new Map<string, PendingUpdate>();
 const updateFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -198,6 +201,15 @@ function getOrCreateRoom(docId: string): Room {
     const userName = room.wsUserNameMap.get(ws) ?? null;
     const key = `${docId}:${userId}`;
     const now = Math.floor(Date.now() / 1000);
+
+    // The merge below only closes after 1s of idle, so continuous typing would
+    // become one row stamped with its start. Cut it so history keeps real time.
+    const open = pendingUpdates.get(key);
+    if (open && now - open.createdAt >= UPDATE_LOG_MAX_WINDOW_S) {
+      clearTimeout(updateFlushTimers.get(key));
+      flushPendingUpdate(key);
+    }
+
     const existing = pendingUpdates.get(key);
     let merged: Uint8Array;
     try {
@@ -678,6 +690,31 @@ const adminServer = http.createServer((req, res) => {
   }
 
   const { pathname } = new URL(req.url ?? "/", "http://localhost");
+
+  // POST /flush/:docId — persist a live room now. A restore or manual version
+  // snapshots the DB row, which lags the room by up to SAVE_MAX_WAIT_MS.
+  const flushMatch = pathname.match(/^\/flush\/(.+)$/);
+  if (req.method === "POST" && flushMatch) {
+    const docId = flushMatch[1];
+    const room = rooms.get(docId);
+    try {
+      if (room) {
+        if (room.saveTimer) {
+          clearTimeout(room.saveTimer);
+          room.saveTimer = null;
+        }
+        room.firstPendingSaveAt = null;
+        flushRoomSave(docId, room);
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, flushed: !!room }));
+    } catch (err) {
+      console.error(`[ws-server] Failed to flush room ${docId}:`, err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false }));
+    }
+    return;
+  }
 
   // POST /reset/:docId — used after restoring a version
   const resetMatch = pathname.match(/^\/reset\/(.+)$/);

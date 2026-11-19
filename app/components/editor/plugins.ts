@@ -15,7 +15,7 @@ import {
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { tableEditing, columnResizing, goToNextCell } from "prosemirror-tables";
-import { undo, redo } from "y-prosemirror";
+import { undoCommand, redoCommand } from "./safe-undo.ts";
 import {
   inputRules,
   InputRule,
@@ -143,9 +143,9 @@ export function buildPlugins(schema: Schema, readOnly: boolean): Plugin[] {
 
   return [
     keymap({
-      "Mod-z": undo,
-      "Mod-y": redo,
-      "Mod-Shift-z": redo,
+      "Mod-z": undoCommand,
+      "Mod-y": redoCommand,
+      "Mod-Shift-z": redoCommand,
       "Mod-b": toggleMark(schema.marks.strong),
       "Mod-i": toggleMark(schema.marks.em),
       "Mod-u": toggleMark(schema.marks.underline),
