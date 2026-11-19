@@ -49,9 +49,9 @@ export class FootnoteView {
           keymap({
             // y-prosemirror undo/redo drive the shared yUndoManager via the
             // outer state alone — no dispatch arg.
-            "Mod-z": () => undoSafely(this.outerView),
-            "Mod-y": () => redoSafely(this.outerView),
-            "Mod-Shift-z": () => redoSafely(this.outerView),
+            "Mod-z": () => this.stepFromNote(undoSafely),
+            "Mod-y": () => this.stepFromNote(redoSafely),
+            "Mod-Shift-z": () => this.stepFromNote(redoSafely),
             // Enter commits the note and returns to the main editor (instead of
             // inserting a hard break, which inline-only footnote content can't
             // hold anyway). Shift-Enter still does the baseKeymap default.
@@ -87,6 +87,15 @@ export class FootnoteView {
       e.stopPropagation();
       this.removeFootnote();
     });
+  }
+
+  // Undo/redo moves the outer selection off the footnote, which closes this
+  // popup and destroys the focused inner editor. Without a refocus the next
+  // Mod-Z goes to <body> and does nothing.
+  private stepFromNote(step: (view: EditorView) => boolean): boolean {
+    const changed = step(this.outerView);
+    this.outerView.focus();
+    return changed;
   }
 
   close() {
