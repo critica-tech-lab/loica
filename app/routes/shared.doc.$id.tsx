@@ -8,7 +8,7 @@ import {
   setViewShare,
   setEditShare,
   updateShareSettings,
-  createDocumentVersion,
+  saveManualVersion,
   restoreDocumentVersion,
   isStarred as checkStarred,
   toggleStar,
@@ -145,7 +145,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "save-version") {
-    await createDocumentVersion(params.id, user.id, false);
+    await saveManualVersion(params.id, user.id);
     return { savedVersion: true };
   }
 

@@ -9,7 +9,14 @@ import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
 import { buildFtsQuery, MIN_SEARCH_QUERY_LENGTH } from "./search-query.server";
 import { flushRoom, kickAccess, notifyDocUnavailable, resetRoom } from "./ws-notify.server";
-import { restoreVersion, snapshotDocument, type RestoreOutcome } from "./version-restore.server";
+import { restoreVersion, snapshotDocument, VersionKind, type RestoreOutcome } from "./version-restore.server";
+import {
+  buildSessions,
+  extractYjsText,
+  type HistorySession,
+  type LoggedUpdate,
+  type ReplayBase,
+} from "./history-replay.server";
 
 export type Document = {
   id: string;
@@ -598,32 +605,40 @@ export async function verifySharePassword(docId: string, password: string): Prom
 
 // ─── Update sessions (Yjs update log) ────────────────────
 
-export interface UpdateSession {
-  userId: string | null;
-  userName: string | null;
-  startedAt: number;
-  endedAt: number;
-  updateCount: number;
+/** contentBefore/contentAfter are the text around the session; see diffAvailable. */
+export interface UpdateSession extends HistorySession {
   snapshotVersionId: string | null;
   prevSnapshotVersionId: string | null;
-  contentBefore: string; // doc text just before session started
-  contentAfter: string;  // doc text at end of session
 }
 
-function extractYjsText(frag: Y.XmlFragment): string {
-  const extractNode = (node: Y.XmlElement | Y.XmlText): string => {
-    if (node instanceof Y.XmlText) {
-      return (node.toDelta() as Array<{ insert?: string }>)
-        .map((d) => (typeof d.insert === "string" ? d.insert : ""))
-        .join("");
-    }
-    const parts: string[] = [];
-    node.forEach((c) => parts.push(extractNode(c as Y.XmlElement | Y.XmlText)));
-    return parts.join("");
-  };
-  const parts: string[] = [];
-  frag.forEach((child) => parts.push(extractNode(child as Y.XmlElement | Y.XmlText)));
-  return parts.filter(Boolean).join("\n");
+interface ReplayBaseRow {
+  created_at: number;
+  yjs_state: Buffer;
+}
+
+/**
+ * Where the replay of the update log must start. A restore replaces the
+ * document, so the latest restore point wins. Otherwise the log may have been
+ * pruned, so start from the newest snapshot taken before its oldest row.
+ */
+function findReplayBase(docId: string, oldestUpdateAt: number): ReplayBase | null {
+  const restorePoint = prep<ReplayBaseRow, [string, number]>(
+    `SELECT created_at, yjs_state FROM document_versions
+     WHERE document_id = ? AND auto = ? AND yjs_state IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`
+  ).get(docId, VersionKind.RestorePoint);
+
+  if (restorePoint) {
+    return { createdAt: restorePoint.created_at, state: restorePoint.yjs_state, replacesHistory: true };
+  }
+
+  const older = prep<ReplayBaseRow, [string, number]>(
+    `SELECT created_at, yjs_state FROM document_versions
+     WHERE document_id = ? AND created_at <= ? AND yjs_state IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`
+  ).get(docId, oldestUpdateAt);
+
+  return older ? { createdAt: older.created_at, state: older.yjs_state, replacesHistory: false } : null;
 }
 
 export function getDocumentHistory(docId: string): UpdateSession[] {
@@ -641,57 +656,18 @@ export function getDocumentHistory(docId: string): UpdateSession[] {
 
   if (updates.length === 0) return [];
 
-  // Group into sessions: same user, gap < 5 min
-  const SESSION_GAP = 5 * 60;
-  const sessions: UpdateSession[] = [];
-  let current: UpdateSession | null = null;
-
-  for (const u of updates) {
-    if (
-      current &&
-      current.userId === u.user_id &&
-      u.created_at - current.endedAt < SESSION_GAP
-    ) {
-      current.endedAt = u.created_at;
-      current.updateCount++;
-    } else {
-      if (current) sessions.push(current);
-      current = {
-        userId: u.user_id,
-        userName: u.user_name,
-        startedAt: u.created_at,
-        endedAt: u.created_at,
-        updateCount: 1,
-        snapshotVersionId: null,
-        prevSnapshotVersionId: null,
-        contentBefore: "",
-        contentAfter: "",
-      };
-    }
-  }
-  if (current) sessions.push(current);
-
-  // Reconstruct exact doc state at session boundaries using raw Yjs updates.
-  // Apply updates chronologically, snapshotting text before and after each session.
-  try {
-    const ydoc = new Y.Doc();
-    const frag = ydoc.getXmlFragment("prosemirror");
-    let i = 0;
-    for (const session of sessions) {
-      while (i < updates.length && updates[i].created_at < session.startedAt) {
-        Y.applyUpdate(ydoc, updates[i].yjs_update);
-        i++;
-      }
-      session.contentBefore = extractYjsText(frag);
-      while (i < updates.length && updates[i].created_at <= session.endedAt) {
-        Y.applyUpdate(ydoc, updates[i].yjs_update);
-        i++;
-      }
-      session.contentAfter = extractYjsText(frag);
-    }
-  } catch {
-    // Yjs reconstruction failed (e.g. legacy CodeMirror doc) — diff will show nothing
-  }
+  const logged: LoggedUpdate[] = updates.map((u) => ({
+    userId: u.user_id,
+    userName: u.user_name,
+    createdAt: u.created_at,
+    update: u.yjs_update,
+  }));
+  const base = findReplayBase(docId, updates[0].created_at);
+  const sessions: UpdateSession[] = buildSessions(logged, base).map((s) => ({
+    ...s,
+    snapshotVersionId: null,
+    prevSnapshotVersionId: null,
+  }));
 
   // Attach closest version snapshot at or before each session ends
   const versions = prep<{ id: string; created_at: number }, [string]>(
@@ -743,14 +719,10 @@ export type DocumentVersionSummary = Omit<DocumentVersion, "content"> & {
   content_size: number;
 };
 
-/** Snapshot a document as stored now, after persisting any live edits. */
-export async function createDocumentVersion(
-  docId: string,
-  userId: string | null,
-  auto: boolean
-): Promise<string> {
+/** A user's "save version": snapshot as stored now, after persisting live edits. */
+export async function saveManualVersion(docId: string, userId: string | null): Promise<string> {
   await flushRoom(docId);
-  return snapshotDocument(db, docId, userId, auto);
+  return snapshotDocument(db, docId, userId, VersionKind.Manual);
 }
 
 export function getDocumentVersions(docId: string): DocumentVersionSummary[] {

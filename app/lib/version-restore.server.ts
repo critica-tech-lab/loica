@@ -50,18 +50,30 @@ interface DocumentStateRow {
   yjs_state: Uint8Array | null;
 }
 
+/**
+ * Stored in document_versions.auto. Pruning only touches Auto and the version
+ * list only shows Manual, so RestorePoint rows stay out of both.
+ */
+export const VersionKind = {
+  Manual: 0,
+  Auto: 1,
+  /** The state a restore just wrote; the history replays from here. */
+  RestorePoint: 2,
+} as const;
+export type VersionKind = (typeof VersionKind)[keyof typeof VersionKind];
+
 /** Snapshot the document as it is stored now, Yjs state included. */
 export function snapshotDocument(
   db: VersionDb,
   docId: string,
   userId: string | null,
-  auto: boolean,
+  kind: VersionKind,
 ): string {
   const id = nanoid(16);
   db.prepare(
     `INSERT INTO document_versions (id, document_id, title, content, yjs_state, created_by, auto)
      SELECT ?, id, title, content, yjs_state, ?, ? FROM documents WHERE id = ?`,
-  ).run(id, userId, auto ? 1 : 0, docId);
+  ).run(id, userId, kind, docId);
   return id;
 }
 
@@ -116,7 +128,7 @@ export async function restoreVersion(
   // debounced save. Without this they miss the backup and the reset drops them.
   await room.flush(docId);
 
-  const backupVersionId = snapshotDocument(db, docId, userId, true);
+  const backupVersionId = snapshotDocument(db, docId, userId, VersionKind.Auto);
 
   const current = db
     .prepare("SELECT yjs_state FROM documents WHERE id = ?")
@@ -126,6 +138,10 @@ export async function restoreVersion(
   db.prepare(
     "UPDATE documents SET title = ?, content = ?, yjs_state = ?, updated_at = unixepoch() WHERE id = ?",
   ).run(version.title, version.content, Buffer.from(state), docId);
+
+  // The update log describes the document that was just replaced. This marks
+  // where the new one begins so the history stops replaying across the swap.
+  snapshotDocument(db, docId, userId, VersionKind.RestorePoint);
 
   await room.reset(docId);
 

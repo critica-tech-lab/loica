@@ -86,6 +86,11 @@ export function VersionPanel({
       if (!selectedVersion) setHistoryPreview(null);
       return;
     }
+    // A diff we could not rebuild would render as an empty document.
+    if (!selectedSession.diffAvailable) {
+      setHistoryPreview(null);
+      return;
+    }
     setHistoryPreview({
       content: selectedSession.contentAfter,
       title: "",
@@ -209,8 +214,11 @@ export function VersionPanel({
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
-                  {isSelected && (
+                  {isSelected && session.diffAvailable && (
                     <span style={{ fontSize: "var(--fs-2xs)", opacity: 0.55, color: "var(--accent)" }}>preview ↗</span>
+                  )}
+                  {!session.diffAvailable && (
+                    <span style={{ fontSize: "var(--fs-2xs)", opacity: 0.55 }}>diff unavailable</span>
                   )}
                   <span style={{ fontSize: "var(--fs-xs)", opacity: 0.45 }}>
                     {session.updateCount} edit{session.updateCount !== 1 ? "s" : ""}

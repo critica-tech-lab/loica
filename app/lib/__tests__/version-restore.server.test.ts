@@ -4,6 +4,7 @@ import * as Y from "yjs";
 import {
   restoreVersion,
   snapshotDocument,
+  VersionKind,
   type RoomControl,
 } from "~/lib/version-restore.server";
 
@@ -109,12 +110,12 @@ describe("snapshotDocument", () => {
   test("copies the Yjs state, so a manual version is restorable", () => {
     setDoc("T", "A", state(["A"]));
 
-    const id = snapshotDocument(db, DOC, USER, false);
+    const id = snapshotDocument(db, DOC, USER, VersionKind.Manual);
 
     const row = versionRow(id)!;
     expect(row.yjs_state).not.toBeNull();
     expect(paragraphsOf(row.yjs_state!)).toEqual(["A"]);
-    expect(row.auto).toBe(0);
+    expect(row.auto).toBe(VersionKind.Manual);
   });
 });
 
@@ -193,6 +194,29 @@ describe("restoreVersion", () => {
     expect(calls).toEqual([]);
     const count = db.prepare("SELECT count(*) AS n FROM document_versions").get() as { n: number };
     expect(count.n).toBe(1);
+  });
+
+  test("marks the restore in the history with a restore point of the new state", async () => {
+    setDoc("Now", "A\n\nB", state(["A", "B"]));
+    addVersion("v1", "A", state(["A"]));
+
+    await restoreVersion(db, room(), DOC, "v1", USER);
+
+    const points = db
+      .prepare("SELECT yjs_state FROM document_versions WHERE auto = ?")
+      .all(VersionKind.RestorePoint) as { yjs_state: Uint8Array }[];
+    expect(points).toHaveLength(1);
+    expect(paragraphsOf(points[0].yjs_state)).toEqual(["A"]);
+  });
+
+  test("the backup is an ordinary auto version, not a restore point", async () => {
+    setDoc("Now", "A", state(["A"]));
+    addVersion("v1", "A", state(["A"]));
+
+    const out = await restoreVersion(db, room(), DOC, "v1", USER);
+    if (out.status !== "restored") throw new Error("expected restored");
+
+    expect(versionRow(out.backupVersionId)!.auto).toBe(VersionKind.Auto);
   });
 
   test("reports an unknown version", async () => {
