@@ -454,6 +454,10 @@ export function DocumentProvider({ children, ...props }: DocumentProps & { child
   const toastedBackupId = useRef<string | null>(null);
   useEffect(() => {
     const d = historyFetcher.data as Record<string, unknown> | undefined;
+    if (d?.restoreError === "no-snapshot") {
+      toast("This older version cannot be restored: it has no editor snapshot.", { type: "error" });
+      return;
+    }
     if (!d?.restored) return;
     setTitle(d.title as string);
     setContent(d.content as string);

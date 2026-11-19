@@ -679,6 +679,31 @@ const adminServer = http.createServer((req, res) => {
 
   const { pathname } = new URL(req.url ?? "/", "http://localhost");
 
+  // POST /flush/:docId — persist a live room now. A restore or manual version
+  // snapshots the DB row, which lags the room by up to SAVE_MAX_WAIT_MS.
+  const flushMatch = pathname.match(/^\/flush\/(.+)$/);
+  if (req.method === "POST" && flushMatch) {
+    const docId = flushMatch[1];
+    const room = rooms.get(docId);
+    try {
+      if (room) {
+        if (room.saveTimer) {
+          clearTimeout(room.saveTimer);
+          room.saveTimer = null;
+        }
+        room.firstPendingSaveAt = null;
+        flushRoomSave(docId, room);
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, flushed: !!room }));
+    } catch (err) {
+      console.error(`[ws-server] Failed to flush room ${docId}:`, err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false }));
+    }
+    return;
+  }
+
   // POST /reset/:docId — used after restoring a version
   const resetMatch = pathname.match(/^\/reset\/(.+)$/);
   if (req.method === "POST" && resetMatch) {

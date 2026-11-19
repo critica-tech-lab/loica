@@ -8,7 +8,8 @@ import { assertDocSize } from "./doc-limits.server";
 import { getDocumentType } from "./templates";
 import { uploadsDir } from "./paths.server";
 import { buildFtsQuery, MIN_SEARCH_QUERY_LENGTH } from "./search-query.server";
-import { kickAccess, notifyDocUnavailable } from "./ws-notify.server";
+import { flushRoom, kickAccess, notifyDocUnavailable, resetRoom } from "./ws-notify.server";
+import { restoreVersion, snapshotDocument, type RestoreOutcome } from "./version-restore.server";
 
 export type Document = {
   id: string;
@@ -742,18 +743,14 @@ export type DocumentVersionSummary = Omit<DocumentVersion, "content"> & {
   content_size: number;
 };
 
-export function createDocumentVersion(
+/** Snapshot a document as stored now, after persisting any live edits. */
+export async function createDocumentVersion(
   docId: string,
   userId: string | null,
-  auto: boolean,
-  yjsState?: Buffer | null
-): string {
-  const id = nanoid(16);
-  db.prepare(
-    `INSERT INTO document_versions (id, document_id, title, content, yjs_state, created_by, auto)
-     SELECT ?, id, title, content, ?, ?, ? FROM documents WHERE id = ?`
-  ).run(id, yjsState ?? null, userId, auto ? 1 : 0, docId);
-  return id;
+  auto: boolean
+): Promise<string> {
+  await flushRoom(docId);
+  return snapshotDocument(db, docId, userId, auto);
 }
 
 export function getDocumentVersions(docId: string): DocumentVersionSummary[] {
@@ -800,48 +797,16 @@ export function getDocumentVersion(versionId: string): DocumentVersion | null {
 }
 
 /**
- * Restore a past version over the current document.
- *
- * Snapshots the *current* content into a new auto-version first, so the
- * restore is reversible — the returned `backupVersionId` can be fed back
- * into this function to undo the restore. Returns `null` if the target
- * version does not exist.
+ * Restore a past version over the current document. Reversible: the outcome
+ * carries a `backupVersionId` of the state just replaced. See
+ * version-restore.server.ts for the flow.
  */
-export async function restoreDocumentVersion(
+export function restoreDocumentVersion(
   docId: string,
   versionId: string,
   userId: string | null,
-): Promise<{ backupVersionId: string } | null> {
-  const version = prep<{ title: string; content: string; yjs_state: Buffer | null }, [string, string]>(
-      "SELECT title, content, yjs_state FROM document_versions WHERE id = ? AND document_id = ?"
-    )
-    .get(versionId, docId);
-
-  if (!version) return null;
-
-  // Auto-version of the current content BEFORE we overwrite it — that's the
-  // undo target. Always flagged `auto = true` so it doesn't clutter the
-  // manual-versions view.
-  const backupVersionId = createDocumentVersion(docId, userId, true);
-
-  // COALESCE keeps the existing yjs_state when the version is legacy (no yjs_state).
-  // Setting it to NULL would make the WS server reinit as blank for PM docs.
-  db.prepare(
-    `UPDATE documents SET title = ?, content = ?, yjs_state = COALESCE(?, yjs_state), updated_at = unixepoch() WHERE id = ?`
-  ).run(version.title, version.content, version.yjs_state ?? null, docId);
-
-  // Notify ws-server to reset the room — await so the room is destroyed
-  // before the client reloads and reconnects. Uses the loopback-only admin
-  // port (see ws-server.ts), not the public WS_PORT.
-  const wsPort = Number(process.env.WS_PORT ?? 4001);
-  const wsAdminPort = process.env.WS_ADMIN_PORT ?? String(wsPort + 1);
-  try {
-    await fetch(`http://127.0.0.1:${wsAdminPort}/reset/${docId}`, { method: "POST", signal: AbortSignal.timeout(5000) });
-  } catch {
-    // ws-server may not be running; restore still succeeded in DB
-  }
-
-  return { backupVersionId };
+): Promise<RestoreOutcome> {
+  return restoreVersion(db, { flush: flushRoom, reset: resetRoom }, docId, versionId, userId);
 }
 
 // ─── Full-text search ────────────────────────────────────
