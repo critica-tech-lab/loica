@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/root";
 import { isAbortError } from "~/lib/abort-error";
+import { SECURITY_HEADERS } from "~/lib/security-headers";
 import { getSessionUser } from "~/lib/auth.server";
 import { getPendingSharesForUser } from "~/lib/sharing.server";
 import { getPendingDocSharesForUser } from "~/lib/doc-sharing.server";
@@ -35,6 +36,7 @@ export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRe
 
 export const headers: Route.HeadersFunction = () => ({
   "Cache-Control": "no-cache, no-store, must-revalidate",
+  ...SECURITY_HEADERS,
 });
 
 export const links: Route.LinksFunction = () => [
