@@ -52,7 +52,7 @@ function load(blob: Uint8Array): Y.Doc {
 
 function paragraphsOf(blob: Uint8Array): string[] {
   const frag = load(blob).getXmlFragment("prosemirror");
-  return frag.toArray().map((p) => (p as Y.XmlElement).toString().replace(/<[^>]+>/g, ""));
+  return frag.toArray().map((p) => (p as Y.XmlElement).toString().replace(/[<>]/g, ""));
 }
 
 function commentIdsOf(blob: Uint8Array): string[] {
