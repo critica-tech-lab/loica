@@ -1,5 +1,6 @@
 import { test, expect, describe, spyOn } from "bun:test";
-import { saveIfSafe, type PersistenceStatements } from "../persistence";
+import * as Y from "yjs";
+import { getDocContent, loadDocumentState, saveIfSafe, type PersistenceStatements } from "../persistence";
 
 // A deleted document (permanentlyDeleteDocument) can still have a live room
 // debouncing saves against it — the UPDATE just matches 0 rows and silently
@@ -56,5 +57,49 @@ describe("saveIfSafe", () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+// ProseMirror always shows one (empty) paragraph, but a blank document's
+// Yjs fragment starts with none. The first typing then creates the paragraph
+// as an undoable edit, and undoing it empties Yjs again; the next transaction
+// writes a fresh empty paragraph, which the undo manager counts as a new edit
+// and so drops the redo stack. A paragraph that exists from the start is never
+// part of an undo step.
+describe("loadDocumentState", () => {
+  function loadWith(row: { content: string; yjs_state: Buffer | null } | undefined) {
+    const stmts = { loadDoc: { get: () => row } } as unknown as PersistenceStatements;
+    const db = { prepare: () => ({ all: () => [] }) } as never;
+    const doc = new Y.Doc();
+    loadDocumentState(db, stmts, doc, "doc-1");
+    return doc;
+  }
+
+  test("starts a blank document with one empty paragraph", () => {
+    const doc = loadWith({ content: "", yjs_state: null });
+
+    const fragment = doc.getXmlFragment("prosemirror");
+    expect(fragment.length).toBe(1);
+    expect(fragment.toString()).toBe("<paragraph></paragraph>");
+  });
+
+  test("leaves a stored document without a fragment alone (older documents keep their Y.Text)", () => {
+    const stored = new Y.Doc();
+    stored.getText("content").insert(0, "legacy text");
+    const state = Buffer.from(Y.encodeStateAsUpdate(stored));
+
+    const doc = loadWith({ content: "legacy text", yjs_state: state });
+
+    expect(doc.getXmlFragment("prosemirror").length).toBe(0);
+  });
+});
+
+describe("a blank document after loadDocumentState", () => {
+  test("still projects to empty markdown, so cleanup and auto-versioning see it as blank", () => {
+    const doc = new Y.Doc();
+    const stmts = { loadDoc: { get: () => ({ content: "", yjs_state: null }) } } as unknown as PersistenceStatements;
+    loadDocumentState({ prepare: () => ({ all: () => [] }) } as never, stmts, doc, "doc-1");
+
+    expect(getDocContent(doc)).toBe("");
   });
 });
