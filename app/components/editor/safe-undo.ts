@@ -17,6 +17,7 @@
 
 import { NodeSelection, Selection, type Command, type EditorState } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
+import type * as Y from "yjs";
 import { undo, redo, ySyncPluginKey } from "y-prosemirror";
 
 type YStep = (state: EditorState) => boolean;
@@ -74,6 +75,20 @@ function revealSelection(view: EditorView): void {
   const { node } = view.domAtPos(view.state.selection.head);
   const element = node instanceof Element ? node : node.parentElement;
   element?.scrollIntoView({ block: "nearest" });
+}
+
+/**
+ * Make comment changes (add, reply, edit, resolve, delete) undoable.
+ *
+ * y-prosemirror's UndoManager only covers the document fragment and only
+ * transactions it originates. Comments live in their own Y.Map and are written
+ * with plain `map.set`, which carries no origin, so both must be added. Edits
+ * from other users arrive with their own origin and stay out of this user's
+ * history.
+ */
+export function trackCommentsInUndo(undoManager: Y.UndoManager, comments: Y.Map<unknown>): void {
+  undoManager.addToScope(comments);
+  undoManager.trackedOrigins.add(null);
 }
 
 /** Undo against the shared Yjs history of `view`. */
